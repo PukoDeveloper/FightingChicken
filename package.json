@@ -1,0 +1,19 @@
+{
+  "name": "fighting-chicken",
+  "version": "1.0.0",
+  "description": "手機彈幕遊戲：小雞大戰勇氣",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@inkshot/engine": "^0.2.13",
+    "pixi.js": "^8.18.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.4.0"
+  }
+}
