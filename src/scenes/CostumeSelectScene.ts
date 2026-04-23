@@ -267,6 +267,8 @@ async function enter(core: Core): Promise<void> {
       await core.events.emit('scene/load', { key: 'levelselect' });
     }
   });
+  backBtn.on('pointerover', () => backBtn.scale.set(1.04));
+  backBtn.on('pointerout',  () => backBtn.scale.set(1.0));
 
   // ── Tick: float preview, pulse confirm button ─────────────────────────────
   let confirmScale = 1;
