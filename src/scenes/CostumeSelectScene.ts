@@ -4,6 +4,7 @@ import type { Core } from '@inkshot/engine';
 import {
   createChickenDisplay,
   createElegantChickenDisplay,
+  createMooseChickenDisplay,
   createAdventureChickenDisplay,
   createHeroChickenDisplay,
   createBossChickenDisplay,
@@ -20,6 +21,7 @@ let _cleanup: (() => void) | null = null;
 function buildPreview(id: CostumeId): Container {
   switch (id) {
     case 'elegant':   return createElegantChickenDisplay();
+    case 'moose':     return createMooseChickenDisplay();
     case 'adventure': return createAdventureChickenDisplay();
     case 'hero':      return createHeroChickenDisplay();
     case 'boss':      return createBossChickenDisplay();

@@ -675,6 +675,76 @@ export function createBossChickenDisplay(): Container {
   return c;
 }
 
+// ─── Moose Chicken (麋鹿小雞) ─────────────────────────────────────────────────
+/**
+ * A warm brown chicken sporting a pair of broad moose antlers and a kind face.
+ * Origin at centre of the body.
+ */
+export function createMooseChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.25 });
+
+  // Left wing
+  g.ellipse(-18, 6, 10, 7).fill(0x8b5e3c);
+
+  // Body (warm brown)
+  g.circle(0, 0, 22).fill(0xa0632a);
+
+  // Belly patch (lighter tan)
+  g.ellipse(4, 6, 11, 9).fill(0xc8945a);
+
+  // ── Antlers ──────────────────────────────────────────────────────────────
+  // Left antler main beam
+  g.moveTo(-6, -20).lineTo(-14, -44).lineTo(-10, -44).lineTo(-4, -22).closePath().fill(0x6b3a1f);
+  // Left antler brow tine
+  g.moveTo(-11, -34).lineTo(-20, -38).lineTo(-19, -35).lineTo(-10, -31).closePath().fill(0x6b3a1f);
+  // Left antler bez tine
+  g.moveTo(-13, -40).lineTo(-22, -46).lineTo(-21, -43).lineTo(-12, -37).closePath().fill(0x6b3a1f);
+
+  // Right antler main beam
+  g.moveTo(4, -20).lineTo(12, -44).lineTo(16, -44).lineTo(8, -22).closePath().fill(0x6b3a1f);
+  // Right antler brow tine
+  g.moveTo(9, -34).lineTo(18, -38).lineTo(17, -35).lineTo(8, -31).closePath().fill(0x6b3a1f);
+  // Right antler bez tine
+  g.moveTo(11, -40).lineTo(20, -46).lineTo(19, -43).lineTo(10, -37).closePath().fill(0x6b3a1f);
+
+  // Comb (small red tuft between antler bases)
+  g.moveTo(-4, -20).lineTo(0, -26).lineTo(4, -20).closePath().fill(0xff3333);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0x8b5e3c);
+
+  // Beak
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xff8800);
+
+  // Snout/muzzle (moose-style large muzzle, slightly protruding)
+  g.ellipse(14, 2, 9, 7).fill(0xb87040);
+
+  // Eye white
+  g.circle(11, -7, 6).fill(0xffffff);
+  // Pupil (warm dark brown)
+  g.circle(12, -6, 3).fill(0x2a1200);
+  // Eye glint
+  g.circle(14, -8, 1.2).fill(0xffffff);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xff8800);
+  g.rect(-14, 31, 11, 3).fill(0xff8800);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xff8800);
+  g.rect(3, 31, 11, 3).fill(0xff8800);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Player chicken factory ───────────────────────────────────────────────────
 /**
  * Returns the correct player chicken Container for the given costume ID.
@@ -683,6 +753,7 @@ export function createBossChickenDisplay(): Container {
 export function createPlayerChicken(costume: CostumeId): Container {
   switch (costume) {
     case 'elegant':   return createElegantChickenDisplay();
+    case 'moose':     return createMooseChickenDisplay();
     case 'adventure': return createAdventureChickenDisplay();
     case 'hero':      return createHeroChickenDisplay();
     case 'boss':      return createBossChickenDisplay();
