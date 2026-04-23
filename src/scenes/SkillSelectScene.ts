@@ -144,6 +144,22 @@ async function enter(core: Core): Promise<void> {
     shortDescText.y = -cardH / 2 + 52;
     card.addChild(shortDescText);
 
+    // Skill effect description
+    const effectStyle = new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 12,
+      fill: isSelected ? 0xffffff : 0xccddff,
+      fontWeight: 'bold',
+      align: 'center',
+      wordWrap: true,
+      wordWrapWidth: cardW - 12,
+    });
+    const effectText = new Text({ text: skill.effect, style: effectStyle });
+    effectText.anchor.set(0.5);
+    effectText.x = 0;
+    effectText.y = -cardH / 2 + 74;
+    card.addChild(effectText);
+
     // Selection indicator
     if (isSelected) {
       const checkStyle = new TextStyle({
