@@ -212,15 +212,15 @@ function _bgmTick(): void {
   const noteIdx = BGM_PATTERN[_bgmStep % BGM_PATTERN.length];
   if (noteIdx >= 0) {
     // Lead arpeggio
-    tone(BGM_SCALE[noteIdx], null, (BGM_STEP_MS * 0.65) / 1000, 0.055, 'square');
+    tone(BGM_SCALE[noteIdx], null, (BGM_STEP_MS * 0.65) / 1000, 0.18, 'square');
     // Bass on every 8 steps (beat 1 and 3 of each bar)
     if (_bgmStep % 8 === 0) {
-      tone(BGM_SCALE[0] / 2, null, (BGM_STEP_MS * 1.8) / 1000, 0.075, 'sawtooth');
+      tone(BGM_SCALE[0] / 2, null, (BGM_STEP_MS * 1.8) / 1000, 0.22, 'sawtooth');
     }
     // Off-beat chord accent on steps 4 and 12 of each bar
     if (_bgmStep % 16 === 4 || _bgmStep % 16 === 12) {
-      tone(BGM_SCALE[2], null, (BGM_STEP_MS * 0.5) / 1000, 0.030, 'square');
-      tone(BGM_SCALE[4], null, (BGM_STEP_MS * 0.5) / 1000, 0.025, 'sine');
+      tone(BGM_SCALE[2], null, (BGM_STEP_MS * 0.5) / 1000, 0.10, 'square');
+      tone(BGM_SCALE[4], null, (BGM_STEP_MS * 0.5) / 1000, 0.08, 'sine');
     }
   }
 

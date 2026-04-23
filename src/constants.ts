@@ -95,3 +95,6 @@ export const COL_BULLET_P3   = 0xcc44ff; // phase 3 – purple
 export const COL_BULLET_RING = 0x44ccff; // ring burst – cyan
 export const COL_SHOCKWAVE   = 0xffee00; // shockwave ring – yellow
 export const COL_BUBBLE      = 0x44ddff; // trap bubble – cyan
+export const COL_BULLET_BOMB  = 0xff7700; // exploding bomb projectile – orange
+export const COL_BULLET_LASER = 0x00ffff; // top-screen laser column – bright cyan
+export const COL_BULLET_CURVE = 0xff44cc; // homing/curving bullet – pink

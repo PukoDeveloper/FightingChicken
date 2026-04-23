@@ -42,6 +42,8 @@ import {
   TRAP_DURATION_MS,
   TRAP_SLOW_FACTOR,
   COL_BUBBLE,
+  COL_BULLET_BOMB,
+  COL_BULLET_LASER,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
@@ -126,6 +128,29 @@ interface BubbleData {
   y: number;
   vx: number; // px/s
   vy: number; // px/s
+}
+
+// ─── Bomb (exploding projectile) data ────────────────────────────────────────
+interface BombData {
+  display: Graphics;
+  x: number;
+  y: number;
+  vx: number;           // px/s
+  vy: number;           // px/s
+  fuseMs: number;       // ms until explosion
+  ringCount: number;    // bullets spawned in explosion ring
+  ringSpeed: number;    // px/s speed of explosion ring bullets
+  ringColor: number;
+}
+
+// ─── Curving bullet data ──────────────────────────────────────────────────────
+interface CurveBulletData {
+  display: Graphics;
+  x: number;
+  y: number;
+  angle: number;       // current direction (radians)
+  speed: number;       // constant magnitude (px/s)
+  turnRate: number;    // radians/s toward player
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -225,6 +250,8 @@ async function enter(core: Core): Promise<void> {
   const enemyBullets: BulletData[] = [];
   const shockwaves: ShockwaveData[] = [];
   const bubbles: BubbleData[] = [];
+  const bombs: BombData[] = [];
+  const curveBullets: CurveBulletData[] = [];
 
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
@@ -328,6 +355,9 @@ async function enter(core: Core): Promise<void> {
   let ringTimer = 0;
   let shockwaveTimer = 0;
   let bubbleTimer = 0;
+  let bombTimer = 0;
+  let laserTimer = 0;
+  let curveTimer = 0;
   let spiralAngle = 0;
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
@@ -629,6 +659,22 @@ async function enter(core: Core): Promise<void> {
         enemyBulletPool.release(enemyBullets[i].display);
       }
       enemyBullets.length = 0;
+      // Clear bombs
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        enemyBulletsContainer.removeChild(bombs[i].display);
+        bombs[i].display.destroy();
+      }
+      bombs.length = 0;
+      // Clear curving bullets
+      for (let i = curveBullets.length - 1; i >= 0; i--) {
+        enemyBulletsContainer.removeChild(curveBullets[i].display);
+        enemyBulletPool.release(curveBullets[i].display);
+      }
+      curveBullets.length = 0;
+      // Reset new attack timers so the first volley fires at their configured interval
+      bombTimer = 0;
+      laserTimer = 0;
+      curveTimer = 0;
     }
   }
 
@@ -659,17 +705,20 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
-  /** Ring: fires n bullets in a full circle */
-  function fireRing(n: number, speed: number, color: number): void {
-    const ex = enemyEntity.position.x;
-    const ey = enemyEntity.position.y;
+  /** Ring: fires n bullets in a full circle from the given position. */
+  function fireRingAt(ox: number, oy: number, n: number, speed: number, color: number): void {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
-      spawnEnemyBullet(ex, ey, Math.cos(a) * speed, Math.sin(a) * speed, color);
+      spawnEnemyBullet(ox, oy, Math.cos(a) * speed, Math.sin(a) * speed, color);
     }
   }
 
-  /** Shockwave: spawns an expanding ring centred on the enemy's current position. */
+  /** Ring: fires n bullets in a full circle centered on the enemy. */
+  function fireRing(n: number, speed: number, color: number): void {
+    fireRingAt(enemyEntity.position.x, enemyEntity.position.y, n, speed, color);
+  }
+
+  /** Shockwave: spawns an expanding ring centered on the enemy's current position. */
   function fireShockwave(speed: number, color: number): void {
     const ex = enemyEntity.position.x;
     const ey = enemyEntity.position.y;
@@ -705,6 +754,88 @@ async function enter(core: Core): Promise<void> {
       display.y = ey;
       bubblesContainer.addChild(display);
       bubbles.push({ display, x: ex, y: ey, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed });
+    }
+  }
+
+  // ── Attack-specific constants ────────────────────────────────────────────────
+  const BOMB_SPEED = 85;                   // px/s, slow tracking projectile
+  const BOMB_PULSE_PERIOD_MS = 120;        // controls pulse frequency as fuse counts down
+  const LASER_MARGIN = 50;                 // px from screen edge for random laser column position
+  const LASER_COL_SPREAD = 14;             // px horizontal jitter within a laser column
+  const LASER_COL_SPACING = 9;            // px vertical spacing between bullets in a column
+  const LASER_DOUBLE_THRESHOLD = 6;       // min bullet count that triggers a second column
+
+  /** Bomb: slow projectile aimed at the player; explodes into a ring after fuseMs. */
+  function fireBomb(
+    count: number, fuseMs: number,
+    ringCount: number, ringSpeed: number, color: number
+  ): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const px = playerEntity.position.x;
+    const py = playerEntity.position.y;
+    const baseAngle = Math.atan2(py - ey, px - ex);
+    const half = (count - 1) / 2;
+    for (let i = 0; i < count; i++) {
+      const a = count > 1 ? baseAngle + (i - half) * 0.35 : baseAngle;
+      const display = new Graphics();
+      // Outer glow + core
+      display.circle(0, 0, 14).fill({ color, alpha: 0.25 });
+      display.circle(0, 0, 10).fill(color);
+      display.circle(0, 0, 5).fill({ color: 0xffffff, alpha: 0.55 });
+      display.x = ex;
+      display.y = ey;
+      display.visible = true;
+      enemyBulletsContainer.addChild(display);
+      bombs.push({
+        display, x: ex, y: ey,
+        vx: Math.cos(a) * BOMB_SPEED,
+        vy: Math.sin(a) * BOMB_SPEED,
+        fuseMs, ringCount, ringSpeed, ringColor: color,
+      });
+    }
+  }
+
+  /** Laser: fires a dense column of bullets from a random x-position at the top
+   *  of the screen, all moving straight down at `speed`. */
+  function fireLaser(count: number, speed: number, color: number): void {
+    const laserX = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
+    for (let i = 0; i < count; i++) {
+      const x = laserX + (Math.random() - 0.5) * LASER_COL_SPREAD;
+      const y = -20 - i * LASER_COL_SPACING; // stagger upward so they form a column as they enter
+      spawnEnemyBullet(x, y, 0, speed, color);
+    }
+    // Fire a second independent column for dense laser waves
+    if (count >= LASER_DOUBLE_THRESHOLD) {
+      const laserX2 = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
+      for (let i = 0; i < Math.floor(count / 2); i++) {
+        const x = laserX2 + (Math.random() - 0.5) * LASER_COL_SPREAD;
+        const y = -20 - i * LASER_COL_SPACING;
+        spawnEnemyBullet(x, y, 0, speed, color);
+      }
+    }
+  }
+
+  /** Curve: fires bullets aimed at the player that gradually home in. */
+  function fireCurve(nWay: number, speed: number, turnRate: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const px = playerEntity.position.x;
+    const py = playerEntity.position.y;
+    const baseAngle = Math.atan2(py - ey, px - ex);
+    const half = (nWay - 1) / 2;
+    for (let i = 0; i < nWay; i++) {
+      const angle = baseAngle + (nWay > 1 ? (i - half) * 0.40 : 0);
+      const display = enemyBulletPool.acquire();
+      display.clear();
+      display.circle(0, 0, 9).fill({ color, alpha: 0.30 });
+      display.circle(0, 0, 6).fill(color);
+      display.circle(0, 0, 3).fill({ color: 0xffffff, alpha: 0.55 });
+      display.x = ex;
+      display.y = ey;
+      display.visible = true;
+      enemyBulletsContainer.addChild(display);
+      curveBullets.push({ display, x: ex, y: ey, angle, speed, turnRate });
     }
   }
 
@@ -942,6 +1073,30 @@ async function enter(core: Core): Promise<void> {
           if (bubbleTimer <= 0) {
             bubbleTimer = p.bubbleInterval;
             fireBubble(p.bubbleCount, p.bubbleSpeed, p.bubbleColor);
+          }
+        }
+
+        if (p.bombInterval > 0) {
+          bombTimer -= dt;
+          if (bombTimer <= 0) {
+            bombTimer = p.bombInterval;
+            fireBomb(p.bombCount, p.bombFuseMs, p.bombRingCount, p.bombRingSpeed, p.bombColor);
+          }
+        }
+
+        if (p.laserInterval > 0) {
+          laserTimer -= dt;
+          if (laserTimer <= 0) {
+            laserTimer = p.laserInterval;
+            fireLaser(p.laserCount, p.laserSpeed, p.laserColor);
+          }
+        }
+
+        if (p.curveInterval > 0) {
+          curveTimer -= dt;
+          if (curveTimer <= 0) {
+            curveTimer = p.curveInterval;
+            fireCurve(p.curveWays, p.curveSpeed, p.curveTurnRate, p.curveColor);
           }
         }
       }
@@ -1224,6 +1379,165 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Move bombs and check fuse ──────────────────────────────────────────
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        const bomb = bombs[i];
+        bomb.x += bomb.vx * (dt / 1000);
+        bomb.y += bomb.vy * (dt / 1000);
+        bomb.display.x = bomb.x;
+        bomb.display.y = bomb.y;
+        bomb.fuseMs -= dt;
+
+        // Pulse scale to signal fuse countdown
+        const pulseScale = 1 + 0.20 * Math.abs(Math.sin((bomb.fuseMs / BOMB_PULSE_PERIOD_MS) * Math.PI));
+        bomb.display.scale.set(pulseScale);
+
+        // Helper: explode this bomb
+        const explodeBomb = () => {
+          fireRingAt(bomb.x, bomb.y, bomb.ringCount, bomb.ringSpeed, bomb.ringColor);
+          core.events.emitSync('particle/emit', {
+            config: {
+              x: bomb.x, y: bomb.y,
+              burst: true, burstCount: 18, speed: 120, speedVariance: 60,
+              spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+              startScale: 1.6, endScale: 0,
+              startColor: bomb.ringColor, endColor: 0xffffff, radius: 5,
+            },
+          });
+          core.events.emitSync('camera/shake', { intensity: 6, duration: 200 });
+          enemyBulletsContainer.removeChild(bomb.display);
+          bomb.display.destroy();
+          bombs.splice(i, 1);
+        };
+
+        // Off-screen: remove without explosion
+        if (bomb.x < -40 || bomb.x > W + 40 || bomb.y < -40 || bomb.y > H + 40) {
+          enemyBulletsContainer.removeChild(bomb.display);
+          bomb.display.destroy();
+          bombs.splice(i, 1);
+          continue;
+        }
+
+        // Fuse expired: explode
+        if (bomb.fuseMs <= 0) {
+          explodeBomb();
+          continue;
+        }
+
+        // Collision with player: explode + deal damage
+        if (invincibleMs <= 0) {
+          const bdx = bomb.x - playerEntity.position.x;
+          const bdy = bomb.y - playerEntity.position.y;
+          if (Math.sqrt(bdx * bdx + bdy * bdy) < 14 + PLAYER_HITBOX_R) {
+            explodeBomb();
+
+            if (evasionChance > 0 && Math.random() < evasionChance) {
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: playerEntity.position.x, y: playerEntity.position.y,
+                  burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                  spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+                },
+              });
+              continue;
+            }
+
+            playerHP = Math.max(0, playerHP - bulletDamage);
+            invincibleMs = effectiveInvincibleMs;
+            playerHitThisRun = true;
+            sfxPlayerHit();
+            core.events.emitSync('camera/shake', { intensity: 10, duration: 350 });
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: COL_BULLET_BOMB, alpha: 1 });
+            flashOverlay.alpha = 0.45;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 14, speed: 140, speedVariance: 70,
+                spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+                startScale: 1.2, endScale: 0,
+                startColor: COL_BULLET_BOMB, endColor: 0xff2200, radius: 5,
+              },
+            });
+            if (playerHP <= 0) { endGame(false); return; }
+          }
+        }
+      }
+
+      // ── Move curving bullets ───────────────────────────────────────────────
+      for (let i = curveBullets.length - 1; i >= 0; i--) {
+        const cb = curveBullets[i];
+
+        // Turn toward player
+        const cpx = playerEntity.position.x;
+        const cpy = playerEntity.position.y;
+        const targetAngle = Math.atan2(cpy - cb.y, cpx - cb.x);
+        let diff = targetAngle - cb.angle;
+        while (diff > Math.PI)  diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        const maxTurn = cb.turnRate * (dt / 1000);
+        cb.angle += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
+
+        // Move
+        cb.x += Math.cos(cb.angle) * cb.speed * (dt / 1000);
+        cb.y += Math.sin(cb.angle) * cb.speed * (dt / 1000);
+        cb.display.x = cb.x;
+        cb.display.y = cb.y;
+
+        // Off-screen
+        if (cb.x < -30 || cb.x > W + 30 || cb.y < -30 || cb.y > H + 30) {
+          enemyBulletsContainer.removeChild(cb.display);
+          enemyBulletPool.release(cb.display);
+          curveBullets.splice(i, 1);
+          continue;
+        }
+
+        // Collision with player
+        if (invincibleMs <= 0) {
+          const ddx = cb.x - cpx;
+          const ddy = cb.y - cpy;
+          if (Math.sqrt(ddx * ddx + ddy * ddy) < ENEMY_BULLET_R + PLAYER_HITBOX_R) {
+            enemyBulletsContainer.removeChild(cb.display);
+            enemyBulletPool.release(cb.display);
+            curveBullets.splice(i, 1);
+
+            if (evasionChance > 0 && Math.random() < evasionChance) {
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: cpx, y: cpy,
+                  burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                  spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+                },
+              });
+              continue;
+            }
+
+            playerHP = Math.max(0, playerHP - bulletDamage);
+            invincibleMs = effectiveInvincibleMs;
+            playerHitThisRun = true;
+            sfxPlayerHit();
+            core.events.emitSync('camera/shake', { intensity: 8, duration: 300 });
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff44cc, alpha: 1 });
+            flashOverlay.alpha = 0.38;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 280);
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: cpx, y: cpy,
+                burst: true, burstCount: 12, speed: 130, speedVariance: 60,
+                spread: 180, lifetime: 450, startAlpha: 1, endAlpha: 0,
+                startScale: 1.1, endScale: 0,
+                startColor: 0xff44cc, endColor: 0xaa0088, radius: 5,
+              },
+            });
+            if (playerHP <= 0) { endGame(false); return; }
+          }
+        }
+      }
+
       // ── Move and collect items ────────────────────────────────────────────
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
@@ -1320,6 +1634,20 @@ async function enter(core: Core): Promise<void> {
     }
     bubbles.length = 0;
 
+    // Clear bombs
+    for (let i = bombs.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(bombs[i].display);
+      bombs[i].display.destroy();
+    }
+    bombs.length = 0;
+
+    // Clear curving bullets
+    for (let i = curveBullets.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(curveBullets[i].display);
+      enemyBulletPool.release(curveBullets[i].display);
+    }
+    curveBullets.length = 0;
+
     // Clear any leftover items between waves
     for (let i = items.length - 1; i >= 0; i--) {
       itemsContainer.removeChild(items[i].display);
@@ -1349,6 +1677,9 @@ async function enter(core: Core): Promise<void> {
     ringTimer = 0;
     shockwaveTimer = 0;
     bubbleTimer = 0;
+    bombTimer = 0;
+    laserTimer = 0;
+    curveTimer = 0;
     trappedMs = 0;
     trapAnimMs = 0;
     phaseFlashTimer = 0;
@@ -1522,6 +1853,20 @@ async function enter(core: Core): Promise<void> {
       bub.display.destroy();
     }
     bubbles.length = 0;
+
+    // Destroy all bombs
+    for (const bomb of bombs) {
+      enemyBulletsContainer.removeChild(bomb.display);
+      bomb.display.destroy();
+    }
+    bombs.length = 0;
+
+    // Destroy all curving bullets
+    for (const cb of curveBullets) {
+      enemyBulletsContainer.removeChild(cb.display);
+      enemyBulletPool.release(cb.display);
+    }
+    curveBullets.length = 0;
 
     // Destroy all items
     for (const item of items) {
