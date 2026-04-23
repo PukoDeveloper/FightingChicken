@@ -22,6 +22,7 @@ import {
   PLAYER_FIRE_INTERVAL,
   PLAYER_BULLET_R,
   INVINCIBLE_MS,
+  PLAYER_MOVE_SPEED,
   ENEMY_HITBOX_R,
   ENEMY_BULLET_R,
   SCORE_PER_HIT,
@@ -33,7 +34,7 @@ import {
   POWER_UP_DURATION_MS,
   POWER_FIRE_INTERVAL,
 } from '../constants';
-import { gameResult } from '../game/store';
+import { gameResult, devConfig } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 
@@ -273,7 +274,35 @@ async function enter(core: Core): Promise<void> {
   powerUpText.y = H - 38;
   uiLayer.addChild(powerUpText);
 
-  // ── Helper: spawn enemy bullet ────────────────────────────────────────────
+  // DEV button (top-right corner, below score text)
+  const devBtnW = 46, devBtnH = 22;
+  const devBtn = new Container();
+  devBtn.eventMode = 'static';
+  devBtn.cursor = 'pointer';
+  const devBtnBg = new Graphics();
+  devBtnBg.roundRect(0, 0, devBtnW, devBtnH, 5)
+    .fill({ color: 0x333333, alpha: 0.85 })
+    .stroke({ color: 0xff6644, width: 1 });
+  devBtn.addChild(devBtnBg);
+  const devBtnStyle = new TextStyle({
+    fontFamily: 'Arial, sans-serif',
+    fontSize: 12,
+    fill: 0xffaa66,
+    fontWeight: 'bold',
+  });
+  const devBtnText = new Text({ text: 'DEV', style: devBtnStyle });
+  devBtnText.anchor.set(0.5);
+  devBtnText.x = devBtnW / 2;
+  devBtnText.y = devBtnH / 2;
+  devBtn.addChild(devBtnText);
+  devBtn.x = W - devBtnW - 10;
+  devBtn.y = 36;
+  uiLayer.addChild(devBtn);
+
+  devBtn.on('pointerdown', async () => {
+    if (gameEnded) return;
+    await core.events.emit('scene/load', { key: 'devmenu' });
+  });
   function spawnEnemyBullet(
     x: number, y: number,
     vx: number, vy: number,
@@ -492,7 +521,7 @@ async function enter(core: Core): Promise<void> {
         const dx = targetX - playerEntity.position.x;
         const dy = targetY - playerEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxMove = 320 * (dt / 1000);
+        const maxMove = devConfig.playerMoveSpeed * (dt / 1000);
         if (dist < maxMove) {
           playerEntity.position.x = targetX;
           playerEntity.position.y = targetY;
@@ -921,7 +950,7 @@ async function enter(core: Core): Promise<void> {
     enemyBulletsContainer.destroy({ children: true });
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, devBtn);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -930,6 +959,7 @@ async function enter(core: Core): Promise<void> {
     levelWaveText.destroy();
     waveBannerText.destroy();
     powerUpText.destroy();
+    devBtn.destroy({ children: true });
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();

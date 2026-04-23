@@ -16,6 +16,8 @@ export const PLAYER_FIRE_INTERVAL = 280;
 export const PLAYER_BULLET_R = 5;
 /** Invincibility duration after taking a hit in ms */
 export const INVINCIBLE_MS = 1200;
+/** Default player movement speed in px/s */
+export const PLAYER_MOVE_SPEED = 380;
 
 // ─── Enemy (Courage / 勇氣) ──────────────────────────────────────────────────
 export const ENEMY_HP_MAX = 200;
