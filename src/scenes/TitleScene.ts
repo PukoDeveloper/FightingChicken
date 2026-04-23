@@ -138,7 +138,7 @@ async function enter(core: Core): Promise<void> {
   devBtn.y = H - devBtnH - 10;
   uiLayer.addChild(devBtn);
 
-  devBtn.on('pointerdown', async () => {
+  devBtn.on('pointerup', async () => {
     await core.events.emit('scene/load', { key: 'devmenu' });
   });
 
