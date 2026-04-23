@@ -224,7 +224,7 @@ async function enter(core: Core): Promise<void> {
     endlessState.score = 0;
     endlessState.periodicShieldTimer = 0;
     endlessState.regenTimer = 0;
-    await core.events.emit('scene/load', { key: 'game' });
+    await core.events.emit('scene/load', { key: 'costumeselect' });
   });
 
   _cleanup = () => {

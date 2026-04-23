@@ -1,5 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import type { EnemyType } from '../constants';
+import type { CostumeId } from './costumes';
 
 // ─── Chicken (小雞) ──────────────────────────────────────────────────────────
 /**
@@ -407,4 +408,514 @@ export function createTrapRing(): Graphics {
   const g = new Graphics();
   g.visible = false;
   return g;
+}
+
+// ─── Elegant Chicken (優雅小雞) ───────────────────────────────────────────────
+/**
+ * A graceful white-and-pink chicken with a ribbon and slender proportions.
+ * Origin at centre of the body.
+ */
+export function createElegantChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.20 });
+
+  // Left wing
+  g.ellipse(-18, 6, 10, 7).fill(0xfff0f5);
+
+  // Body
+  g.circle(0, 0, 22).fill(0xffffff);
+
+  // Belly highlight (soft pink)
+  g.ellipse(4, 6, 11, 9).fill(0xffe0ee);
+
+  // Comb (pink ribbon shape)
+  g.moveTo(-6, -20).lineTo(-2, -32).lineTo(2, -20)
+    .closePath().fill(0xff99cc);
+  // Ribbon bow
+  g.moveTo(-10, -22).lineTo(-2, -26).lineTo(-2, -18).closePath().fill(0xff66aa);
+  g.moveTo(10, -22).lineTo(2, -26).lineTo(2, -18).closePath().fill(0xff66aa);
+  g.circle(0, -22, 3).fill(0xff3388);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0xfff0f5);
+
+  // Beak (small, pink)
+  g.moveTo(18, -2).lineTo(26, 2).lineTo(18, 6).closePath().fill(0xffaacc);
+
+  // Eye white
+  g.circle(12, -7, 6).fill(0xffffff);
+  // Pupil (blue)
+  g.circle(13, -6, 3).fill(0x2244aa);
+  // Eye glint
+  g.circle(15, -8, 1.2).fill(0xffffff);
+  // Eyelash (three small strokes above eye)
+  g.moveTo(8, -13).lineTo(9, -16).lineTo(10, -13).fill(0x111111);
+  g.moveTo(12, -14).lineTo(13, -17).lineTo(14, -14).fill(0x111111);
+  g.moveTo(15, -13).lineTo(17, -16).lineTo(18, -13).fill(0x111111);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xffaacc);
+  g.rect(-14, 31, 11, 3).fill(0xffaacc);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xffaacc);
+  g.rect(3, 31, 11, 3).fill(0xffaacc);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Adventure Chicken (冒險小雞) ─────────────────────────────────────────────
+/**
+ * A rugged orange-brown chicken with a tiny explorer hat and scarf.
+ * Origin at centre of the body.
+ */
+export function createAdventureChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.25 });
+
+  // Left wing
+  g.ellipse(-18, 6, 10, 7).fill(0xcc8800);
+
+  // Body (earthy orange)
+  g.circle(0, 0, 22).fill(0xdd8800);
+
+  // Belly patch
+  g.ellipse(4, 6, 11, 9).fill(0xeeaa44);
+
+  // Explorer hat brim
+  g.rect(-14, -24, 28, 5).fill(0x5c3a00);
+  // Hat crown
+  g.rect(-9, -38, 18, 16).fill(0x7a4e00);
+  // Hat band
+  g.rect(-9, -25, 18, 4).fill(0xcc7700);
+
+  // Comb (under hat)
+  g.moveTo(-4, -20).lineTo(0, -26).lineTo(4, -20).closePath().fill(0xff3333);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0xcc8800);
+
+  // Scarf (two-tone wrap around neck)
+  g.ellipse(4, 14, 14, 5).fill(0xdd3300);
+  g.ellipse(4, 17, 10, 3).fill(0xff6644);
+
+  // Beak
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xff8800);
+
+  // Eye white
+  g.circle(12, -7, 6).fill(0xffffff);
+  // Pupil (determined green)
+  g.circle(13, -6, 3).fill(0x225500);
+  // Eye glint
+  g.circle(15, -8, 1.2).fill(0xffffff);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xff8800);
+  g.rect(-14, 31, 11, 3).fill(0xff8800);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xff8800);
+  g.rect(3, 31, 11, 3).fill(0xff8800);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Hero Chicken (勇者小雞) ──────────────────────────────────────────────────
+/**
+ * A golden legendary chicken with a crown and radiant aura.
+ * Origin at centre of the body.
+ */
+export function createHeroChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Radiant aura
+  g.circle(0, 0, 30).fill({ color: 0xffdd00, alpha: 0.18 });
+  g.circle(0, 0, 26).fill({ color: 0xffee88, alpha: 0.12 });
+
+  // Shadow
+  g.ellipse(0, 26, 20, 6).fill({ color: 0x000000, alpha: 0.22 });
+
+  // Left wing (golden)
+  g.ellipse(-19, 6, 11, 8).fill(0xffd700);
+
+  // Body
+  g.circle(0, 0, 22).fill(0xffd700);
+
+  // Belly highlight
+  g.ellipse(4, 6, 11, 9).fill(0xffee66);
+
+  // Crown (five points)
+  const crownX = [-10, -6, 0, 6, 10];
+  const crownTipY = [-42, -48, -44, -48, -42];
+  const crownBaseY = -28;
+  for (let i = 0; i < 5; i++) {
+    const x0 = i === 0 ? -10 : crownX[i - 1] + (crownX[i] - crownX[i - 1]) / 2;
+    const x1 = crownX[i];
+    const x2 = i === 4 ? 10 : crownX[i] + (crownX[i + 1] - crownX[i]) / 2;
+    g.poly([x0, crownBaseY, x1, crownTipY[i], x2, crownBaseY]).fill(0xffd700);
+  }
+  // Crown band
+  g.rect(-10, -28, 20, 6).fill(0xffcc00);
+  // Crown jewels
+  g.circle(-5, -25, 2).fill(0xff2244);
+  g.circle(0, -25, 2).fill(0x44aaff);
+  g.circle(5, -25, 2).fill(0x44ff88);
+
+  // Comb (under crown, small)
+  g.moveTo(-4, -20).lineTo(0, -26).lineTo(4, -20).closePath().fill(0xff3333);
+
+  // Right wing
+  g.ellipse(20, 6, 11, 8).fill(0xffd700);
+
+  // Beak
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xff8800);
+
+  // Eye white
+  g.circle(12, -7, 6).fill(0xffffff);
+  // Pupil (gold iris)
+  g.circle(13, -6, 3).fill(0x884400);
+  // Pupil shine
+  g.circle(13, -6, 1.5).fill(0xffdd00);
+  // Eye glint
+  g.circle(15, -8, 1.2).fill(0xffffff);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xff8800);
+  g.rect(-14, 31, 11, 3).fill(0xff8800);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xff8800);
+  g.rect(3, 31, 11, 3).fill(0xff8800);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Boss Chicken (BOSS雞) ────────────────────────────────────────────────────
+/**
+ * A dark, menacing chicken with spiky accents and glowing red eyes —
+ * the player character who has absorbed the power of every boss.
+ * Origin at centre of the body.
+ */
+export function createBossChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Dark aura
+  g.circle(0, 0, 34).fill({ color: 0x440000, alpha: 0.22 });
+  g.circle(0, 0, 28).fill({ color: 0x880000, alpha: 0.14 });
+
+  // Shadow
+  g.ellipse(0, 26, 20, 6).fill({ color: 0x000000, alpha: 0.35 });
+
+  // Left wing (dark)
+  g.ellipse(-19, 6, 11, 8).fill(0x222222);
+
+  // Body (dark charcoal)
+  g.circle(0, 0, 22).fill(0x1a1a1a);
+
+  // Body highlight (subtle purple sheen)
+  g.ellipse(-5, -5, 14, 11).fill({ color: 0x660066, alpha: 0.28 });
+
+  // Spiky comb (five sharp spikes)
+  const spikeXs = [-10, -5, 0, 5, 10];
+  const spikeTips = [-38, -44, -40, -44, -38];
+  for (let i = 0; i < spikeXs.length; i++) {
+    g.moveTo(spikeXs[i] - 3, -20)
+      .lineTo(spikeXs[i], spikeTips[i])
+      .lineTo(spikeXs[i] + 3, -20)
+      .closePath().fill(0xcc0000);
+  }
+
+  // Right wing (dark)
+  g.ellipse(20, 6, 11, 8).fill(0x222222);
+
+  // Beak (dark red)
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xaa2200);
+
+  // Eye glow
+  g.circle(12, -7, 9).fill({ color: 0xff0000, alpha: 0.30 });
+  // Eye white (red)
+  g.circle(12, -7, 6).fill(0xdd0000);
+  // Pupil (black)
+  g.circle(13, -6, 3).fill(0x000000);
+  // Eye glint
+  g.circle(15, -8, 1.2).fill(0xff6666);
+
+  // Left foot (dark)
+  g.rect(-9, 22, 3, 10).fill(0x444444);
+  g.rect(-14, 31, 11, 3).fill(0x444444);
+
+  // Right foot (dark)
+  g.rect(6, 22, 3, 10).fill(0x444444);
+  g.rect(3, 31, 11, 3).fill(0x444444);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Moose Chicken (麋鹿小雞) ─────────────────────────────────────────────────
+/**
+ * A warm brown chicken sporting a pair of broad moose antlers and a kind face.
+ * Origin at centre of the body.
+ */
+export function createMooseChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.25 });
+
+  // Left wing
+  g.ellipse(-18, 6, 10, 7).fill(0x8b5e3c);
+
+  // Body (warm brown)
+  g.circle(0, 0, 22).fill(0xa0632a);
+
+  // Belly patch (lighter tan)
+  g.ellipse(4, 6, 11, 9).fill(0xc8945a);
+
+  // ── Antlers ──────────────────────────────────────────────────────────────
+  // Left antler main beam
+  g.moveTo(-6, -20).lineTo(-14, -44).lineTo(-10, -44).lineTo(-4, -22).closePath().fill(0x6b3a1f);
+  // Left antler brow tine
+  g.moveTo(-11, -34).lineTo(-20, -38).lineTo(-19, -35).lineTo(-10, -31).closePath().fill(0x6b3a1f);
+  // Left antler bez tine
+  g.moveTo(-13, -40).lineTo(-22, -46).lineTo(-21, -43).lineTo(-12, -37).closePath().fill(0x6b3a1f);
+
+  // Right antler main beam
+  g.moveTo(4, -20).lineTo(12, -44).lineTo(16, -44).lineTo(8, -22).closePath().fill(0x6b3a1f);
+  // Right antler brow tine
+  g.moveTo(9, -34).lineTo(18, -38).lineTo(17, -35).lineTo(8, -31).closePath().fill(0x6b3a1f);
+  // Right antler bez tine
+  g.moveTo(11, -40).lineTo(20, -46).lineTo(19, -43).lineTo(10, -37).closePath().fill(0x6b3a1f);
+
+  // Comb (small red tuft between antler bases)
+  g.moveTo(-4, -20).lineTo(0, -26).lineTo(4, -20).closePath().fill(0xff3333);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0x8b5e3c);
+
+  // Beak
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xff8800);
+
+  // Snout/muzzle (moose-style large muzzle, slightly protruding)
+  g.ellipse(14, 2, 9, 7).fill(0xb87040);
+
+  // Eye white
+  g.circle(11, -7, 6).fill(0xffffff);
+  // Pupil (warm dark brown)
+  g.circle(12, -6, 3).fill(0x2a1200);
+  // Eye glint
+  g.circle(14, -8, 1.2).fill(0xffffff);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xff8800);
+  g.rect(-14, 31, 11, 3).fill(0xff8800);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xff8800);
+  g.rect(3, 31, 11, 3).fill(0xff8800);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Fox Chicken (狐狸小雞) ───────────────────────────────────────────────────
+/**
+ * An orange-and-white fox-styled chicken with triangular ears and a bushy tail.
+ * Origin at centre of the body.
+ */
+export function createFoxChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.25 });
+
+  // Fluffy tail (behind body, drawn first)
+  g.ellipse(-28, 10, 13, 9).fill(0xff6a00);
+  g.ellipse(-28, 10, 9, 6).fill(0xffddb0);
+  // Tail tip
+  g.circle(-38, 10, 7).fill(0xffffff);
+
+  // Left wing (fox orange)
+  g.ellipse(-18, 6, 10, 7).fill(0xe05800);
+
+  // Body (vivid orange)
+  g.circle(0, 0, 22).fill(0xff6a00);
+
+  // White chest patch
+  g.ellipse(3, 5, 12, 10).fill(0xffeedd);
+
+  // Triangular fox ears
+  // Left ear outer
+  g.moveTo(-13, -20).lineTo(-18, -40).lineTo(-4, -26).closePath().fill(0xff6a00);
+  // Left ear inner
+  g.moveTo(-12, -22).lineTo(-16, -36).lineTo(-6, -27).closePath().fill(0xffaaaa);
+  // Right ear outer
+  g.moveTo(1, -22).lineTo(8, -42).lineTo(16, -24).closePath().fill(0xff6a00);
+  // Right ear inner
+  g.moveTo(3, -23).lineTo(8, -37).lineTo(14, -25).closePath().fill(0xffaaaa);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0xe05800);
+
+  // Beak (dark orange)
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xcc5500);
+
+  // Fox mask: white cheek patches
+  g.ellipse(8, 0, 7, 6).fill(0xfff0e0);
+
+  // Eye white
+  g.circle(11, -7, 6).fill(0xffffff);
+  // Iris (amber)
+  g.circle(12, -6, 3.5).fill(0xdd8800);
+  // Pupil (slit, approximated with tall ellipse)
+  g.ellipse(12, -6, 1.5, 3).fill(0x110000);
+  // Eye glint
+  g.circle(14, -8, 1.2).fill(0xffffff);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xcc5500);
+  g.rect(-14, 31, 11, 3).fill(0xcc5500);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xcc5500);
+  g.rect(3, 31, 11, 3).fill(0xcc5500);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Wizard Chicken (魔法小雞) ────────────────────────────────────────────────
+/**
+ * A mystical purple chicken wearing a tall star-studded wizard hat with sparkles.
+ * Origin at centre of the body.
+ */
+export function createWizardChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.25 });
+
+  // Magical aura glow
+  g.circle(0, 0, 28).fill({ color: 0x8833ff, alpha: 0.12 });
+
+  // Left wing (purple)
+  g.ellipse(-18, 6, 10, 7).fill(0x7722cc);
+
+  // Body (deep purple)
+  g.circle(0, 0, 22).fill(0x9933ff);
+
+  // Robe/belly highlight (lighter violet)
+  g.ellipse(4, 6, 11, 9).fill(0xbb77ff);
+
+  // ── Wizard hat brim ───────────────────────────────────────────────────────
+  g.ellipse(-1, -22, 18, 5).fill(0x330088);
+  // Hat body (tall cone)
+  g.moveTo(-16, -22).lineTo(-6, -58).lineTo(14, -58).lineTo(18, -22).closePath().fill(0x5500cc);
+  // Hat highlight stripe
+  g.moveTo(-3, -24).lineTo(-1, -55).lineTo(4, -55).lineTo(5, -24).closePath()
+    .fill({ color: 0xaa66ff, alpha: 0.35 });
+  // Hat tip curl
+  g.circle(4, -58, 4).fill(0x5500cc);
+
+  // Stars on hat
+  // Star helper: small 4-point star as two overlapping rects approximated by polygons
+  const drawStar = (sx: number, sy: number, r: number, col: number) => {
+    g.moveTo(sx, sy - r)
+      .lineTo(sx + r * 0.35, sy - r * 0.35)
+      .lineTo(sx + r, sy)
+      .lineTo(sx + r * 0.35, sy + r * 0.35)
+      .lineTo(sx, sy + r)
+      .lineTo(sx - r * 0.35, sy + r * 0.35)
+      .lineTo(sx - r, sy)
+      .lineTo(sx - r * 0.35, sy - r * 0.35)
+      .closePath().fill(col);
+  };
+  drawStar(-4, -38, 5, 0xffee00);
+  drawStar(7, -46, 4, 0xffffff);
+  drawStar(-8, -50, 3, 0xffcc44);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0x7722cc);
+
+  // Beak
+  g.moveTo(18, -2).lineTo(28, 2).lineTo(18, 7).closePath().fill(0xff8800);
+
+  // Eye white
+  g.circle(11, -7, 6).fill(0xffffff);
+  // Iris (bright violet)
+  g.circle(12, -6, 3.5).fill(0xcc44ff);
+  // Pupil
+  g.circle(13, -5, 2).fill(0x110022);
+  // Eye glint
+  g.circle(14, -8, 1.2).fill(0xffffff);
+
+  // Sparkle particles around body
+  const sparks = [[-20, -8, 3], [20, -12, 2.5], [-14, 14, 2], [18, 10, 2], [0, -26, 2.5]];
+  for (const [sx, sy, sr] of sparks) {
+    g.star(sx, sy, 4, sr, sr * 0.4, 0).fill(0xffee00);
+  }
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0x5500cc);
+  g.rect(-14, 31, 11, 3).fill(0x5500cc);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0x5500cc);
+  g.rect(3, 31, 11, 3).fill(0x5500cc);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Player chicken factory ───────────────────────────────────────────────────
+/**
+ * Returns the correct player chicken Container for the given costume ID.
+ * Falls back to the default chicken if the ID is unrecognised.
+ */
+export function createPlayerChicken(costume: CostumeId): Container {
+  switch (costume) {
+    case 'elegant':   return createElegantChickenDisplay();
+    case 'moose':     return createMooseChickenDisplay();
+    case 'fox':       return createFoxChickenDisplay();
+    case 'wizard':    return createWizardChickenDisplay();
+    case 'adventure': return createAdventureChickenDisplay();
+    case 'hero':      return createHeroChickenDisplay();
+    case 'boss':      return createBossChickenDisplay();
+    default:          return createChickenDisplay();
+  }
 }

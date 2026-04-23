@@ -1,5 +1,6 @@
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 import type { BuffId } from './endless';
+import type { CostumeId } from './costumes';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -38,5 +39,16 @@ export const endlessState = {
   periodicShieldTimer: 0,
   /** Remaining ms on the regen countdown carried over from the previous wave. */
   regenTimer: 0,
+};
+
+/** Costume / skin state persisted across scenes within a single session. */
+export const costumeState = {
+  /** The costume currently selected by the player. */
+  selected: 'default' as CostumeId,
+  /**
+   * Set of 1-based level numbers cleared at least once in level mode.
+   * Used to determine which costumes are unlocked.
+   */
+  clearedLevels: new Set<number>(),
 };
 
