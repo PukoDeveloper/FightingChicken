@@ -8,6 +8,7 @@ import {
   GameStateManager,
 } from '@inkshot/engine';
 import { TitleScene } from './scenes/TitleScene';
+import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { GameScene } from './scenes/GameScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { GAME_W, GAME_H } from './constants';
@@ -59,6 +60,7 @@ async function main(): Promise<void> {
           c.events.emitSync('camera/move', { x: GAME_W / 2, y: GAME_H / 2 });
 
           c.events.emitSync('scene/register', { scene: TitleScene });
+          c.events.emitSync('scene/register', { scene: LevelSelectScene });
           c.events.emitSync('scene/register', { scene: GameScene });
           c.events.emitSync('scene/register', { scene: GameOverScene });
           await c.events.emit('scene/load', { key: 'title' });

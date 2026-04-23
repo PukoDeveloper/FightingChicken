@@ -685,9 +685,10 @@ async function enter(core: Core): Promise<void> {
 
     // Advance level on win, reset on loss
     if (won) {
+      gameResult.playedLevel = gameResult.currentLevel;
       gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
     } else {
-      gameResult.currentLevel = 1;
+      gameResult.playedLevel = gameResult.currentLevel;
     }
 
     // Big explosion on enemy if won
