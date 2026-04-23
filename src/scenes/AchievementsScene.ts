@@ -3,11 +3,10 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { startBgm } from '../game/audio';
+import { ACHIEVEMENT_DEFS } from '../game/achievements';
 
 type AchEntry = {
   id: string;
-  name?: string;
-  description?: string;
   progress: number;
   threshold?: number;
   unlockedAt: string | null;
@@ -77,7 +76,7 @@ async function enter(core: Core): Promise<void> {
       fontWeight: 'bold',
       fill: unlocked ? 0xeeffee : 0x777788,
     });
-    const nameText = new Text({ text: ach.name ?? ach.id, style: nameStyle });
+    const nameText = new Text({ text: ACHIEVEMENT_DEFS[ach.id]?.name ?? ach.id, style: nameStyle });
     nameText.x = 12;
     nameText.y = 10;
     item.addChild(nameText);
@@ -87,7 +86,7 @@ async function enter(core: Core): Promise<void> {
       fontSize: 13,
       fill: unlocked ? 0x99bb99 : 0x555566,
     });
-    const descText = new Text({ text: ach.description ?? '', style: descStyle });
+    const descText = new Text({ text: ACHIEVEMENT_DEFS[ach.id]?.description ?? '', style: descStyle });
     descText.x = 12;
     descText.y = 34;
     item.addChild(descText);
