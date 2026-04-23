@@ -89,13 +89,13 @@ async function enter(core: Core): Promise<void> {
   });
 
   closeBtn.addEventListener('click', async () => {
-    await core.events.emit('scene/load', { key: 'game' });
+    await core.events.emit('scene/load', { key: 'title' });
   });
 
   // Close on clicking the dark backdrop (outside the panel)
   overlay.addEventListener('click', async (e) => {
     if (e.target === overlay) {
-      await core.events.emit('scene/load', { key: 'game' });
+      await core.events.emit('scene/load', { key: 'title' });
     }
   });
 }

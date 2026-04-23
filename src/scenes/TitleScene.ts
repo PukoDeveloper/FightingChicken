@@ -113,6 +113,35 @@ async function enter(core: Core): Promise<void> {
   btn.y = H * 0.78;
   uiLayer.addChild(btn);
 
+  // ── DEV button (bottom-right corner) ─────────────────────────────────────
+  const devBtnW = 46, devBtnH = 22;
+  const devBtn = new Container();
+  devBtn.eventMode = 'static';
+  devBtn.cursor = 'pointer';
+  const devBtnBg = new Graphics();
+  devBtnBg.roundRect(0, 0, devBtnW, devBtnH, 5)
+    .fill({ color: 0x333333, alpha: 0.85 })
+    .stroke({ color: 0xff6644, width: 1 });
+  devBtn.addChild(devBtnBg);
+  const devBtnStyle = new TextStyle({
+    fontFamily: 'Arial, sans-serif',
+    fontSize: 12,
+    fill: 0xffaa66,
+    fontWeight: 'bold',
+  });
+  const devBtnText = new Text({ text: 'DEV', style: devBtnStyle });
+  devBtnText.anchor.set(0.5);
+  devBtnText.x = devBtnW / 2;
+  devBtnText.y = devBtnH / 2;
+  devBtn.addChild(devBtnText);
+  devBtn.x = W - devBtnW - 10;
+  devBtn.y = H - devBtnH - 10;
+  uiLayer.addChild(devBtn);
+
+  devBtn.on('pointerdown', async () => {
+    await core.events.emit('scene/load', { key: 'devmenu' });
+  });
+
   // ── Button animation & interaction ────────────────────────────────────────
   let btnScale = 1;
   let btnScaleDir = 1;
@@ -140,7 +169,7 @@ async function enter(core: Core): Promise<void> {
   _cleanup = () => {
     core.events.removeNamespace('title');
     worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, hint, btn);
+    uiLayer.removeChild(title, subtitle, hint, btn, devBtn);
     stars.destroy({ children: true });
     chickenPreview.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -149,6 +178,7 @@ async function enter(core: Core): Promise<void> {
     subtitle.destroy();
     hint.destroy();
     btn.destroy({ children: true });
+    devBtn.destroy({ children: true });
     unsubTick();
   };
 }
