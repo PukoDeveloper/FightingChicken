@@ -32,5 +32,11 @@ export const endlessState = {
   bestWave: 1,
   /** HP carried over from the previous wave (0 = start fresh at base HP). */
   currentHp: 0,
+  /** Cumulative score across all waves in the current endless run. */
+  score: 0,
+  /** Remaining ms on the periodic-shield countdown carried over from the previous wave. */
+  periodicShieldTimer: 0,
+  /** Remaining ms on the regen countdown carried over from the previous wave. */
+  regenTimer: 0,
 };
 

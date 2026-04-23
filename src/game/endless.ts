@@ -26,7 +26,7 @@ export type BuffId =
   | 'periodic_shield' // gain 2 s invincibility every 12 s
   | 'blood_price'     // max HP -1 (min 1), but each bullet deals +2 damage (stackable)
   | 'bullet_power'    // each bullet deals +1 bonus damage (stackable)
-  | 'evasion'         // +25% chance to nullify incoming damage (stackable, capped at 75%)
+  | 'evasion'         // +10% chance to nullify incoming damage (stackable, capped at 30%)
   | 'regen'           // heal 1 HP every 12 s (stackable: each stack reduces interval by 3 s, min 6 s)
   | 'long_invincible' // +600 ms invincibility after taking damage (stackable)
   | 'item_drop_up';   // item spawn interval reduced 25% per stack (stackable, capped at 75% reduction)
@@ -99,7 +99,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'evasion',
     name: '閃避本能',
-    desc: '受到攻擊時有 25% 機率\n完全無效化傷害（最高 75%）',
+    desc: '受到攻擊時有 10% 機率\n完全無效化傷害（最高 30%）',
     color: 0x000a0a,
     borderColor: 0x00eebb,
   },
@@ -131,7 +131,7 @@ const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
 
 /** Maximum stack counts for buffs that have a hard cap on usefulness. */
 const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
-  evasion: 3,        // 3 × 25% = 75% dodge cap; a 4th stack is wasted
+  evasion: 3,        // 3 × 10% = 30% dodge cap; a 4th stack is wasted
   item_drop_up: 4,   // 4 stacks reduces spawn to ~31.6% of base, near the 2 s floor
 };
 
@@ -187,6 +187,12 @@ export function endlessEnemyType(waveNum: number): EnemyType {
 }
 
 /**
+ * After this wave number all hard upper-bound caps are lifted so that
+ * difficulty can scale without limit — making the mode feel truly endless.
+ */
+const ENDLESS_UNCAP_WAVE = 20;
+
+/**
  * Build a WaveConfig for an endless-mode wave.
  * Difficulty scales smoothly with `waveNum` (1-based).
  */
@@ -194,8 +200,12 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   // Each wave is ~15% harder than the previous.
   const d = Math.pow(1.15, waveNum - 1);
 
-  // Enemy HP grows with difficulty (capped to keep it fun).
-  const hp = Math.min(Math.round(150 * d), 1200);
+  // After ENDLESS_UNCAP_WAVE the hard caps are lifted so values grow freely.
+  const uncapped = waveNum >= ENDLESS_UNCAP_WAVE;
+  const capAt = (val: number, max: number) => uncapped ? val : Math.min(val, max);
+
+  // Enemy HP grows with difficulty (capped early on to keep it fun).
+  const hp = capAt(Math.round(150 * d), 1200);
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
@@ -212,16 +222,16 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
 
   const ring3 = Math.max(1200, Math.round(3500 / d));
 
-  // Way counts grow slowly.
-  const spiralWays1 = Math.min(6 + Math.floor((waveNum - 1) * 0.8), 20);
-  const spiralWays2 = Math.min(9 + Math.floor((waveNum - 1) * 0.9), 24);
-  const spiralWays3 = Math.min(12 + Math.floor((waveNum - 1) * 1.0), 28);
+  // Way counts grow slowly; caps are lifted after ENDLESS_UNCAP_WAVE.
+  const spiralWays1 = capAt(6 + Math.floor((waveNum - 1) * 0.8), 20);
+  const spiralWays2 = capAt(9 + Math.floor((waveNum - 1) * 0.9), 24);
+  const spiralWays3 = capAt(12 + Math.floor((waveNum - 1) * 1.0), 28);
 
-  const aimWays1 = Math.min(2 + Math.floor((waveNum - 1) * 0.3), 6);
-  const aimWays2 = Math.min(3 + Math.floor((waveNum - 1) * 0.3), 7);
-  const aimWays3 = Math.min(4 + Math.floor((waveNum - 1) * 0.35), 8);
+  const aimWays1 = capAt(2 + Math.floor((waveNum - 1) * 0.3), 6);
+  const aimWays2 = capAt(3 + Math.floor((waveNum - 1) * 0.3), 7);
+  const aimWays3 = capAt(4 + Math.floor((waveNum - 1) * 0.35), 8);
 
-  const ringCount3 = Math.min(20 + Math.floor((waveNum - 1) * 2), 56);
+  const ringCount3 = capAt(20 + Math.floor((waveNum - 1) * 2), 56);
 
   // Introduce shockwaves from wave 6, bubbles from wave 6 too.
   const hasShockwave = waveNum >= 6;
@@ -229,15 +239,15 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const sw1 = hasShockwave ? Math.max(2500, Math.round(6000 / d)) : 0;
   const sw2 = hasShockwave ? Math.max(2000, Math.round(4500 / d)) : 0;
   const sw3 = hasShockwave ? Math.max(1500, Math.round(3200 / d)) : 0;
-  const swSpeed = Math.min(SHOCKWAVE_EXPAND_SPEED + (waveNum - 6) * 8, 320);
+  const swSpeed = capAt(SHOCKWAVE_EXPAND_SPEED + (waveNum - 6) * 8, 320);
 
   const bub1 = hasBubble ? Math.max(2800, Math.round(6500 / d)) : 0;
   const bub2 = hasBubble ? Math.max(2200, Math.round(5000 / d)) : 0;
   const bub3 = hasBubble ? Math.max(1800, Math.round(3800 / d)) : 0;
-  const bubSpeed = Math.min(BUBBLE_SPEED + (waveNum - 6) * 5, 200);
-  const bubCount1 = hasBubble ? Math.min(1 + Math.floor((waveNum - 6) * 0.2), 3) : 1;
-  const bubCount2 = hasBubble ? Math.min(2 + Math.floor((waveNum - 6) * 0.2), 4) : 1;
-  const bubCount3 = hasBubble ? Math.min(2 + Math.floor((waveNum - 6) * 0.25), 5) : 1;
+  const bubSpeed = capAt(BUBBLE_SPEED + (waveNum - 6) * 5, 200);
+  const bubCount1 = hasBubble ? capAt(1 + Math.floor((waveNum - 6) * 0.2), 3) : 1;
+  const bubCount2 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.2), 4) : 1;
+  const bubCount3 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.25), 5) : 1;
 
   return {
     waveNumber: waveNum,

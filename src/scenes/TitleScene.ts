@@ -221,6 +221,9 @@ async function enter(core: Core): Promise<void> {
     endlessState.active = true;
     endlessState.wave = 1;
     endlessState.buffs = [];
+    endlessState.score = 0;
+    endlessState.periodicShieldTimer = 0;
+    endlessState.regenTimer = 0;
     await core.events.emit('scene/load', { key: 'game' });
   });
 

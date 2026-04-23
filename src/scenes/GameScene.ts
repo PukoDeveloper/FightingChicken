@@ -211,8 +211,8 @@ async function enter(core: Core): Promise<void> {
   );
   // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
   const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
-  // Evasion chance: 25% per stack, capped at 75%
-  const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
+  // Evasion chance: 10% per stack, capped at 30%
+  const evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
   // Effective invincibility duration: base + 600 ms per long_invincible stack
   const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
@@ -227,8 +227,16 @@ async function enter(core: Core): Promise<void> {
     ? Math.max(15000 - buffRegenCount * 3000, 6000)
     : 0;
 
-  // Periodic shield: counts down ms until next activation
-  let periodicShieldTimer = hasPeriodicShield ? 12000 : 0;
+  // Periodic shield: counts down ms until next activation.
+  // Carry over the remaining time from the previous wave (or start fresh at 12 s).
+  let periodicShieldTimer: number;
+  if (!hasPeriodicShield) {
+    periodicShieldTimer = 0;
+  } else if (isEndless && endlessState.periodicShieldTimer > 0) {
+    periodicShieldTimer = endlessState.periodicShieldTimer;
+  } else {
+    periodicShieldTimer = 12000;
+  }
 
   // ── Game state ───────────────────────────────────────────────────────────
   // In endless mode, carry HP from the previous wave; on wave 1 start at full HP.
@@ -255,7 +263,8 @@ async function enter(core: Core): Promise<void> {
     }
   }
   let enemyHP = waveMaxHp;
-  let score = 0;
+  // In endless mode, score is cumulative across waves; carry it over from the previous wave.
+  let score = isEndless ? endlessState.score : 0;
   let phase: 1 | 2 | 3 = 1;
   let invincibleMs = 0;
   let gameEnded = false;
@@ -275,7 +284,16 @@ async function enter(core: Core): Promise<void> {
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
   let phaseFlashTimer = 0;
-  let regenTimer = regenIntervalMs; // counts down to next HP regen tick
+  // Regen: counts down to next HP regen tick.
+  // Carry over the remaining time from the previous wave (or start fresh at the full interval).
+  let regenTimer: number;
+  if (regenIntervalMs <= 0) {
+    regenTimer = 0;
+  } else if (isEndless && endlessState.regenTimer > 0) {
+    regenTimer = endlessState.regenTimer;
+  } else {
+    regenTimer = regenIntervalMs;
+  }
 
   // Touch tracking
   let touchActive = false;
@@ -1274,8 +1292,11 @@ async function enter(core: Core): Promise<void> {
     gameResult.score = score;
     if (score > gameResult.highScore) gameResult.highScore = score;
 
-    // Carry the player's current HP into the next wave
+    // Carry the player's current HP, cumulative score, and buff timers into the next wave
     endlessState.currentHp = playerHP;
+    endlessState.score = score;
+    endlessState.periodicShieldTimer = periodicShieldTimer;
+    endlessState.regenTimer = regenTimer;
 
     // Advance wave counter for the next round
     endlessState.wave += 1;
@@ -1301,6 +1322,9 @@ async function enter(core: Core): Promise<void> {
         endlessState.bestWave = endlessState.wave;
       }
       endlessState.currentHp = 0; // reset for next attempt
+      endlessState.score = 0;
+      endlessState.periodicShieldTimer = 0;
+      endlessState.regenTimer = 0;
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
       // Advance level on win, reset on loss
