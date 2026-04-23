@@ -1292,7 +1292,7 @@ async function enter(core: Core): Promise<void> {
 
     // Store accumulated score
     gameResult.score = score;
-    if (score > gameResult.highScore) gameResult.highScore = score;
+    if (score > endlessState.highScore) endlessState.highScore = score;
 
     // Carry the player's current HP, cumulative score, and buff timers into the next wave
     endlessState.currentHp = playerHP;
@@ -1316,10 +1316,10 @@ async function enter(core: Core): Promise<void> {
 
     gameResult.won = won;
     gameResult.score = score;
-    if (score > gameResult.highScore) gameResult.highScore = score;
 
     if (isEndless) {
-      // In endless mode, record the wave reached and reset the session
+      // In endless mode, record the wave reached, update endless high score, and reset the session
+      if (score > endlessState.highScore) endlessState.highScore = score;
       if (endlessState.wave > endlessState.bestWave) {
         endlessState.bestWave = endlessState.wave;
       }
@@ -1329,6 +1329,11 @@ async function enter(core: Core): Promise<void> {
       endlessState.regenTimer = 0;
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
+      // Update per-level high score
+      const lvl = gameResult.currentLevel;
+      if (score > (gameResult.levelHighScores[lvl] ?? 0)) {
+        gameResult.levelHighScores[lvl] = score;
+      }
       // Advance level on win, reset on loss
       if (won) {
         gameResult.playedLevel = gameResult.currentLevel;

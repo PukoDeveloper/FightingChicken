@@ -22,7 +22,11 @@ async function enter(core: Core): Promise<void> {
   worldLayer.addChild(stars);
 
   // ── Character display ────────────────────────────────────────────────────
-  const { won, score, highScore } = gameResult;
+  const { won, score } = gameResult;
+  const isEndlessGameOver = endlessState.active && gameResult.playedLevel === 0;
+  const highScore = isEndlessGameOver
+    ? endlessState.highScore
+    : (gameResult.levelHighScores[gameResult.playedLevel] ?? 0);
 
   const character = won ? createCourageDisplay() : createPlayerChicken(costumeState.selected);
   character.scale.set(won ? 1.8 : 1.6);
@@ -86,7 +90,6 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(hiScoreLabel);
 
   // ── Level / endless wave reached ──────────────────────────────────────────
-  const isEndlessGameOver = endlessState.active && gameResult.playedLevel === 0;
   const clearedLevel = gameResult.playedLevel;
   const levelStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
