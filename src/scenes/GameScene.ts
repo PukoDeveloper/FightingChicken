@@ -208,9 +208,29 @@ async function enter(core: Core): Promise<void> {
   let periodicShieldTimer = hasPeriodicShield ? 12000 : 0;
 
   // ── Game state ───────────────────────────────────────────────────────────
-  // Apply hp_restore buff: start at full effective max; hp_restore is applied once per buff
-  const buffHpRestoreCount = isEndless ? endlessState.buffs.filter(b => b === 'hp_restore').length : 0;
-  let playerHP = Math.min(effectiveHpMax, PLAYER_HP_MAX + buffHpRestoreCount + buffHpUpCount);
+  // In endless mode, carry HP from the previous wave; on wave 1 start at full HP.
+  // Then apply the most recently chosen buff (last in the buffs array) if it's hp_restore.
+  const latestBuff = isEndless && endlessState.buffs.length > 0
+    ? endlessState.buffs[endlessState.buffs.length - 1]
+    : null;
+  let playerHP: number;
+  if (!isEndless) {
+    playerHP = PLAYER_HP_MAX;
+  } else if (endlessState.currentHp === 0) {
+    // First wave — start at full effective max
+    playerHP = effectiveHpMax;
+  } else {
+    // Carry over HP from last wave, clamped to new max (hp_up may have raised it)
+    playerHP = Math.min(endlessState.currentHp, effectiveHpMax);
+    // hp_restore: heal ceil(effectiveHpMax / 2) when this buff was just chosen
+    if (latestBuff === 'hp_restore') {
+      playerHP = Math.min(effectiveHpMax, playerHP + Math.ceil(effectiveHpMax / 2));
+    }
+    // hp_up: the max increased by 1 — grant that extra HP on pickup
+    if (latestBuff === 'hp_up') {
+      playerHP = Math.min(effectiveHpMax, playerHP + 1);
+    }
+  }
   let enemyHP = waveMaxHp;
   let score = 0;
   let phase: 1 | 2 | 3 = 1;
@@ -1135,6 +1155,9 @@ async function enter(core: Core): Promise<void> {
     gameResult.score = score;
     if (score > gameResult.highScore) gameResult.highScore = score;
 
+    // Carry the player's current HP into the next wave
+    endlessState.currentHp = playerHP;
+
     // Advance wave counter for the next round
     endlessState.wave += 1;
     if (endlessState.wave > endlessState.bestWave) {
@@ -1158,6 +1181,7 @@ async function enter(core: Core): Promise<void> {
       if (endlessState.wave > endlessState.bestWave) {
         endlessState.bestWave = endlessState.wave;
       }
+      endlessState.currentHp = 0; // reset for next attempt
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
       // Advance level on win, reset on loss

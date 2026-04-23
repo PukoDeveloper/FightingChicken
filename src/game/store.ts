@@ -30,5 +30,7 @@ export const endlessState = {
   buffs: [] as BuffId[],
   /** Best (highest) wave reached in endless mode. */
   bestWave: 1,
+  /** HP carried over from the previous wave (0 = start fresh at base HP). */
+  currentHp: 0,
 };
 
