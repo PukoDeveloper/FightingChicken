@@ -278,7 +278,7 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'costumeselect' });
   });
 
-  achBtn.on('pointerup', async () => {
+  achBtn.on('pointerdown', async () => {
     await core.events.emit('scene/load', { key: 'achievements' });
   });
 
