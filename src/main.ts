@@ -43,8 +43,8 @@ async function main(): Promise<void> {
       new SaveManager(),
       new LocalStorageSaveAdapter({ keyPrefix: 'fightingchicken:' }),
       new AchievementPlugin(),
-      // Subtle dynamic lighting: dim ambient + point lights around player & enemy.
-      new LightingPlugin({ ambientIntensity: 0.62, ambientColor: 0x000011 }),
+      // Dynamic lighting: full ambient + point lights around player & enemy.
+      new LightingPlugin({ ambientIntensity: 1.0, ambientColor: 0xffffff }),
       // Debug overlay (Backtick / F12 to toggle) — only bundled in dev mode.
       ...(import.meta.env.DEV ? [new DebugPlugin()] : []),
       {
