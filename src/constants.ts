@@ -53,6 +53,10 @@ export const ITEM_SPAWN_MAX_MS = 16000;
 export const POWER_UP_DURATION_MS = 8000;
 /** Fire interval while damage power-up is active (ms) */
 export const POWER_FIRE_INTERVAL = 140;
+/** Probability (0–1) that a spawned pickup is a health item vs a power item */
+export const HEALTH_ITEM_PROB = 0.7;
+/** Invincibility duration granted when collecting a health item (ms) */
+export const HEALTH_ITEM_INVINCIBLE_MS = 2000;
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
 export const SCORE_PER_HIT = 10;

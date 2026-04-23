@@ -33,6 +33,8 @@ import {
   ITEM_SPAWN_MAX_MS,
   POWER_UP_DURATION_MS,
   POWER_FIRE_INTERVAL,
+  HEALTH_ITEM_PROB,
+  HEALTH_ITEM_INVINCIBLE_MS,
 } from '../constants';
 import { gameResult, devConfig } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
@@ -304,7 +306,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Helper: spawn a random pickup item ────────────────────────────────────
   function spawnItem(): void {
-    const type: 'health' | 'power' = Math.random() < 0.5 ? 'health' : 'power';
+    const type: 'health' | 'power' = Math.random() < HEALTH_ITEM_PROB ? 'health' : 'power';
     const display = type === 'health' ? createHealthItem() : createPowerItem();
     const x = 40 + Math.random() * (W - 80);
     const y = -20;
@@ -738,6 +740,7 @@ async function enter(core: Core): Promise<void> {
         if (Math.sqrt(cdx * cdx + cdy * cdy) < ITEM_COLLECT_R + 14) {
           if (item.type === 'health') {
             playerHP = Math.min(PLAYER_HP_MAX, playerHP + 1);
+            invincibleMs = Math.max(invincibleMs, HEALTH_ITEM_INVINCIBLE_MS);
           } else {
             powerUpTimer = POWER_UP_DURATION_MS;
           }

@@ -114,8 +114,12 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'title' });
   });
 
-  // Close on clicking the dark backdrop (outside the panel)
+  // Close on clicking the dark backdrop (outside the panel).
+  // Guard with a short delay so a tap that opened this menu can't immediately
+  // close it via the phantom 'click' event that follows pointerup.
+  const openedAt = Date.now();
   overlay.addEventListener('click', async (e) => {
+    if (Date.now() - openedAt < 350) return;
     if (e.target === overlay) {
       await core.events.emit('scene/load', { key: 'title' });
     }
