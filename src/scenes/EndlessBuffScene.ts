@@ -71,7 +71,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(waveInfoText);
 
   // ── Buff cards ────────────────────────────────────────────────────────────
-  const buffs: BuffDef[] = pickRandomBuffs(3);
+  const buffs: BuffDef[] = pickRandomBuffs(3, endlessState.buffs);
   const cardW = W * 0.78;
   const cardH = 110;
   const cardGap = 16;

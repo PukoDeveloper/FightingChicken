@@ -204,9 +204,9 @@ async function enter(core: Core): Promise<void> {
 
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
   const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount, 1), 10);
-  // Effective base fire interval (reduced by 15% per fire_rate_up stack, floored at 60 ms)
+  // Effective base fire interval (reduced by 10% per fire_rate_up stack, floored at 60 ms)
   const effectiveFireInterval = Math.max(
-    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.85, buffFireRateCount)),
+    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)),
     60,
   );
   // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
@@ -383,7 +383,8 @@ async function enter(core: Core): Promise<void> {
   const trapRing = createTrapRing();
   worldLayer.addChild(trapRing);
 
-  // Power-up indicator (bottom-left, above hearts)
+  // Timer indicators (bottom-left, stacked vertically above hearts).
+  // Each timer type gets its own Text object so multiple can show simultaneously.
   const powerUpStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 14,
@@ -391,11 +392,38 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0xff8800, distance: 2, alpha: 0.8, blur: 2 },
   });
-  const powerUpText = new Text({ text: '', style: powerUpStyle });
-  powerUpText.anchor.set(0, 1);
-  powerUpText.x = 10;
-  powerUpText.y = H - 38;
-  uiLayer.addChild(powerUpText);
+  const trappedTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0x44ddff,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x006688, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const shieldTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xaaddff,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x224466, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const regenTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0x44ff88,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x006633, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const powerUpText       = new Text({ text: '', style: powerUpStyle });
+  const trappedTimerText  = new Text({ text: '', style: trappedTimerStyle });
+  const shieldTimerText   = new Text({ text: '', style: shieldTimerStyle });
+  const regenTimerText    = new Text({ text: '', style: regenTimerStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText].forEach(t => {
+    t.anchor.set(0, 1);
+    t.x = 10;
+    t.y = H - 38;
+    t.visible = false;
+    uiLayer.addChild(t);
+  });
 
   function spawnEnemyBullet(
     x: number, y: number,
@@ -487,18 +515,24 @@ async function enter(core: Core): Promise<void> {
     if (buffItemDropCount > 0) statusLine += `  ITEM:${Math.round(itemSpawnMinMs / 1000)}s`;
     levelWaveText.text = statusLine;
 
-    // Power-up indicator
-    if (powerUpTimer > 0) {
-      powerUpText.text = `⚡ 火力提升 ${Math.ceil(powerUpTimer / 1000)}s`;
-    } else if (trappedMs > 0) {
-      powerUpText.text = `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`;
-    } else if (hasPeriodicShield && periodicShieldTimer > 0) {
-      powerUpText.text = `🛡 護盾 ${Math.ceil(periodicShieldTimer / 1000)}s`;
-    } else if (regenIntervalMs > 0 && regenTimer > 0) {
-      powerUpText.text = `💚 再生 ${Math.ceil(regenTimer / 1000)}s`;
-    } else {
-      powerUpText.text = '';
-    }
+    // Timer indicators: collect active timers, then stack them above the hearts.
+    const timerEntries: Array<[Text, string]> = [];
+    if (powerUpTimer > 0) timerEntries.push([powerUpText, `⚡ 火力提升 ${Math.ceil(powerUpTimer / 1000)}s`]);
+    if (trappedMs > 0) timerEntries.push([trappedTimerText, `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`]);
+    if (hasPeriodicShield && periodicShieldTimer > 0) timerEntries.push([shieldTimerText, `🛡 護盾 ${Math.ceil(periodicShieldTimer / 1000)}s`]);
+    if (regenIntervalMs > 0 && regenTimer > 0) timerEntries.push([regenTimerText, `💚 再生 ${Math.ceil(regenTimer / 1000)}s`]);
+
+    const timerBaseY = H - 38;
+    const timerLineH = 18;
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText].forEach(t => {
+      t.text = '';
+      t.visible = false;
+    });
+    timerEntries.forEach(([text, label], i) => {
+      text.text = label;
+      text.y = timerBaseY - (timerEntries.length - 1 - i) * timerLineH;
+      text.visible = true;
+    });
   }
 
   // ── Helper: check phase ───────────────────────────────────────────────────
@@ -1370,7 +1404,7 @@ async function enter(core: Core): Promise<void> {
     trapRing.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -1379,6 +1413,9 @@ async function enter(core: Core): Promise<void> {
     levelWaveText.destroy();
     waveBannerText.destroy();
     powerUpText.destroy();
+    trappedTimerText.destroy();
+    shieldTimerText.destroy();
+    regenTimerText.destroy();
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
