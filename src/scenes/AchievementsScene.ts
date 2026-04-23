@@ -13,8 +13,14 @@ type AchEntry = {
 };
 
 let _cleanup: (() => void) | null = null;
+let _enterTime = 0;
+
+/** Minimum ms after scene entry before back-button events are accepted,
+ *  preventing carryover pointerup from the previous scene. */
+const SCENE_ENTER_DEBOUNCE_MS = 300;
 
 async function enter(core: Core): Promise<void> {
+  _enterTime = Date.now();
   const W = core.app.screen.width;
   const H = core.app.screen.height;
 
@@ -155,6 +161,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(btn);
 
   btn.on('pointerup', async () => {
+    if (Date.now() - _enterTime < SCENE_ENTER_DEBOUNCE_MS) return;
     await core.events.emit('scene/load', { key: 'title' });
   });
 
