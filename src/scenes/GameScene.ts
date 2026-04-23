@@ -29,6 +29,7 @@ import {
   SCORE_BONUS_WAVE_MULT,
   ITEM_COLLECT_R,
   ITEM_LIFETIME_MS,
+  ITEM_FALL_SPEED,
   ITEM_SPAWN_MIN_MS,
   ITEM_SPAWN_MAX_MS,
   POWER_UP_DURATION_MS,
@@ -52,11 +53,10 @@ interface ItemData {
   display: Container;
   x: number;
   y: number;
-  vx: number; // drift px/s
-  vy: number;
+  vx: number; // px/s (horizontal, currently 0)
+  vy: number; // px/s (vertical fall speed)
   type: 'health' | 'power';
   lifetime: number; // ms remaining
-  bobTimer: number; // accumulator for bobbing sine
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -308,17 +308,16 @@ async function enter(core: Core): Promise<void> {
     const type: 'health' | 'power' = Math.random() < 0.5 ? 'health' : 'power';
     const display = type === 'health' ? createHealthItem() : createPowerItem();
     const x = 40 + Math.random() * (W - 80);
-    const y = H * 0.35 + Math.random() * (H * 0.30);
+    const y = -20;
     display.x = x;
     display.y = y;
     itemsContainer.addChild(display);
     items.push({
       display, x, y,
       vx: 0,
-      vy: 0,
+      vy: ITEM_FALL_SPEED,
       type,
       lifetime: ITEM_LIFETIME_MS,
-      bobTimer: Math.random() * Math.PI * 2 * 400,
     });
   }
 
@@ -717,18 +716,19 @@ async function enter(core: Core): Promise<void> {
       // ── Move and collect items ────────────────────────────────────────────
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
-        item.bobTimer += dt;
         item.lifetime -= dt;
 
-        // Visual position: add bobbing offset
+        // Move vertically
+        item.y += item.vy * (dt / 1000);
+
         item.display.x = item.x;
-        item.display.y = item.y + Math.sin(item.bobTimer / 400) * 6;
+        item.display.y = item.y;
 
         // Fade out when about to expire
         item.display.alpha = item.lifetime < 2000 ? Math.max(0, item.lifetime / 2000) : 1;
 
-        // Expire
-        if (item.lifetime <= 0) {
+        // Remove if fallen off screen or expired
+        if (item.y > H + 20 || item.lifetime <= 0) {
           removeItem(items, i, itemsContainer);
           continue;
         }
