@@ -397,7 +397,10 @@ async function enter(core: Core): Promise<void> {
 
   // ── Skill state ──────────────────────────────────────────────────────────
   const activeSkillId = skillState.selected;
-  const isActiveSkill = activeSkillId === 'swift_dodge' || activeSkillId === 'burst_fire' || activeSkillId === 'bullet_clear';
+  const activeSkillDef = activeSkillId !== null
+    ? SKILLS.find(s => s.id === activeSkillId) ?? null
+    : null;
+  const isActiveSkill = activeSkillDef?.type === 'active';
   // Cooldown in ms for the active skill (0 = ready to use)
   let skillCooldownMs = 0;
   // Active skill effect timer (ms remaining while the skill effect is active)
@@ -560,10 +563,6 @@ async function enter(core: Core): Promise<void> {
 
   // ── Active skill button (bottom-right) ────────────────────────────────────
   // Only rendered when an active skill is selected.
-  const activeSkillDef = isActiveSkill
-    ? SKILLS.find(s => s.id === activeSkillId) ?? null
-    : null;
-
   const skillBtnContainer = new Container();
   skillBtnContainer.visible = isActiveSkill;
   const skillBtnBg = new Graphics();
