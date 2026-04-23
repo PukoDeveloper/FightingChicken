@@ -25,7 +25,7 @@ import {
   ENEMY_HITBOX_R,
   ENEMY_BULLET_R,
   SCORE_PER_HIT,
-  SCORE_BONUS_WIN,
+  SCORE_BONUS_WAVE_MULT,
   ITEM_COLLECT_R,
   ITEM_LIFETIME_MS,
   ITEM_SPAWN_MIN_MS,
@@ -309,15 +309,13 @@ async function enter(core: Core): Promise<void> {
     const display = type === 'health' ? createHealthItem() : createPowerItem();
     const x = 40 + Math.random() * (W - 80);
     const y = H * 0.35 + Math.random() * (H * 0.30);
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 20;
     display.x = x;
     display.y = y;
     itemsContainer.addChild(display);
     items.push({
       display, x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx: 0,
+      vy: 0,
       type,
       lifetime: ITEM_LIFETIME_MS,
       bobTimer: Math.random() * Math.PI * 2 * 400,
@@ -635,7 +633,7 @@ async function enter(core: Core): Promise<void> {
           checkPhase();
 
           if (enemyHP <= 0) {
-            score += SCORE_BONUS_WIN;
+            score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
             const nextWaveIdx = waveIdx + 1;
             if (nextWaveIdx < levelConfig.waves.length) {
               advanceWave(nextWaveIdx);
@@ -721,16 +719,6 @@ async function enter(core: Core): Promise<void> {
         const item = items[i];
         item.bobTimer += dt;
         item.lifetime -= dt;
-
-        // Drift
-        item.x += item.vx * (dt / 1000);
-        item.y += item.vy * (dt / 1000);
-
-        // Bounce gently off play-area walls
-        if (item.x < 30)      { item.x = 30;      item.vx =  Math.abs(item.vx); }
-        if (item.x > W - 30)  { item.x = W - 30;  item.vx = -Math.abs(item.vx); }
-        if (item.y < H * 0.25) { item.y = H * 0.25; item.vy =  Math.abs(item.vy); }
-        if (item.y > H * 0.75) { item.y = H * 0.75; item.vy = -Math.abs(item.vy); }
 
         // Visual position: add bobbing offset
         item.display.x = item.x;

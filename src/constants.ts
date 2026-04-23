@@ -52,7 +52,8 @@ export const POWER_FIRE_INTERVAL = 140;
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
 export const SCORE_PER_HIT = 10;
-export const SCORE_BONUS_WIN = 5000;
+/** Multiplied by the wave's max HP to compute the wave-clear bonus score. */
+export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Colours ─────────────────────────────────────────────────────────────────
 export const COL_BG          = 0x000011;
