@@ -217,26 +217,6 @@ async function enter(core: Core): Promise<void> {
   });
   const enemyEntity = enemyOut.entity as Entity;
 
-  // ── Dynamic lighting ──────────────────────────────────────────────────────
-  // Player gets a warm yellow glow; enemy gets a red glow.
-  const { output: playerLightOut } = core.events.emitSync('lighting/light:add', {
-    x: playerEntity.position.x,
-    y: playerEntity.position.y,
-    radius: 110,
-    color: 0xffdd88,
-    intensity: 0.85,
-  });
-  const playerLightId = (playerLightOut as { id: string }).id;
-
-  const { output: enemyLightOut } = core.events.emitSync('lighting/light:add', {
-    x: enemyEntity.position.x,
-    y: enemyEntity.position.y,
-    radius: 150,
-    color: 0xff4422,
-    intensity: 0.90,
-  });
-  const enemyLightId = (enemyLightOut as { id: string }).id;
-
   // ── BGM ───────────────────────────────────────────────────────────────────
   startBgm();
 
@@ -830,18 +810,6 @@ async function enter(core: Core): Promise<void> {
       // ── Enemy bobbing animation ───────────────────────────────────────────
       enemyBobTimer += dt;
       enemyEntity.position.y = H * 0.18 + Math.sin(enemyBobTimer / 800) * 12;
-
-      // ── Update dynamic lighting positions ─────────────────────────────────
-      core.events.emitSync('lighting/light:update', {
-        id: playerLightId,
-        x: playerEntity.position.x,
-        y: playerEntity.position.y,
-      });
-      core.events.emitSync('lighting/light:update', {
-        id: enemyLightId,
-        x: enemyEntity.position.x,
-        y: enemyEntity.position.y,
-      });
 
       // ── Phase flash ───────────────────────────────────────────────────────
       if (phaseFlashTimer > 0) {
@@ -1510,10 +1478,6 @@ async function enter(core: Core): Promise<void> {
 
     stopBgm();
 
-    // Remove dynamic lights for this scene
-    core.events.emitSync('lighting/light:remove', { id: playerLightId });
-    core.events.emitSync('lighting/light:remove', { id: enemyLightId });
-
     await saveProgress();
 
     // Brief delay before switching scene
@@ -1599,10 +1563,8 @@ async function enter(core: Core): Promise<void> {
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
 
-    // Remove dynamic lights for this scene (no-op if already removed by endGame)
+    // Cleanup BGM
     stopBgm();
-    core.events.emitSync('lighting/light:remove', { id: playerLightId });
-    core.events.emitSync('lighting/light:remove', { id: enemyLightId });
   };
 }
 
