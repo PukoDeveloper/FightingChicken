@@ -302,13 +302,13 @@ async function enter(core: Core): Promise<void> {
   const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
   // Level itemDropMult further scales the intervals (< 1 = more frequent drops for hard levels)
-  const levelItemMult = levelConfig?.itemDropMult ?? 1.0;
+  const levelItemDropMult = levelConfig?.itemDropMult ?? 1.0;
   const itemSpawnMinMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemMult * Math.pow(0.75, buffItemDropCount)), 2000)
-    : Math.round(ITEM_SPAWN_MIN_MS * levelItemMult);
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
+    : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
   const itemSpawnMaxMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemMult * Math.pow(0.75, buffItemDropCount)), 4000)
-    : Math.round(ITEM_SPAWN_MAX_MS * levelItemMult);
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
+    : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
   // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
   const regenIntervalMs = buffRegenCount > 0
     ? Math.max(15000 - buffRegenCount * 3000, 6000)
