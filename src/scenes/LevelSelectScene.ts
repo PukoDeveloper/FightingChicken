@@ -36,9 +36,9 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(titleLabel);
 
   // ── Level buttons ─────────────────────────────────────────────────────────
-  const levelColors = [0x226622, 0xcc7700, 0x880088];
-  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff];
-  const btnW = 280, btnH = 96;
+  const levelColors = [0x226622, 0xcc7700, 0x880088, 0x005588, 0x660000];
+  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444];
+  const btnW = 260, btnH = 76;
   const levelBtns: Container[] = [];
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
@@ -48,25 +48,25 @@ async function enter(core: Core): Promise<void> {
     btn.cursor = 'pointer';
 
     const bg = new Graphics();
-    bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 14)
-      .fill({ color: levelColors[i - 1], alpha: 0.88 });
-    bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 14)
-      .stroke({ color: levelBorderColors[i - 1], width: 2.5 });
+    bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
+      .fill({ color: levelColors[i - 1] ?? 0x333333, alpha: 0.88 });
+    bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
+      .stroke({ color: levelBorderColors[i - 1] ?? 0xaaaaaa, width: 2.5 });
     btn.addChild(bg);
 
     const numStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-      fontSize: 14,
+      fontSize: 12,
       fill: 0xaaaaaa,
     });
     const numLabel = new Text({ text: `第 ${i} 關`, style: numStyle });
     numLabel.anchor.set(0.5);
-    numLabel.y = -24;
+    numLabel.y = -20;
     btn.addChild(numLabel);
 
     const nameStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: 'bold',
       fill: 0xffffff,
     });
@@ -77,16 +77,16 @@ async function enter(core: Core): Promise<void> {
 
     const waveStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-      fontSize: 13,
+      fontSize: 12,
       fill: 0xdddddd,
     });
     const waveLabel = new Text({ text: `${cfg.waves.length} 波`, style: waveStyle });
     waveLabel.anchor.set(0.5);
-    waveLabel.y = 30;
+    waveLabel.y = 24;
     btn.addChild(waveLabel);
 
     btn.x = W * 0.5;
-    btn.y = H * (0.32 + (i - 1) * 0.185);
+    btn.y = H * (0.27 + (i - 1) * 0.145);
     uiLayer.addChild(btn);
     levelBtns.push(btn);
 
@@ -123,7 +123,7 @@ async function enter(core: Core): Promise<void> {
   backBtn.addChild(backText);
 
   backBtn.x = W * 0.5;
-  backBtn.y = H * 0.92;
+  backBtn.y = H * 0.96;
   uiLayer.addChild(backBtn);
 
   backBtn.on('pointerdown', async () => {

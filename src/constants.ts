@@ -63,6 +63,28 @@ export const SCORE_PER_HIT = 10;
 /** Multiplied by the wave's max HP to compute the wave-clear bonus score. */
 export const SCORE_BONUS_WAVE_MULT = 20;
 
+// ─── Enemy types ─────────────────────────────────────────────────────────────
+/** Identifies which enemy sprite & theme is used for a level. */
+export type EnemyType = 'courage' | 'phantom' | 'chaos';
+
+// ─── Shockwave ────────────────────────────────────────────────────────────────
+/** Default shockwave ring expansion speed in px/s */
+export const SHOCKWAVE_EXPAND_SPEED = 210;
+/** Maximum shockwave radius (px) before it despawns */
+export const SHOCKWAVE_MAX_RADIUS   = 290;
+/** Visual and collision half-thickness of the shockwave ring (px) */
+export const SHOCKWAVE_THICKNESS    = 22;
+
+// ─── Trap Bubble ─────────────────────────────────────────────────────────────
+/** Default trap-bubble travel speed in px/s */
+export const BUBBLE_SPEED     = 90;
+/** Collision radius of a trap bubble (px) */
+export const BUBBLE_HITBOX_R  = 12;
+/** Duration the player is slowed when hit by a bubble (ms) */
+export const TRAP_DURATION_MS = 2500;
+/** Player speed multiplier while trapped (fraction of normal) */
+export const TRAP_SLOW_FACTOR = 0.22;
+
 // ─── Colours ─────────────────────────────────────────────────────────────────
 export const COL_BG          = 0x000011;
 export const COL_STAR        = 0xffffff;
@@ -71,3 +93,5 @@ export const COL_BULLET_P1   = 0xff4444; // phase 1 – red
 export const COL_BULLET_P2   = 0xff8800; // phase 2 – orange
 export const COL_BULLET_P3   = 0xcc44ff; // phase 3 – purple
 export const COL_BULLET_RING = 0x44ccff; // ring burst – cyan
+export const COL_SHOCKWAVE   = 0xffee00; // shockwave ring – yellow
+export const COL_BUBBLE      = 0x44ddff; // trap bubble – cyan
