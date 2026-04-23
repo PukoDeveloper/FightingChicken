@@ -15,7 +15,7 @@ export const PLAYER_FIRE_INTERVAL = 280;
 /** Player bullet radius (visual) */
 export const PLAYER_BULLET_R = 5;
 /** Invincibility duration after taking a hit in ms */
-export const INVINCIBLE_MS = 2400;
+export const INVINCIBLE_MS = 1200;
 
 // ─── Enemy (Courage / 勇氣) ──────────────────────────────────────────────────
 export const ENEMY_HP_MAX = 200;

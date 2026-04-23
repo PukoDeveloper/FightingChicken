@@ -147,10 +147,11 @@ async function enter(core: Core): Promise<void> {
     const h = createHeart(true);
     h.scale.set(1.1);
     h.x = 18 + i * 26;
-    h.y = 24;
+    h.y = 0;
     heartsContainer.addChild(h);
     hearts.push(h);
   }
+  heartsContainer.y = H - 30;
   uiLayer.addChild(heartsContainer);
 
   // Boss HP bar
