@@ -36,6 +36,20 @@ export const PHASE2_FRAC = 0.66;
 /** HP fraction at which phase 3 starts */
 export const PHASE3_FRAC = 0.33;
 
+// ─── Pickups ─────────────────────────────────────────────────────────────────
+/** Collection radius for pickups (px) */
+export const ITEM_COLLECT_R = 22;
+/** Time before an uncollected pickup disappears (ms) */
+export const ITEM_LIFETIME_MS = 7000;
+/** Minimum time between pickup spawns (ms) */
+export const ITEM_SPAWN_MIN_MS = 8000;
+/** Maximum time between pickup spawns (ms) */
+export const ITEM_SPAWN_MAX_MS = 16000;
+/** Duration of the damage power-up (ms) */
+export const POWER_UP_DURATION_MS = 8000;
+/** Fire interval while damage power-up is active (ms) */
+export const POWER_FIRE_INTERVAL = 140;
+
 // ─── Scoring ─────────────────────────────────────────────────────────────────
 export const SCORE_PER_HIT = 10;
 export const SCORE_BONUS_WIN = 5000;

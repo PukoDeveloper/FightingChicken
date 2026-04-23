@@ -12,6 +12,8 @@ import {
   createHeart,
   createBossHpBar,
   createFlashOverlay,
+  createHealthItem,
+  createPowerItem,
 } from '../game/sprites';
 import {
   PLAYER_HP_MAX,
@@ -24,6 +26,12 @@ import {
   ENEMY_BULLET_R,
   SCORE_PER_HIT,
   SCORE_BONUS_WIN,
+  ITEM_COLLECT_R,
+  ITEM_LIFETIME_MS,
+  ITEM_SPAWN_MIN_MS,
+  ITEM_SPAWN_MAX_MS,
+  POWER_UP_DURATION_MS,
+  POWER_FIRE_INTERVAL,
 } from '../constants';
 import { gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
@@ -36,6 +44,18 @@ interface BulletData {
   y: number;
   vx: number; // px/s
   vy: number; // px/s
+}
+
+// ─── Item (pickup) data ───────────────────────────────────────────────────────
+interface ItemData {
+  display: Container;
+  x: number;
+  y: number;
+  vx: number; // drift px/s
+  vy: number;
+  type: 'health' | 'power';
+  lifetime: number; // ms remaining
+  bobTimer: number; // accumulator for bobbing sine
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -84,7 +104,8 @@ async function enter(core: Core): Promise<void> {
   // ── Bullet containers ────────────────────────────────────────────────────
   const playerBulletsContainer = new Container();
   const enemyBulletsContainer = new Container();
-  worldLayer.addChild(enemyBulletsContainer, playerBulletsContainer);
+  const itemsContainer = new Container();
+  worldLayer.addChild(enemyBulletsContainer, itemsContainer, playerBulletsContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createChickenDisplay();
@@ -112,6 +133,11 @@ async function enter(core: Core): Promise<void> {
   // ── Bullet arrays ────────────────────────────────────────────────────────
   const playerBullets: BulletData[] = [];
   const enemyBullets: BulletData[] = [];
+
+  // ── Item (pickup) state ───────────────────────────────────────────────────
+  const items: ItemData[] = [];
+  let itemSpawnTimer = 5000; // first item spawns after 5 s
+  let powerUpTimer = 0;      // ms remaining on current damage power-up
 
   // ── Game state ───────────────────────────────────────────────────────────
   let playerHP = PLAYER_HP_MAX;
@@ -233,6 +259,20 @@ async function enter(core: Core): Promise<void> {
   const flashOverlay = createFlashOverlay(W, H);
   sysLayer.addChild(flashOverlay);
 
+  // Power-up indicator (bottom-left, above hearts)
+  const powerUpStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xffee44,
+    fontWeight: 'bold',
+    dropShadow: { color: 0xff8800, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const powerUpText = new Text({ text: '', style: powerUpStyle });
+  powerUpText.anchor.set(0, 1);
+  powerUpText.x = 10;
+  powerUpText.y = H - 38;
+  uiLayer.addChild(powerUpText);
+
   // ── Helper: spawn enemy bullet ────────────────────────────────────────────
   function spawnEnemyBullet(
     x: number, y: number,
@@ -263,6 +303,35 @@ async function enter(core: Core): Promise<void> {
     arr.splice(idx, 1);
   }
 
+  // ── Helper: spawn a random pickup item ────────────────────────────────────
+  function spawnItem(): void {
+    const type: 'health' | 'power' = Math.random() < 0.5 ? 'health' : 'power';
+    const display = type === 'health' ? createHealthItem() : createPowerItem();
+    const x = 40 + Math.random() * (W - 80);
+    const y = H * 0.35 + Math.random() * (H * 0.30);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 20 + Math.random() * 20;
+    display.x = x;
+    display.y = y;
+    itemsContainer.addChild(display);
+    items.push({
+      display, x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      type,
+      lifetime: ITEM_LIFETIME_MS,
+      bobTimer: Math.random() * Math.PI * 2 * 400,
+    });
+  }
+
+  // ── Helper: remove pickup item ────────────────────────────────────────────
+  function removeItem(arr: ItemData[], idx: number, container: Container): void {
+    const item = arr[idx];
+    container.removeChild(item.display);
+    item.display.destroy();
+    arr.splice(idx, 1);
+  }
+
   // ── Helper: update HUD ────────────────────────────────────────────────────
   function updateHUD(): void {
     // Hearts
@@ -288,6 +357,13 @@ async function enter(core: Core): Promise<void> {
     scoreText.text = `SCORE: ${score}`;
     phaseText.text = `PHASE ${phase}`;
     levelWaveText.text = `LVL ${levelConfig.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig.waves.length}`;
+
+    // Power-up indicator
+    if (powerUpTimer > 0) {
+      powerUpText.text = `⚡ 火力提升 ${Math.ceil(powerUpTimer / 1000)}s`;
+    } else {
+      powerUpText.text = '';
+    }
   }
 
   // ── Helper: check phase ───────────────────────────────────────────────────
@@ -462,9 +538,14 @@ async function enter(core: Core): Promise<void> {
       // ── Player auto-fire ──────────────────────────────────────────────────
       playerFireTimer -= dt;
       if (playerFireTimer <= 0) {
-        playerFireTimer = PLAYER_FIRE_INTERVAL;
+        const fireInterval = powerUpTimer > 0 ? POWER_FIRE_INTERVAL : PLAYER_FIRE_INTERVAL;
+        playerFireTimer = fireInterval;
         spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18);
         spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18);
+        if (powerUpTimer > 0) {
+          // Extra centre bullet while powered up
+          spawnPlayerBullet(playerEntity.position.x, playerEntity.position.y - 22);
+        }
       }
 
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
@@ -626,6 +707,84 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Item spawn timer ──────────────────────────────────────────────────
+      if (!waveTransitioning) {
+        itemSpawnTimer -= dt;
+        if (itemSpawnTimer <= 0) {
+          itemSpawnTimer = ITEM_SPAWN_MIN_MS + Math.random() * (ITEM_SPAWN_MAX_MS - ITEM_SPAWN_MIN_MS);
+          spawnItem();
+        }
+      }
+
+      // ── Move and collect items ────────────────────────────────────────────
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        item.bobTimer += dt;
+        item.lifetime -= dt;
+
+        // Drift
+        item.x += item.vx * (dt / 1000);
+        item.y += item.vy * (dt / 1000);
+
+        // Bounce gently off play-area walls
+        if (item.x < 30)      { item.x = 30;      item.vx =  Math.abs(item.vx); }
+        if (item.x > W - 30)  { item.x = W - 30;  item.vx = -Math.abs(item.vx); }
+        if (item.y < H * 0.25) { item.y = H * 0.25; item.vy =  Math.abs(item.vy); }
+        if (item.y > H * 0.75) { item.y = H * 0.75; item.vy = -Math.abs(item.vy); }
+
+        // Visual position: add bobbing offset
+        item.display.x = item.x;
+        item.display.y = item.y + Math.sin(item.bobTimer / 400) * 6;
+
+        // Fade out when about to expire
+        item.display.alpha = item.lifetime < 2000 ? Math.max(0, item.lifetime / 2000) : 1;
+
+        // Expire
+        if (item.lifetime <= 0) {
+          removeItem(items, i, itemsContainer);
+          continue;
+        }
+
+        // Collect
+        const cdx = item.x - playerEntity.position.x;
+        const cdy = item.y - playerEntity.position.y;
+        if (Math.sqrt(cdx * cdx + cdy * cdy) < ITEM_COLLECT_R + 14) {
+          if (item.type === 'health') {
+            playerHP = Math.min(PLAYER_HP_MAX, playerHP + 1);
+          } else {
+            powerUpTimer = POWER_UP_DURATION_MS;
+          }
+          // Sparkle burst on collect
+          core.events.emitSync('particle/emit', {
+            config: {
+              x: item.x,
+              y: item.y,
+              burst: true,
+              burstCount: 14,
+              speed: 100,
+              speedVariance: 50,
+              spread: 180,
+              angle: 0,
+              lifetime: 450,
+              startAlpha: 1,
+              endAlpha: 0,
+              startScale: 1,
+              endScale: 0,
+              startColor: item.type === 'health' ? 0x00ff88 : 0xffee44,
+              endColor: item.type === 'health' ? 0x00cc55 : 0xff8800,
+              radius: 5,
+            },
+          });
+          removeItem(items, i, itemsContainer);
+          continue;
+        }
+      }
+
+      // ── Power-up countdown ────────────────────────────────────────────────
+      if (powerUpTimer > 0) {
+        powerUpTimer = Math.max(0, powerUpTimer - dt);
+      }
+
       updateHUD();
     }
   );
@@ -641,6 +800,13 @@ async function enter(core: Core): Promise<void> {
       enemyBullets[i].display.destroy();
     }
     enemyBullets.length = 0;
+
+    // Clear any leftover items between waves
+    for (let i = items.length - 1; i >= 0; i--) {
+      itemsContainer.removeChild(items[i].display);
+      items[i].display.destroy();
+    }
+    items.length = 0;
 
     // Show wave-clear banner (1-based wave number for display)
     waveBannerText.text = `第 ${nextWaveIdx + 1} 波！`;
@@ -664,6 +830,7 @@ async function enter(core: Core): Promise<void> {
     ringTimer = 0;
     phaseFlashTimer = 0;
     flashOverlay.alpha = 0;
+    itemSpawnTimer = 3000; // first item spawns 3 s into new wave
 
     // Reset enemy position
     enemyEntity.position.x = W * 0.5;
@@ -745,20 +912,28 @@ async function enter(core: Core): Promise<void> {
     playerBullets.length = 0;
     enemyBullets.length = 0;
 
+    // Destroy all items
+    for (const item of items) {
+      itemsContainer.removeChild(item.display);
+      item.display.destroy();
+    }
+    items.length = 0;
+
     // Destroy entities
     core.events.emitSync('entity/destroy', { id: 'player' });
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, enemyBulletsContainer);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
     playerBulletsContainer.destroy({ children: true });
+    itemsContainer.destroy({ children: true });
     enemyBulletsContainer.destroy({ children: true });
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -766,6 +941,7 @@ async function enter(core: Core): Promise<void> {
     phaseText.destroy();
     levelWaveText.destroy();
     waveBannerText.destroy();
+    powerUpText.destroy();
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
