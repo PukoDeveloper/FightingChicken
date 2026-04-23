@@ -2,6 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
+import { endlessState } from '../game/store';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
@@ -110,8 +111,49 @@ async function enter(core: Core): Promise<void> {
   btn.addChild(btnText);
 
   btn.x = W * 0.5;
-  btn.y = H * 0.78;
+  btn.y = H * 0.74;
   uiLayer.addChild(btn);
+
+  // ── Endless Mode button ───────────────────────────────────────────────────
+  const endlessBtnW = 200, endlessBtnH = 52;
+  const endlessBtn = new Container();
+  endlessBtn.eventMode = 'static';
+  endlessBtn.cursor = 'pointer';
+
+  const endlessBtnBg = new Graphics();
+  endlessBtnBg.roundRect(-endlessBtnW / 2, -endlessBtnH / 2, endlessBtnW, endlessBtnH, 12)
+    .fill({ color: 0x004488, alpha: 0.9 });
+  endlessBtnBg.roundRect(-endlessBtnW / 2, -endlessBtnH / 2, endlessBtnW, endlessBtnH, 12)
+    .stroke({ color: 0x44aaff, width: 2 });
+  endlessBtn.addChild(endlessBtnBg);
+
+  const endlessBtnStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 22,
+    fontWeight: 'bold',
+    fill: 0xaaddff,
+  });
+  const endlessBtnText = new Text({ text: '∞  無盡模式', style: endlessBtnStyle });
+  endlessBtnText.anchor.set(0.5);
+  endlessBtn.addChild(endlessBtnText);
+
+  // Best wave sub-label
+  const bestWaveStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 12,
+    fill: 0x88bbdd,
+  });
+  const bestWaveText = new Text({
+    text: endlessState.bestWave > 1 ? `最高波數：第 ${endlessState.bestWave} 波` : '挑戰無限關卡！',
+    style: bestWaveStyle,
+  });
+  bestWaveText.anchor.set(0.5);
+  bestWaveText.y = endlessBtnH / 2 + 10;
+  endlessBtn.addChild(bestWaveText);
+
+  endlessBtn.x = W * 0.5;
+  endlessBtn.y = H * 0.84;
+  uiLayer.addChild(endlessBtn);
 
   // ── DEV button (bottom-right corner) ─────────────────────────────────────
   const devBtnW = 46, devBtnH = 22;
@@ -145,6 +187,8 @@ async function enter(core: Core): Promise<void> {
   // ── Button animation & interaction ────────────────────────────────────────
   let btnScale = 1;
   let btnScaleDir = 1;
+  let endlessBtnScale = 1;
+  let endlessBtnDir = 1;
 
   const unsubTick = core.events.on('title', 'core/tick', ({ delta }: { delta: number }) => {
     const dt = delta;
@@ -152,6 +196,12 @@ async function enter(core: Core): Promise<void> {
     if (btnScale > 1.05) btnScaleDir = -1;
     if (btnScale < 0.96) btnScaleDir = 1;
     btn.scale.set(btnScale);
+
+    // Endless button pulses slightly out of phase
+    endlessBtnScale += 0.0006 * endlessBtnDir * dt;
+    if (endlessBtnScale > 1.04) endlessBtnDir = -1;
+    if (endlessBtnScale < 0.97) endlessBtnDir = 1;
+    endlessBtn.scale.set(endlessBtnScale);
 
     // Pulse VS text
     vsText.rotation += 0.002 * dt;
@@ -163,13 +213,21 @@ async function enter(core: Core): Promise<void> {
 
   // Click / touch start
   btn.on('pointerdown', async () => {
+    endlessState.active = false;
     await core.events.emit('scene/load', { key: 'levelselect' });
+  });
+
+  endlessBtn.on('pointerdown', async () => {
+    endlessState.active = true;
+    endlessState.wave = 1;
+    endlessState.buffs = [];
+    await core.events.emit('scene/load', { key: 'game' });
   });
 
   _cleanup = () => {
     core.events.removeNamespace('title');
     worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, hint, btn, devBtn);
+    uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, devBtn);
     stars.destroy({ children: true });
     chickenPreview.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -178,6 +236,7 @@ async function enter(core: Core): Promise<void> {
     subtitle.destroy();
     hint.destroy();
     btn.destroy({ children: true });
+    endlessBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
     unsubTick();
   };

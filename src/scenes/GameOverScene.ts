@@ -3,6 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createChickenDisplay, createCourageDisplay } from '../game/sprites';
 import { gameResult } from '../game/store';
+import { endlessState } from '../game/store';
 import { createLevel } from '../game/levels';
 
 let _cleanup: (() => void) | null = null;
@@ -84,20 +85,26 @@ async function enter(core: Core): Promise<void> {
   hiScoreLabel.y = H * 0.67;
   uiLayer.addChild(hiScoreLabel);
 
-  // ── Level reached ─────────────────────────────────────────────────────────
+  // ── Level / endless wave reached ──────────────────────────────────────────
+  const isEndlessGameOver = endlessState.active && gameResult.playedLevel === 0;
   const clearedLevel = gameResult.playedLevel;
-  const clearedLevelConfig = createLevel(clearedLevel);
   const levelStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 16,
     fill: 0xaaddff,
   });
-  const levelLabel = new Text({
-    text: won
+  let levelLabelText: string;
+  if (isEndlessGameOver) {
+    const waveReached = endlessState.wave;
+    const best = endlessState.bestWave;
+    levelLabelText = `無盡模式 · 第 ${waveReached} 波  最高：第 ${best} 波`;
+  } else {
+    const clearedLevelConfig = createLevel(clearedLevel);
+    levelLabelText = won
       ? `通關第 ${clearedLevel} 關「${clearedLevelConfig.name}」！`
-      : `挑戰第 ${clearedLevel} 關「${clearedLevelConfig.name}」`,
-    style: levelStyle,
-  });
+      : `挑戰第 ${clearedLevel} 關「${clearedLevelConfig.name}」`;
+  }
+  const levelLabel = new Text({ text: levelLabelText, style: levelStyle });
   levelLabel.anchor.set(0.5);
   levelLabel.x = W * 0.5;
   levelLabel.y = H * 0.74;
@@ -110,9 +117,11 @@ async function enter(core: Core): Promise<void> {
     fill: won ? 0xaaffaa : 0xffaaaa,
     align: 'center',
   });
-  const msgText = won
-    ? '你用勇氣戰勝了勇氣！\n小雞的逆襲成功了！'
-    : '被彈幕擊倒了...\n再試一次！';
+  const msgText = isEndlessGameOver
+    ? '被彈幕擊倒了...\n無盡的挑戰等著你！'
+    : (won
+      ? '你用勇氣戰勝了勇氣！\n小雞的逆襲成功了！'
+      : '被彈幕擊倒了...\n再試一次！');
   const msgLabel = new Text({ text: msgText, style: msgStyle });
   msgLabel.anchor.set(0.5);
   msgLabel.x = W * 0.5;
@@ -148,6 +157,12 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(btn);
 
   btn.on('pointerdown', async () => {
+    if (isEndlessGameOver) {
+      // Restart endless mode from wave 1 with fresh buffs
+      endlessState.active = true;
+      endlessState.wave = 1;
+      endlessState.buffs = [];
+    }
     await core.events.emit('scene/load', { key: 'game' });
   });
 
@@ -178,6 +193,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(titleBtn);
 
   titleBtn.on('pointerdown', async () => {
+    endlessState.active = false;
     await core.events.emit('scene/load', { key: 'title' });
   });
 
