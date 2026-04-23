@@ -87,7 +87,7 @@ async function enter(core: Core): Promise<void> {
   const hint = new Text({ text: '拖曳移動小雞  •  自動射擊\n躲開勇氣的彈幕，擊敗他！', style: hintStyle });
   hint.anchor.set(0.5);
   hint.x = W * 0.5;
-  hint.y = H * 0.65;
+  hint.y = H * 0.60;
   hint.alpha = 0;
   uiLayer.addChild(hint);
 
@@ -115,7 +115,7 @@ async function enter(core: Core): Promise<void> {
   btn.addChild(btnText);
 
   btn.x = W * 0.5;
-  btn.y = H * 0.74;
+  btn.y = H * 0.72;
   btn.alpha = 0;
   uiLayer.addChild(btn);
 
@@ -157,9 +157,37 @@ async function enter(core: Core): Promise<void> {
   endlessBtn.addChild(bestWaveText);
 
   endlessBtn.x = W * 0.5;
-  endlessBtn.y = H * 0.84;
+  endlessBtn.y = H * 0.82;
   endlessBtn.alpha = 0;
   uiLayer.addChild(endlessBtn);
+
+  // ── Achievements button ───────────────────────────────────────────────────
+  const achBtnW = 180, achBtnH = 44;
+  const achBtn = new Container();
+  achBtn.eventMode = 'static';
+  achBtn.cursor = 'pointer';
+
+  const achBtnBg = new Graphics();
+  achBtnBg.roundRect(-achBtnW / 2, -achBtnH / 2, achBtnW, achBtnH, 10)
+    .fill({ color: 0x222233, alpha: 0.88 });
+  achBtnBg.roundRect(-achBtnW / 2, -achBtnH / 2, achBtnW, achBtnH, 10)
+    .stroke({ color: 0x8888bb, width: 1.5 });
+  achBtn.addChild(achBtnBg);
+
+  const achBtnStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fill: 0xccccee,
+  });
+  const achBtnText = new Text({ text: '🏆  成就', style: achBtnStyle });
+  achBtnText.anchor.set(0.5);
+  achBtn.addChild(achBtnText);
+
+  achBtn.x = W * 0.5;
+  achBtn.y = H * 0.91;
+  achBtn.alpha = 0;
+  uiLayer.addChild(achBtn);
 
   // ── DEV button (bottom-right corner) ─────────────────────────────────────
   const devBtnW = 46, devBtnH = 22;
@@ -191,8 +219,8 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Scene fade-in via TweenManager ────────────────────────────────────────
-  const fadeTargets = [title, subtitle, hint, btn, endlessBtn] as unknown as Record<string, unknown>[];
-  const delays = [0, 150, 600, 350, 500];
+  const fadeTargets = [title, subtitle, hint, btn, endlessBtn, achBtn] as unknown as Record<string, unknown>[];
+  const delays = [0, 150, 600, 350, 500, 650];
   fadeTargets.forEach((t, i) => {
     core.events.emitSync('tween/to', {
       target: t,
@@ -250,12 +278,16 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'costumeselect' });
   });
 
+  achBtn.on('pointerup', async () => {
+    await core.events.emit('scene/load', { key: 'achievements' });
+  });
+
   _cleanup = () => {
     core.events.removeNamespace('title');
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     core.events.emitSync('tween/kill', { target: endlessBtn.scale as unknown as Record<string, unknown> });
     worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, devBtn);
+    uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, achBtn, devBtn);
     stars.destroy({ children: true });
     chickenPreview.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -265,6 +297,7 @@ async function enter(core: Core): Promise<void> {
     hint.destroy();
     btn.destroy({ children: true });
     endlessBtn.destroy({ children: true });
+    achBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
     unsubTick();
   };

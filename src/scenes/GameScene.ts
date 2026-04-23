@@ -153,6 +153,16 @@ interface CurveBulletData {
   turnRate: number;    // radians/s toward player
 }
 
+// ─── Laser beam data ─────────────────────────────────────────────────────────
+interface LaserBeamData {
+  display: Graphics;
+  x: number;            // center x of the beam
+  phase: 'warning' | 'active' | 'fading';
+  phaseMs: number;      // ms remaining in current phase
+  color: number;
+  hitDealt: boolean;    // only deal damage once per active phase
+}
+
 // ─── Module-level cleanup handle ────────────────────────────────────────────
 let _cleanup: (() => void) | null = null;
 
@@ -215,7 +225,8 @@ async function enter(core: Core): Promise<void> {
   const itemsContainer = new Container();
   const shockwavesContainer = new Container();
   const bubblesContainer = new Container();
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, itemsContainer, playerBulletsContainer);
+  const lasersContainer = new Container();
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, itemsContainer, playerBulletsContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -252,6 +263,7 @@ async function enter(core: Core): Promise<void> {
   const bubbles: BubbleData[] = [];
   const bombs: BombData[] = [];
   const curveBullets: CurveBulletData[] = [];
+  const lasers: LaserBeamData[] = [];
 
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
@@ -671,6 +683,12 @@ async function enter(core: Core): Promise<void> {
         enemyBulletPool.release(curveBullets[i].display);
       }
       curveBullets.length = 0;
+      // Clear laser beams
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        lasersContainer.removeChild(lasers[i].display);
+        lasers[i].display.destroy();
+      }
+      lasers.length = 0;
       // Reset new attack timers so the first volley fires at their configured interval
       bombTimer = 0;
       laserTimer = 0;
@@ -761,9 +779,11 @@ async function enter(core: Core): Promise<void> {
   const BOMB_SPEED = 85;                   // px/s, slow tracking projectile
   const BOMB_PULSE_PERIOD_MS = 120;        // controls pulse frequency as fuse counts down
   const LASER_MARGIN = 50;                 // px from screen edge for random laser column position
-  const LASER_COL_SPREAD = 14;             // px horizontal jitter within a laser column
-  const LASER_COL_SPACING = 9;            // px vertical spacing between bullets in a column
-  const LASER_DOUBLE_THRESHOLD = 6;       // min bullet count that triggers a second column
+  const LASER_DOUBLE_THRESHOLD = 6;       // min bullet count that triggers a second beam
+  const LASER_WARNING_MS_BEAM = 900;      // warning phase duration (ms)
+  const LASER_ACTIVE_MS_BEAM  = 350;      // active beam damage phase (ms)
+  const LASER_FADE_MS_BEAM    = 300;      // fade-out phase (ms)
+  const LASER_BEAM_HALF_W     = 12;       // half-width of beam collision zone (px)
 
   /** Bomb: slow projectile aimed at the player; explodes into a ring after fuseMs. */
   function fireBomb(
@@ -796,23 +816,19 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
-  /** Laser: fires a dense column of bullets from a random x-position at the top
-   *  of the screen, all moving straight down at `speed`. */
-  function fireLaser(count: number, speed: number, color: number): void {
-    const laserX = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
-    for (let i = 0; i < count; i++) {
-      const x = laserX + (Math.random() - 0.5) * LASER_COL_SPREAD;
-      const y = -20 - i * LASER_COL_SPACING; // stagger upward so they form a column as they enter
-      spawnEnemyBullet(x, y, 0, speed, color);
-    }
-    // Fire a second independent column for dense laser waves
+  /** Laser: fires a visible beam from the top of the screen downward.
+   *  Phase 1 (warning): thin flashing line marks the target column.
+   *  Phase 2 (active):  wide glowing beam deals damage on contact.
+   *  Phase 3 (fading):  beam fades out. */
+  function fireLaser(count: number, _speed: number, color: number): void {
+    const spawnBeam = (bx: number) => {
+      const display = new Graphics();
+      lasersContainer.addChild(display);
+      lasers.push({ display, x: bx, phase: 'warning', phaseMs: LASER_WARNING_MS_BEAM, color, hitDealt: false });
+    };
+    spawnBeam(LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2));
     if (count >= LASER_DOUBLE_THRESHOLD) {
-      const laserX2 = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
-      for (let i = 0; i < Math.floor(count / 2); i++) {
-        const x = laserX2 + (Math.random() - 0.5) * LASER_COL_SPREAD;
-        const y = -20 - i * LASER_COL_SPACING;
-        spawnEnemyBullet(x, y, 0, speed, color);
-      }
+      spawnBeam(LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2));
     }
   }
 
@@ -1538,6 +1554,104 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Update laser beams ──────────────────────────────────────────────
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        const laser = lasers[i];
+        laser.phaseMs -= dt;
+
+        if (laser.phase === 'warning') {
+          // Thin flashing line + warning diamond at the top
+          const elapsed = LASER_WARNING_MS_BEAM - laser.phaseMs;
+          const alpha = 0.3 + 0.4 * Math.abs(Math.sin((elapsed / 120) * Math.PI));
+          laser.display.clear();
+          laser.display.rect(laser.x - 1, 0, 2, H)
+            .fill({ color: laser.color, alpha });
+          // Warning diamond marker
+          laser.display
+            .moveTo(laser.x,      18)
+            .lineTo(laser.x + 9,  30)
+            .lineTo(laser.x,      42)
+            .lineTo(laser.x - 9,  30)
+            .closePath()
+            .fill({ color: laser.color, alpha });
+
+          if (laser.phaseMs <= 0) {
+            laser.phase = 'active';
+            laser.phaseMs = LASER_ACTIVE_MS_BEAM;
+          }
+        } else if (laser.phase === 'active') {
+          // Wide glowing beam
+          laser.display.clear();
+          laser.display.rect(laser.x - LASER_BEAM_HALF_W - 8, 0, (LASER_BEAM_HALF_W + 8) * 2, H)
+            .fill({ color: laser.color, alpha: 0.15 });
+          laser.display.rect(laser.x - LASER_BEAM_HALF_W, 0, LASER_BEAM_HALF_W * 2, H)
+            .fill({ color: laser.color, alpha: 0.65 });
+          laser.display.rect(laser.x - 3, 0, 6, H)
+            .fill({ color: 0xffffff, alpha: 0.90 });
+
+          // Collision: check if player is within the beam's width
+          if (!laser.hitDealt && invincibleMs <= 0) {
+            const cpx = playerEntity.position.x;
+            const cpy = playerEntity.position.y;
+            if (Math.abs(cpx - laser.x) < LASER_BEAM_HALF_W + PLAYER_HITBOX_R) {
+              laser.hitDealt = true;
+
+              if (evasionChance > 0 && Math.random() < evasionChance) {
+                core.events.emitSync('particle/emit', {
+                  config: {
+                    x: cpx, y: cpy,
+                    burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                    spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                    startScale: 0.9, endScale: 0,
+                    startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+                  },
+                });
+              } else {
+                playerHP = Math.max(0, playerHP - 1);
+                invincibleMs = effectiveInvincibleMs;
+                playerHitThisRun = true;
+                sfxPlayerHit();
+                core.events.emitSync('camera/shake', { intensity: 10, duration: 350 });
+                flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0x00ffff, alpha: 1 });
+                flashOverlay.alpha = 0.42;
+                phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+                core.events.emitSync('particle/emit', {
+                  config: {
+                    x: cpx, y: cpy,
+                    burst: true, burstCount: 14, speed: 120, speedVariance: 60,
+                    spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+                    startScale: 1.2, endScale: 0,
+                    startColor: 0x00ffff, endColor: 0x0088aa, radius: 5,
+                  },
+                });
+                if (playerHP <= 0) { endGame(false); return; }
+              }
+            }
+          }
+
+          if (laser.phaseMs <= 0) {
+            laser.phase = 'fading';
+            laser.phaseMs = LASER_FADE_MS_BEAM;
+          }
+        } else {
+          // Fading: draw at reduced alpha
+          const alpha = laser.phaseMs / LASER_FADE_MS_BEAM;
+          laser.display.clear();
+          laser.display.rect(laser.x - LASER_BEAM_HALF_W - 8, 0, (LASER_BEAM_HALF_W + 8) * 2, H)
+            .fill({ color: laser.color, alpha: 0.15 * alpha });
+          laser.display.rect(laser.x - LASER_BEAM_HALF_W, 0, LASER_BEAM_HALF_W * 2, H)
+            .fill({ color: laser.color, alpha: 0.65 * alpha });
+          laser.display.rect(laser.x - 3, 0, 6, H)
+            .fill({ color: 0xffffff, alpha: 0.90 * alpha });
+
+          if (laser.phaseMs <= 0) {
+            lasersContainer.removeChild(laser.display);
+            laser.display.destroy();
+            lasers.splice(i, 1);
+          }
+        }
+      }
+
       // ── Move and collect items ────────────────────────────────────────────
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
@@ -1647,6 +1761,13 @@ async function enter(core: Core): Promise<void> {
       enemyBulletPool.release(curveBullets[i].display);
     }
     curveBullets.length = 0;
+
+    // Clear laser beams
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasersContainer.removeChild(lasers[i].display);
+      lasers[i].display.destroy();
+    }
+    lasers.length = 0;
 
     // Clear any leftover items between waves
     for (let i = items.length - 1; i >= 0; i--) {
@@ -1868,6 +1989,13 @@ async function enter(core: Core): Promise<void> {
     }
     curveBullets.length = 0;
 
+    // Destroy all laser beams
+    for (const laser of lasers) {
+      lasersContainer.removeChild(laser.display);
+      laser.display.destroy();
+    }
+    lasers.length = 0;
+
     // Destroy all items
     for (const item of items) {
       itemsContainer.removeChild(item.display);
@@ -1880,7 +2008,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, trapRing);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, trapRing);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -1889,6 +2017,7 @@ async function enter(core: Core): Promise<void> {
     enemyBulletsContainer.destroy({ children: true });
     shockwavesContainer.destroy({ children: true });
     bubblesContainer.destroy({ children: true });
+    lasersContainer.destroy({ children: true });
     trapRing.destroy();
 
     // Destroy UI
