@@ -5,12 +5,16 @@ import { createStarfield, createPlayerChicken, createCourageDisplay } from '../g
 import { gameResult, costumeState } from '../game/store';
 import { endlessState } from '../game/store';
 import { createLevel } from '../game/levels';
+import { startBgm, sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
 
 async function enter(core: Core): Promise<void> {
   const W = core.app.screen.width;
   const H = core.app.screen.height;
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  startBgm();
 
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
   const worldLayer = worldOut.layer as Container;
@@ -168,6 +172,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(btn);
 
   btn.on('pointerdown', async () => {
+    sfxMenuClick();
     if (isEndlessGameOver) {
       endlessState.active = true;
       endlessState.wave = 1;
@@ -208,6 +213,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(titleBtn);
 
   titleBtn.on('pointerdown', async () => {
+    sfxMenuClick();
     endlessState.active = false;
     await core.events.emit('scene/load', { key: 'title' });
   });

@@ -5,12 +5,16 @@ import { createStarfield } from '../game/sprites';
 import { endlessState } from '../game/store';
 import { pickRandomBuffs, ALL_BUFFS } from '../game/endless';
 import type { BuffDef } from '../game/endless';
+import { sfxWaveClear, sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
 
 async function enter(core: Core): Promise<void> {
   const W = core.app.screen.width;
   const H = core.app.screen.height;
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  sfxWaveClear();
 
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
   const worldLayer = worldOut.layer as Container;
@@ -150,6 +154,7 @@ async function enter(core: Core): Promise<void> {
     card.on('pointerdown', async () => {
       // Disable all cards to prevent double-click
       cardContainers.forEach(c => { c.eventMode = 'none'; });
+      sfxMenuClick();
       endlessState.buffs.push(buff.id);
       await core.events.emit('scene/load', { key: 'game' });
     });

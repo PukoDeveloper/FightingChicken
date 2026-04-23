@@ -17,6 +17,7 @@ import { endlessState } from '../game/store';
 import { COSTUMES, isCostumeUnlocked } from '../game/costumes';
 import type { CostumeId } from '../game/costumes';
 import { saveProgress } from '../game/persistence';
+import { sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
 
@@ -171,6 +172,7 @@ async function enter(core: Core): Promise<void> {
 
     if (unlocked) {
       card.on('pointerdown', () => {
+        sfxMenuClick();
         selectedId = cfg.id;
         costumeState.selected = selectedId;
         refreshLabels(selectedId);
@@ -235,6 +237,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(confirmBtn);
 
   confirmBtn.on('pointerdown', async () => {
+    sfxMenuClick();
     costumeState.selected = selectedId;
     await saveProgress();
     await core.events.emit('scene/load', { key: 'game' });
@@ -269,6 +272,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(backBtn);
 
   backBtn.on('pointerdown', async () => {
+    sfxMenuClick();
     if (endlessState.active) {
       await core.events.emit('scene/load', { key: 'title' });
     } else {

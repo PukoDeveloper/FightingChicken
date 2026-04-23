@@ -4,12 +4,16 @@ import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
+import { startBgm, sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
 
 async function enter(core: Core): Promise<void> {
   const W = core.app.screen.width;
   const H = core.app.screen.height;
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  startBgm();
 
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
   const worldLayer = worldOut.layer as Container;
@@ -92,6 +96,7 @@ async function enter(core: Core): Promise<void> {
 
     const level = i;
     btn.on('pointerdown', async () => {
+      sfxMenuClick();
       gameResult.currentLevel = level;
       await core.events.emit('scene/load', { key: 'costumeselect' });
     });
@@ -127,6 +132,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(backBtn);
 
   backBtn.on('pointerdown', async () => {
+    sfxMenuClick();
     await core.events.emit('scene/load', { key: 'title' });
   });
 
