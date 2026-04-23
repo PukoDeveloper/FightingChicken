@@ -190,19 +190,26 @@ async function enter(core: Core): Promise<void> {
 
   // ── Endless-mode buff state ───────────────────────────────────────────────
   // Derive effective player stats from accumulated buffs.
-  const buffHpUpCount    = isEndless ? endlessState.buffs.filter(b => b === 'hp_up').length : 0;
-  const buffFireRateCount = isEndless ? endlessState.buffs.filter(b => b === 'fire_rate_up').length : 0;
-  const buffTripleCount  = isEndless ? endlessState.buffs.filter(b => b === 'triple_shot').length : 0;
-  const hasBerserker     = isEndless && endlessState.buffs.includes('berserker');
-  const hasPeriodicShield = isEndless && endlessState.buffs.includes('periodic_shield');
+  const buffHpUpCount      = isEndless ? endlessState.buffs.filter(b => b === 'hp_up').length : 0;
+  const buffFireRateCount  = isEndless ? endlessState.buffs.filter(b => b === 'fire_rate_up').length : 0;
+  const buffTripleCount    = isEndless ? endlessState.buffs.filter(b => b === 'triple_shot').length : 0;
+  const buffBloodPriceCount = isEndless ? endlessState.buffs.filter(b => b === 'blood_price').length : 0;
+  const buffBulletPowerCount = isEndless ? endlessState.buffs.filter(b => b === 'bullet_power').length : 0;
+  const buffEvasionCount   = isEndless ? endlessState.buffs.filter(b => b === 'evasion').length : 0;
+  const hasBerserker       = isEndless && endlessState.buffs.includes('berserker');
+  const hasPeriodicShield  = isEndless && endlessState.buffs.includes('periodic_shield');
 
-  // Effective max HP (base + hp_up stacks, capped at 10)
-  const effectiveHpMax = Math.min(PLAYER_HP_MAX + buffHpUpCount, 10);
+  // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
+  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount, 1), 10);
   // Effective base fire interval (reduced by 15% per fire_rate_up stack, floored at 60 ms)
   const effectiveFireInterval = Math.max(
     Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.85, buffFireRateCount)),
     60,
   );
+  // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
+  const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
+  // Evasion chance: 25% per stack, capped at 75%
+  const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
 
   // Periodic shield: counts down ms until next activation
   let periodicShieldTimer = hasPeriodicShield ? 12000 : 0;
@@ -216,7 +223,7 @@ async function enter(core: Core): Promise<void> {
   let playerHP: number;
   if (!isEndless) {
     playerHP = PLAYER_HP_MAX;
-  } else if (endlessState.currentHp === 0) {
+  } else if (endlessState.currentHp <= 0) {
     // First wave — start at full effective max
     playerHP = effectiveHpMax;
   } else {
@@ -452,9 +459,14 @@ async function enter(core: Core): Promise<void> {
     // Score / phase / wave
     scoreText.text = `SCORE: ${score}`;
     phaseText.text = `PHASE ${phase}`;
-    levelWaveText.text = isEndless
+
+    // Build bottom-right status line
+    let statusLine = isEndless
       ? `∞ 無盡  第 ${endlessState.wave} 波`
       : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`;
+    if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
+    if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
+    levelWaveText.text = statusLine;
 
     // Power-up indicator
     if (powerUpTimer > 0) {
@@ -798,8 +810,8 @@ async function enter(core: Core): Promise<void> {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
           removeBullet(playerBullets, i, playerBulletsContainer);
-          enemyHP = Math.max(0, enemyHP - 1);
-          score += SCORE_PER_HIT;
+          enemyHP = Math.max(0, enemyHP - bulletDamage);
+          score += SCORE_PER_HIT * bulletDamage;
           hitFlashTimer = 80;
 
           // Emit explosion particles
@@ -866,6 +878,22 @@ async function enter(core: Core): Promise<void> {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_BULLET_R + PLAYER_HITBOX_R) {
           removeBullet(enemyBullets, i, enemyBulletsContainer);
+
+          // Evasion roll: skip damage but still remove the bullet
+          if (evasionChance > 0 && Math.random() < evasionChance) {
+            // Show a brief "dodge" flash in green
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                startScale: 0.9, endScale: 0,
+                startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+              },
+            });
+            continue;
+          }
+
           playerHP = Math.max(0, playerHP - 1);
           invincibleMs = INVINCIBLE_MS;
 
@@ -942,6 +970,21 @@ async function enter(core: Core): Promise<void> {
             shockwavesContainer.removeChild(sw.display);
             sw.display.destroy();
             shockwaves.splice(i, 1);
+
+            // Evasion roll for shockwave
+            if (evasionChance > 0 && Math.random() < evasionChance) {
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: playerEntity.position.x, y: playerEntity.position.y,
+                  burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                  spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+                },
+              });
+              continue;
+            }
+
             playerHP = Math.max(0, playerHP - 1);
             invincibleMs = INVINCIBLE_MS;
 

@@ -23,7 +23,10 @@ export type BuffId =
   | 'fire_rate_up'    // -15% fire interval (faster shots, stackable)
   | 'triple_shot'     // +1 extra centre bullet per volley (stackable)
   | 'berserker'       // when HP ≤ 2, fire interval halved
-  | 'periodic_shield';// gain 2 s invincibility every 12 s
+  | 'periodic_shield' // gain 2 s invincibility every 12 s
+  | 'blood_price'     // max HP -1 (min 1), but each bullet deals +2 damage (stackable)
+  | 'bullet_power'    // each bullet deals +1 bonus damage (stackable)
+  | 'evasion';        // +25% chance to nullify incoming damage (stackable, capped at 75%)
 
 export interface BuffDef {
   id: BuffId;
@@ -75,6 +78,27 @@ export const ALL_BUFFS: BuffDef[] = [
     desc: '每 12 秒自動獲得\n2 秒無敵效果',
     color: 0x08080f,
     borderColor: 0xaaddff,
+  },
+  {
+    id: 'blood_price',
+    name: '血之代價',
+    desc: '最大生命 -1（最低 1），\n每顆子彈傷害 +2',
+    color: 0x1a0005,
+    borderColor: 0xff2255,
+  },
+  {
+    id: 'bullet_power',
+    name: '穿甲彈',
+    desc: '每顆子彈傷害 +1\n（可多次疊加）',
+    color: 0x0d0a00,
+    borderColor: 0xffdd00,
+  },
+  {
+    id: 'evasion',
+    name: '閃避本能',
+    desc: '受到攻擊時有 25% 機率\n完全無效化傷害（最高 75%）',
+    color: 0x000a0a,
+    borderColor: 0x00eebb,
   },
 ];
 
