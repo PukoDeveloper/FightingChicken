@@ -134,6 +134,7 @@ const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
 const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
   evasion: 3,        // 3 × 10% = 30% dodge cap; a 4th stack is wasted
   item_drop_up: 4,   // 4 stacks reduces spawn to ~31.6% of base, near the 2 s floor
+  regen: 3,          // 3 stacks reaches the 6 s interval floor; a 4th stack is wasted
 };
 
 /**

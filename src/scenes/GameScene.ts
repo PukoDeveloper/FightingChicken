@@ -290,7 +290,9 @@ async function enter(core: Core): Promise<void> {
   if (regenIntervalMs <= 0) {
     regenTimer = 0;
   } else if (isEndless && endlessState.regenTimer > 0) {
-    regenTimer = endlessState.regenTimer;
+    // Cap to the current interval so a newly-added stack is felt immediately
+    // (carry-over could exceed the shorter interval when a second stack is picked).
+    regenTimer = Math.min(endlessState.regenTimer, regenIntervalMs);
   } else {
     regenTimer = regenIntervalMs;
   }
