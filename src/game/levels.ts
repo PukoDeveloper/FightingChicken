@@ -88,6 +88,11 @@ export interface LevelConfig {
   /** Determines which enemy sprite & mechanics theme is active. */
   enemyType: EnemyType;
   waves: WaveConfig[];
+  /**
+   * Multiplier applied to item spawn intervals (< 1 = more frequent drops).
+   * Defaults to 1.0 when omitted.
+   */
+  itemDropMult?: number;
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -424,6 +429,7 @@ const LEVEL_4: LevelConfig = {
   levelNumber: 4,
   name: '幽靈試煉',
   enemyType: 'phantom',
+  itemDropMult: 0.65,
   waves: [
     {
       waveNumber: 1,
@@ -590,6 +596,7 @@ const LEVEL_5: LevelConfig = {
   levelNumber: 5,
   name: '混沌深淵',
   enemyType: 'chaos',
+  itemDropMult: 0.55,
   waves: [
     {
       waveNumber: 1,
