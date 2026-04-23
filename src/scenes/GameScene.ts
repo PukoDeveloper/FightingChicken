@@ -204,27 +204,27 @@ async function enter(core: Core): Promise<void> {
 
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
   const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount, 1), 10);
-  // Effective base fire interval (reduced by 15% per fire_rate_up stack, floored at 60 ms)
+  // Effective base fire interval (reduced by 8% per fire_rate_up stack, floored at 80 ms)
   const effectiveFireInterval = Math.max(
-    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.85, buffFireRateCount)),
-    60,
+    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.92, buffFireRateCount)),
+    80,
   );
   // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
-  const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
-  // Evasion chance: 25% per stack, capped at 75%
-  const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
-  // Effective invincibility duration: base + 600 ms per long_invincible stack
-  const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
-  // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
+  const bulletDamage = 1 + buffBloodPriceCount * 1 + buffBulletPowerCount;
+  // Evasion chance: 10% per stack, capped at 40%
+  const evasionChance = Math.min(buffEvasionCount * 0.10, 0.40);
+  // Effective invincibility duration: base + 200 ms per long_invincible stack
+  const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 200;
+  // Effective item spawn interval: reduced 10% per stack (capped at 50% reduction, floor 2 s / 4 s)
   const itemSpawnMinMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * Math.pow(0.75, buffItemDropCount)), 2000)
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * Math.pow(0.90, buffItemDropCount)), 2000)
     : ITEM_SPAWN_MIN_MS;
   const itemSpawnMaxMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, buffItemDropCount)), 4000)
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.90, buffItemDropCount)), 4000)
     : ITEM_SPAWN_MAX_MS;
-  // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
+  // Regen: 15 s base interval per first stack, each additional stack subtracts 1 s more (min 9 s)
   const regenIntervalMs = buffRegenCount > 0
-    ? Math.max(15000 - buffRegenCount * 3000, 6000)
+    ? Math.max(15000 - buffRegenCount * 1000, 9000)
     : 0;
 
   // Periodic shield: counts down ms until next activation
@@ -255,7 +255,7 @@ async function enter(core: Core): Promise<void> {
     }
   }
   let enemyHP = waveMaxHp;
-  let score = 0;
+  let score = isEndless ? endlessState.accumulatedScore : 0;
   let phase: 1 | 2 | 3 = 1;
   let invincibleMs = 0;
   let gameEnded = false;
@@ -1239,6 +1239,9 @@ async function enter(core: Core): Promise<void> {
     // Store accumulated score
     gameResult.score = score;
     if (score > gameResult.highScore) gameResult.highScore = score;
+
+    // Persist accumulated score for the next wave
+    endlessState.accumulatedScore = score;
 
     // Carry the player's current HP into the next wave
     endlessState.currentHp = playerHP;

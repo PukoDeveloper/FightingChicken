@@ -57,7 +57,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'fire_rate_up',
     name: '射速提升',
-    desc: '射擊頻率提高 15%\n（可多次疊加）',
+    desc: '射擊頻率提高 8%\n（可多次疊加）',
     color: 0x0a0a1a,
     borderColor: 0x44aaff,
   },
@@ -85,7 +85,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'blood_price',
     name: '血之代價',
-    desc: '最大生命 -1（最低 1），\n每顆子彈傷害 +2',
+    desc: '最大生命 -1（最低 1），\n每顆子彈傷害 +1',
     color: 0x1a0005,
     borderColor: 0xff2255,
   },
@@ -99,7 +99,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'evasion',
     name: '閃避本能',
-    desc: '受到攻擊時有 25% 機率\n完全無效化傷害（最高 75%）',
+    desc: '受到攻擊時有 10% 機率\n完全無效化傷害（最高 40%）',
     color: 0x000a0a,
     borderColor: 0x00eebb,
   },
@@ -113,14 +113,14 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'long_invincible',
     name: '無敵延長',
-    desc: '受傷後無敵時間\n延長 0.6 秒（可疊加）',
+    desc: '受傷後無敵時間\n延長 0.2 秒（可疊加）',
     color: 0x080810,
     borderColor: 0x8888ff,
   },
   {
     id: 'item_drop_up',
     name: '道具好運',
-    desc: '道具出現間隔縮短 25%\n（可疊加，最多縮短 75%）',
+    desc: '道具出現間隔縮短 10%\n（可疊加，最多縮短 50%）',
     color: 0x100a00,
     borderColor: 0xffaa22,
   },

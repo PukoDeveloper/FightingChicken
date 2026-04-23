@@ -32,5 +32,7 @@ export const endlessState = {
   bestWave: 1,
   /** HP carried over from the previous wave (0 = start fresh at base HP). */
   currentHp: 0,
+  /** Score accumulated across all waves in the current endless run. */
+  accumulatedScore: 0,
 };
 

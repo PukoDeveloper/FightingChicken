@@ -163,6 +163,7 @@ async function enter(core: Core): Promise<void> {
       endlessState.wave = 1;
       endlessState.buffs = [];
       endlessState.currentHp = 0;
+      endlessState.accumulatedScore = 0;
     }
     await core.events.emit('scene/load', { key: 'game' });
   });
