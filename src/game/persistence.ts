@@ -25,6 +25,19 @@ export function initPersistence(core: Core): void {
 export async function saveProgress(): Promise<void> {
   if (!_core) return;
   try {
+    // Snapshot achievement states so they are included in the slot patch before
+    // the storage adapter writes.  The AchievementPlugin hooks into the
+    // save/slot:save *after* phase, but the LocalStorageSaveAdapter (registered
+    // first) also runs in that phase and writes to storage before the plugin can
+    // append its data.  By embedding achievements in the patch here we guarantee
+    // they are part of the slot data that gets persisted.
+    const { output: achOut } = _core.events.emitSync('achievement/list', {});
+    type AchievementEntry = { id: string; progress: number; unlockedAt: string | null };
+    const achList = (achOut as { achievements: AchievementEntry[] }).achievements ?? [];
+    const achievementsSnapshot: { data: Record<string, { progress: number; unlockedAt: string | null }> } = {
+      data: Object.fromEntries(achList.map((a) => [a.id, { progress: a.progress, unlockedAt: a.unlockedAt }])),
+    };
+
     _core.events.emitSync('save/slot:set', {
       id: SLOT_ID,
       patch: {
@@ -33,6 +46,7 @@ export async function saveProgress(): Promise<void> {
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
+        _achievements: achievementsSnapshot,
       },
     });
     await _core.events.emit('save/slot:save', { id: SLOT_ID });

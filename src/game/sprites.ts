@@ -66,8 +66,8 @@ export function createCourageDisplay(): Container {
   const g = new Graphics();
 
   // Outer glow ring
-  g.circle(0, 0, 58).fill({ color: 0x9900cc, alpha: 0.18 });
-  g.circle(0, 0, 52).fill({ color: 0xdd00ff, alpha: 0.12 });
+  g.circle(0, 0, 58).fill({ color: 0x9900cc, alpha: 0.08 });
+  g.circle(0, 0, 52).fill({ color: 0xdd00ff, alpha: 0.05 });
 
   // Left horn
   g.moveTo(-28, -36).lineTo(-18, -58).lineTo(-8, -36).closePath().fill(0xff4400);
@@ -148,8 +148,8 @@ export function createPhantomDisplay(): Container {
   const g = new Graphics();
 
   // Outer ethereal aura
-  g.circle(0, 0, 58).fill({ color: 0x2244cc, alpha: 0.14 });
-  g.circle(0, 0, 50).fill({ color: 0x4466ff, alpha: 0.10 });
+  g.circle(0, 0, 58).fill({ color: 0x2244cc, alpha: 0.07 });
+  g.circle(0, 0, 50).fill({ color: 0x4466ff, alpha: 0.05 });
 
   // Left wispy tendril
   g.ellipse(-34, 30, 7, 22).fill({ color: 0x3355dd, alpha: 0.55 });
@@ -207,8 +207,8 @@ export function createChaosDisplay(): Container {
   const g = new Graphics();
 
   // Outer chaotic aura
-  g.circle(0, 0, 62).fill({ color: 0x660000, alpha: 0.16 });
-  g.circle(0, 0, 54).fill({ color: 0xcc00cc, alpha: 0.10 });
+  g.circle(0, 0, 62).fill({ color: 0x660000, alpha: 0.08 });
+  g.circle(0, 0, 54).fill({ color: 0xcc00cc, alpha: 0.05 });
 
   // Spiky outer shell (12-point star)
   const spikes = 12;
