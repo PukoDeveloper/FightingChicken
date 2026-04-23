@@ -41,7 +41,6 @@ import {
   BUBBLE_HITBOX_R,
   TRAP_DURATION_MS,
   TRAP_SLOW_FACTOR,
-  COL_BULLET_P1,
   COL_BUBBLE,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState } from '../game/store';

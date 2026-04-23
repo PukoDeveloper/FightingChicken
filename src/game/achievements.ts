@@ -69,13 +69,15 @@ export function initAchievements(core: Core): void {
 
   // ── Endless mode ────────────────────────────────────────────────────────────
 
+  type EndlessWavePayload = { wave: number };
+
   core.events.emitSync('achievement/define', {
     achievement: {
       id: 'endless_wave_10',
       name: '波浪挑戰者 🌊',
       description: '在無盡模式通過第 10 波',
       triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as { wave: number }).wave >= 10,
+      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 10,
     },
   });
 
@@ -85,7 +87,7 @@ export function initAchievements(core: Core): void {
       name: '無盡鬥士 ⚔️',
       description: '在無盡模式通過第 25 波',
       triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as { wave: number }).wave >= 25,
+      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 25,
     },
   });
 
@@ -95,7 +97,7 @@ export function initAchievements(core: Core): void {
       name: '不滅傳說 👑',
       description: '在無盡模式通過第 50 波',
       triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as { wave: number }).wave >= 50,
+      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 50,
     },
   });
 

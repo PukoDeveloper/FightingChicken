@@ -194,7 +194,7 @@ const BGM_PATTERN: number[] = [
 ];
 
 const BGM_BPM = 148;
-/** Duration of one sixteenth-note in milliseconds. */
+/** Duration of one sixteenth-note in milliseconds (≈ 101.35 ms at BPM 148). */
 const BGM_STEP_MS = (60_000 / BGM_BPM) / 4; // ≈ 101 ms
 
 let _bgmTimer = 0;
