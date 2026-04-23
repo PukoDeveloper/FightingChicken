@@ -196,6 +196,9 @@ async function enter(core: Core): Promise<void> {
   const buffBloodPriceCount = isEndless ? endlessState.buffs.filter(b => b === 'blood_price').length : 0;
   const buffBulletPowerCount = isEndless ? endlessState.buffs.filter(b => b === 'bullet_power').length : 0;
   const buffEvasionCount   = isEndless ? endlessState.buffs.filter(b => b === 'evasion').length : 0;
+  const buffRegenCount     = isEndless ? endlessState.buffs.filter(b => b === 'regen').length : 0;
+  const buffLongInvCount   = isEndless ? endlessState.buffs.filter(b => b === 'long_invincible').length : 0;
+  const buffItemDropCount  = isEndless ? endlessState.buffs.filter(b => b === 'item_drop_up').length : 0;
   const hasBerserker       = isEndless && endlessState.buffs.includes('berserker');
   const hasPeriodicShield  = isEndless && endlessState.buffs.includes('periodic_shield');
 
@@ -210,6 +213,19 @@ async function enter(core: Core): Promise<void> {
   const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
   // Evasion chance: 25% per stack, capped at 75%
   const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
+  // Effective invincibility duration: base + 600 ms per long_invincible stack
+  const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
+  // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
+  const itemSpawnMinMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * Math.pow(0.75, buffItemDropCount)), 2000)
+    : ITEM_SPAWN_MIN_MS;
+  const itemSpawnMaxMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, buffItemDropCount)), 4000)
+    : ITEM_SPAWN_MAX_MS;
+  // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
+  const regenIntervalMs = buffRegenCount > 0
+    ? Math.max(15000 - buffRegenCount * 3000, 6000)
+    : 0;
 
   // Periodic shield: counts down ms until next activation
   let periodicShieldTimer = hasPeriodicShield ? 12000 : 0;
@@ -259,6 +275,7 @@ async function enter(core: Core): Promise<void> {
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
   let phaseFlashTimer = 0;
+  let regenTimer = regenIntervalMs; // counts down to next HP regen tick
 
   // Touch tracking
   let touchActive = false;
@@ -466,6 +483,8 @@ async function enter(core: Core): Promise<void> {
       : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`;
     if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
     if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
+    if (buffLongInvCount > 0) statusLine += `  INV:${(effectiveInvincibleMs / 1000).toFixed(1)}s`;
+    if (buffItemDropCount > 0) statusLine += `  ITEM:${Math.round(itemSpawnMinMs / 1000)}s`;
     levelWaveText.text = statusLine;
 
     // Power-up indicator
@@ -475,6 +494,8 @@ async function enter(core: Core): Promise<void> {
       powerUpText.text = `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`;
     } else if (hasPeriodicShield && periodicShieldTimer > 0) {
       powerUpText.text = `🛡 護盾 ${Math.ceil(periodicShieldTimer / 1000)}s`;
+    } else if (regenIntervalMs > 0 && regenTimer > 0) {
+      powerUpText.text = `💚 再生 ${Math.ceil(regenTimer / 1000)}s`;
     } else {
       powerUpText.text = '';
     }
@@ -716,6 +737,27 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Regen (endless buff) ─────────────────────────────────────────────
+      if (regenIntervalMs > 0) {
+        regenTimer -= dt;
+        if (regenTimer <= 0) {
+          regenTimer = regenIntervalMs;
+          if (playerHP < effectiveHpMax) {
+            playerHP = Math.min(effectiveHpMax, playerHP + 1);
+            updateHUD();
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 10, speed: 70, speedVariance: 30,
+                spread: 180, lifetime: 400, startAlpha: 0.9, endAlpha: 0,
+                startScale: 1.0, endScale: 0,
+                startColor: 0x44ff88, endColor: 0x00cc44, radius: 4,
+              },
+            });
+          }
+        }
+      }
+
       // ── Player auto-fire ──────────────────────────────────────────────────
       playerFireTimer -= dt;
       if (playerFireTimer <= 0) {
@@ -895,7 +937,7 @@ async function enter(core: Core): Promise<void> {
           }
 
           playerHP = Math.max(0, playerHP - 1);
-          invincibleMs = INVINCIBLE_MS;
+          invincibleMs = effectiveInvincibleMs;
 
           // Screen flash red on hit
           flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff0000, alpha: 1 });
@@ -935,7 +977,7 @@ async function enter(core: Core): Promise<void> {
       if (!waveTransitioning) {
         itemSpawnTimer -= dt;
         if (itemSpawnTimer <= 0) {
-          itemSpawnTimer = ITEM_SPAWN_MIN_MS + Math.random() * (ITEM_SPAWN_MAX_MS - ITEM_SPAWN_MIN_MS);
+          itemSpawnTimer = itemSpawnMinMs + Math.random() * (itemSpawnMaxMs - itemSpawnMinMs);
           spawnItem();
         }
       }
@@ -986,7 +1028,7 @@ async function enter(core: Core): Promise<void> {
             }
 
             playerHP = Math.max(0, playerHP - 1);
-            invincibleMs = INVINCIBLE_MS;
+            invincibleMs = effectiveInvincibleMs;
 
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffee00, alpha: 1 });
             flashOverlay.alpha = 0.45;

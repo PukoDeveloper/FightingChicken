@@ -26,7 +26,10 @@ export type BuffId =
   | 'periodic_shield' // gain 2 s invincibility every 12 s
   | 'blood_price'     // max HP -1 (min 1), but each bullet deals +2 damage (stackable)
   | 'bullet_power'    // each bullet deals +1 bonus damage (stackable)
-  | 'evasion';        // +25% chance to nullify incoming damage (stackable, capped at 75%)
+  | 'evasion'         // +25% chance to nullify incoming damage (stackable, capped at 75%)
+  | 'regen'           // heal 1 HP every 12 s (stackable: each stack reduces interval by 3 s, min 6 s)
+  | 'long_invincible' // +600 ms invincibility after taking damage (stackable)
+  | 'item_drop_up';   // item spawn interval reduced 25% per stack (stackable, capped at 75% reduction)
 
 export interface BuffDef {
   id: BuffId;
@@ -99,6 +102,27 @@ export const ALL_BUFFS: BuffDef[] = [
     desc: '受到攻擊時有 25% 機率\n完全無效化傷害（最高 75%）',
     color: 0x000a0a,
     borderColor: 0x00eebb,
+  },
+  {
+    id: 'regen',
+    name: '生命再生',
+    desc: '每隔一段時間\n自動恢復 1 點生命',
+    color: 0x001a08,
+    borderColor: 0x22ff88,
+  },
+  {
+    id: 'long_invincible',
+    name: '無敵延長',
+    desc: '受傷後無敵時間\n延長 0.6 秒（可疊加）',
+    color: 0x080810,
+    borderColor: 0x8888ff,
+  },
+  {
+    id: 'item_drop_up',
+    name: '道具好運',
+    desc: '道具出現間隔縮短 25%\n（可疊加，最多縮短 75%）',
+    color: 0x100a00,
+    borderColor: 0xffaa22,
   },
 ];
 
