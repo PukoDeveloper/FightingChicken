@@ -16,6 +16,8 @@ export const PLAYER_FIRE_INTERVAL = 280;
 export const PLAYER_BULLET_R = 5;
 /** Invincibility duration after taking a hit in ms */
 export const INVINCIBLE_MS = 1200;
+/** Default player movement speed in px/s */
+export const PLAYER_MOVE_SPEED = 380;
 
 // ─── Enemy (Courage / 勇氣) ──────────────────────────────────────────────────
 export const ENEMY_HP_MAX = 200;
@@ -52,7 +54,8 @@ export const POWER_FIRE_INTERVAL = 140;
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
 export const SCORE_PER_HIT = 10;
-export const SCORE_BONUS_WIN = 5000;
+/** Multiplied by the wave's max HP to compute the wave-clear bonus score. */
+export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Colours ─────────────────────────────────────────────────────────────────
 export const COL_BG          = 0x000011;

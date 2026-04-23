@@ -22,10 +22,11 @@ import {
   PLAYER_FIRE_INTERVAL,
   PLAYER_BULLET_R,
   INVINCIBLE_MS,
+  PLAYER_MOVE_SPEED,
   ENEMY_HITBOX_R,
   ENEMY_BULLET_R,
   SCORE_PER_HIT,
-  SCORE_BONUS_WIN,
+  SCORE_BONUS_WAVE_MULT,
   ITEM_COLLECT_R,
   ITEM_LIFETIME_MS,
   ITEM_SPAWN_MIN_MS,
@@ -33,7 +34,7 @@ import {
   POWER_UP_DURATION_MS,
   POWER_FIRE_INTERVAL,
 } from '../constants';
-import { gameResult } from '../game/store';
+import { gameResult, devConfig } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 
@@ -273,7 +274,35 @@ async function enter(core: Core): Promise<void> {
   powerUpText.y = H - 38;
   uiLayer.addChild(powerUpText);
 
-  // ── Helper: spawn enemy bullet ────────────────────────────────────────────
+  // DEV button (top-right corner, below score text)
+  const devBtnW = 46, devBtnH = 22;
+  const devBtn = new Container();
+  devBtn.eventMode = 'static';
+  devBtn.cursor = 'pointer';
+  const devBtnBg = new Graphics();
+  devBtnBg.roundRect(0, 0, devBtnW, devBtnH, 5)
+    .fill({ color: 0x333333, alpha: 0.85 })
+    .stroke({ color: 0xff6644, width: 1 });
+  devBtn.addChild(devBtnBg);
+  const devBtnStyle = new TextStyle({
+    fontFamily: 'Arial, sans-serif',
+    fontSize: 12,
+    fill: 0xffaa66,
+    fontWeight: 'bold',
+  });
+  const devBtnText = new Text({ text: 'DEV', style: devBtnStyle });
+  devBtnText.anchor.set(0.5);
+  devBtnText.x = devBtnW / 2;
+  devBtnText.y = devBtnH / 2;
+  devBtn.addChild(devBtnText);
+  devBtn.x = W - devBtnW - 10;
+  devBtn.y = 36;
+  uiLayer.addChild(devBtn);
+
+  devBtn.on('pointerdown', async () => {
+    if (gameEnded) return;
+    await core.events.emit('scene/load', { key: 'devmenu' });
+  });
   function spawnEnemyBullet(
     x: number, y: number,
     vx: number, vy: number,
@@ -309,15 +338,13 @@ async function enter(core: Core): Promise<void> {
     const display = type === 'health' ? createHealthItem() : createPowerItem();
     const x = 40 + Math.random() * (W - 80);
     const y = H * 0.35 + Math.random() * (H * 0.30);
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 20;
     display.x = x;
     display.y = y;
     itemsContainer.addChild(display);
     items.push({
       display, x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx: 0,
+      vy: 0,
       type,
       lifetime: ITEM_LIFETIME_MS,
       bobTimer: Math.random() * Math.PI * 2 * 400,
@@ -494,7 +521,7 @@ async function enter(core: Core): Promise<void> {
         const dx = targetX - playerEntity.position.x;
         const dy = targetY - playerEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxMove = 320 * (dt / 1000);
+        const maxMove = devConfig.playerMoveSpeed * (dt / 1000);
         if (dist < maxMove) {
           playerEntity.position.x = targetX;
           playerEntity.position.y = targetY;
@@ -635,7 +662,7 @@ async function enter(core: Core): Promise<void> {
           checkPhase();
 
           if (enemyHP <= 0) {
-            score += SCORE_BONUS_WIN;
+            score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
             const nextWaveIdx = waveIdx + 1;
             if (nextWaveIdx < levelConfig.waves.length) {
               advanceWave(nextWaveIdx);
@@ -721,16 +748,6 @@ async function enter(core: Core): Promise<void> {
         const item = items[i];
         item.bobTimer += dt;
         item.lifetime -= dt;
-
-        // Drift
-        item.x += item.vx * (dt / 1000);
-        item.y += item.vy * (dt / 1000);
-
-        // Bounce gently off play-area walls
-        if (item.x < 30)      { item.x = 30;      item.vx =  Math.abs(item.vx); }
-        if (item.x > W - 30)  { item.x = W - 30;  item.vx = -Math.abs(item.vx); }
-        if (item.y < H * 0.25) { item.y = H * 0.25; item.vy =  Math.abs(item.vy); }
-        if (item.y > H * 0.75) { item.y = H * 0.75; item.vy = -Math.abs(item.vy); }
 
         // Visual position: add bobbing offset
         item.display.x = item.x;
@@ -933,7 +950,7 @@ async function enter(core: Core): Promise<void> {
     enemyBulletsContainer.destroy({ children: true });
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, devBtn);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -942,6 +959,7 @@ async function enter(core: Core): Promise<void> {
     levelWaveText.destroy();
     waveBannerText.destroy();
     powerUpText.destroy();
+    devBtn.destroy({ children: true });
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
