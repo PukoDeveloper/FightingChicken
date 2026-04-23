@@ -5,6 +5,8 @@ import {
   createChickenDisplay,
   createElegantChickenDisplay,
   createMooseChickenDisplay,
+  createFoxChickenDisplay,
+  createWizardChickenDisplay,
   createAdventureChickenDisplay,
   createHeroChickenDisplay,
   createBossChickenDisplay,
@@ -22,6 +24,8 @@ function buildPreview(id: CostumeId): Container {
   switch (id) {
     case 'elegant':   return createElegantChickenDisplay();
     case 'moose':     return createMooseChickenDisplay();
+    case 'fox':       return createFoxChickenDisplay();
+    case 'wizard':    return createWizardChickenDisplay();
     case 'adventure': return createAdventureChickenDisplay();
     case 'hero':      return createHeroChickenDisplay();
     case 'boss':      return createBossChickenDisplay();

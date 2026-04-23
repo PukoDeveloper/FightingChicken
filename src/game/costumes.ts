@@ -1,7 +1,7 @@
 import { TOTAL_LEVELS } from './levels';
 
 // ─── Costume IDs ─────────────────────────────────────────────────────────────
-export type CostumeId = 'default' | 'elegant' | 'adventure' | 'hero' | 'boss' | 'moose';
+export type CostumeId = 'default' | 'elegant' | 'adventure' | 'hero' | 'boss' | 'moose' | 'fox' | 'wizard';
 
 // ─── Stat modifiers (reserved for future use) ────────────────────────────────
 /** Multipliers / additive bonuses applied to player stats when a costume is equipped. */
@@ -51,6 +51,20 @@ export const COSTUMES: CostumeConfig[] = [
     stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
   },
   {
+    id: 'fox',
+    name: '狐狸小雞',
+    description: '機靈狡黠、尾巴蓬鬆的奇特小雞',
+    unlockHint: '預設解鎖',
+    stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
+  },
+  {
+    id: 'wizard',
+    name: '魔法小雞',
+    description: '頭戴巫師帽、施展魔法的神秘小雞',
+    unlockHint: '預設解鎖',
+    stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
+  },
+  {
     id: 'adventure',
     name: '冒險小雞',
     description: '走遍四方、無所畏懼的旅行者',
@@ -89,6 +103,8 @@ export function isCostumeUnlocked(
     case 'default':   return true;
     case 'elegant':   return true;
     case 'moose':     return true;
+    case 'fox':       return true;
+    case 'wizard':    return true;
     case 'adventure': return cleared.has(1);
     case 'hero':      return cleared.size >= TOTAL_LEVELS;
     case 'boss':      return bestWave >= 20;

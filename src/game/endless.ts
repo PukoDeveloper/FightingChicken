@@ -10,6 +10,7 @@ import {
   COL_BUBBLE,
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
+  PLAYER_HP_MAX,
 } from '../constants';
 import type { EnemyType } from '../constants';
 import type { WaveConfig } from './levels';
@@ -143,7 +144,7 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
   // Compute effective max HP so we can hide berserker when it would be trivially permanent.
   const hpUp         = currentBuffs.filter(b => b === 'hp_up').length;
   const bloodPrice   = currentBuffs.filter(b => b === 'blood_price').length;
-  const effectiveHpMax = Math.min(Math.max(5 + hpUp - bloodPrice, 1), 10);
+  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bloodPrice, 1), 10);
 
   const pool = ALL_BUFFS.filter(buff => {
     // Skip non-stackable buffs the player already has
