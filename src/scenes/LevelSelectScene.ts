@@ -49,9 +49,9 @@ async function enter(core: Core): Promise<void> {
 
     const bg = new Graphics();
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .fill({ color: levelColors[i - 1] ?? 0x333333, alpha: 0.88 });
+      .fill({ color: levelColors[i - 1], alpha: 0.88 });
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .stroke({ color: levelBorderColors[i - 1] ?? 0xaaaaaa, width: 2.5 });
+      .stroke({ color: levelBorderColors[i - 1], width: 2.5 });
     btn.addChild(bg);
 
     const numStyle = new TextStyle({

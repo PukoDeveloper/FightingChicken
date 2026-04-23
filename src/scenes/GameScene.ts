@@ -183,6 +183,7 @@ async function enter(core: Core): Promise<void> {
   let gameEnded = false;
   let waveTransitioning = false;
   let trappedMs = 0; // ms remaining on player trap (bubble hit)
+  let trapAnimMs = 0; // accumulated ms for trap ring pulse animation
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -587,14 +588,15 @@ async function enter(core: Core): Promise<void> {
       // ── Trap countdown & visual ring ──────────────────────────────────────
       if (trappedMs > 0) {
         trappedMs = Math.max(0, trappedMs - dt);
+        trapAnimMs += dt;
         trapRing.visible = true;
         trapRing.x = playerEntity.position.x;
         trapRing.y = playerEntity.position.y;
-        const pulse = 1 + 0.08 * Math.sin(Date.now() / 180);
+        const pulse = 1 + 0.08 * Math.sin(trapAnimMs / 180);
         trapRing.clear();
         trapRing.circle(0, 0, 26 * pulse).fill({ color: COL_BUBBLE, alpha: 0.12 });
         trapRing.circle(0, 0, 26 * pulse).stroke({ color: COL_BUBBLE, width: 3, alpha: 0.70 });
-        if (trappedMs <= 0) trapRing.visible = false;
+        if (trappedMs <= 0) { trapRing.visible = false; trapAnimMs = 0; }
       }
 
       // ── Enemy bobbing animation ───────────────────────────────────────────
@@ -1037,6 +1039,7 @@ async function enter(core: Core): Promise<void> {
     shockwaveTimer = 0;
     bubbleTimer = 0;
     trappedMs = 0;
+    trapAnimMs = 0;
     phaseFlashTimer = 0;
     flashOverlay.alpha = 0;
     itemSpawnTimer = 3000; // first item spawns 3 s into new wave
