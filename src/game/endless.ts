@@ -187,6 +187,12 @@ export function endlessEnemyType(waveNum: number): EnemyType {
 }
 
 /**
+ * After this wave number all hard upper-bound caps are lifted so that
+ * difficulty can scale without limit — making the mode feel truly endless.
+ */
+const ENDLESS_UNCAP_WAVE = 20;
+
+/**
  * Build a WaveConfig for an endless-mode wave.
  * Difficulty scales smoothly with `waveNum` (1-based).
  */
@@ -194,8 +200,12 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   // Each wave is ~15% harder than the previous.
   const d = Math.pow(1.15, waveNum - 1);
 
-  // Enemy HP grows with difficulty (capped to keep it fun).
-  const hp = Math.min(Math.round(150 * d), 1200);
+  // After ENDLESS_UNCAP_WAVE the hard caps are lifted so values grow freely.
+  const uncapped = waveNum >= ENDLESS_UNCAP_WAVE;
+  const capAt = (val: number, max: number) => uncapped ? val : Math.min(val, max);
+
+  // Enemy HP grows with difficulty (capped early on to keep it fun).
+  const hp = capAt(Math.round(150 * d), 1200);
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
@@ -212,16 +222,16 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
 
   const ring3 = Math.max(1200, Math.round(3500 / d));
 
-  // Way counts grow slowly.
-  const spiralWays1 = Math.min(6 + Math.floor((waveNum - 1) * 0.8), 20);
-  const spiralWays2 = Math.min(9 + Math.floor((waveNum - 1) * 0.9), 24);
-  const spiralWays3 = Math.min(12 + Math.floor((waveNum - 1) * 1.0), 28);
+  // Way counts grow slowly; caps are lifted after ENDLESS_UNCAP_WAVE.
+  const spiralWays1 = capAt(6 + Math.floor((waveNum - 1) * 0.8), 20);
+  const spiralWays2 = capAt(9 + Math.floor((waveNum - 1) * 0.9), 24);
+  const spiralWays3 = capAt(12 + Math.floor((waveNum - 1) * 1.0), 28);
 
-  const aimWays1 = Math.min(2 + Math.floor((waveNum - 1) * 0.3), 6);
-  const aimWays2 = Math.min(3 + Math.floor((waveNum - 1) * 0.3), 7);
-  const aimWays3 = Math.min(4 + Math.floor((waveNum - 1) * 0.35), 8);
+  const aimWays1 = capAt(2 + Math.floor((waveNum - 1) * 0.3), 6);
+  const aimWays2 = capAt(3 + Math.floor((waveNum - 1) * 0.3), 7);
+  const aimWays3 = capAt(4 + Math.floor((waveNum - 1) * 0.35), 8);
 
-  const ringCount3 = Math.min(20 + Math.floor((waveNum - 1) * 2), 56);
+  const ringCount3 = capAt(20 + Math.floor((waveNum - 1) * 2), 56);
 
   // Introduce shockwaves from wave 6, bubbles from wave 6 too.
   const hasShockwave = waveNum >= 6;
@@ -229,15 +239,15 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const sw1 = hasShockwave ? Math.max(2500, Math.round(6000 / d)) : 0;
   const sw2 = hasShockwave ? Math.max(2000, Math.round(4500 / d)) : 0;
   const sw3 = hasShockwave ? Math.max(1500, Math.round(3200 / d)) : 0;
-  const swSpeed = Math.min(SHOCKWAVE_EXPAND_SPEED + (waveNum - 6) * 8, 320);
+  const swSpeed = capAt(SHOCKWAVE_EXPAND_SPEED + (waveNum - 6) * 8, 320);
 
   const bub1 = hasBubble ? Math.max(2800, Math.round(6500 / d)) : 0;
   const bub2 = hasBubble ? Math.max(2200, Math.round(5000 / d)) : 0;
   const bub3 = hasBubble ? Math.max(1800, Math.round(3800 / d)) : 0;
-  const bubSpeed = Math.min(BUBBLE_SPEED + (waveNum - 6) * 5, 200);
-  const bubCount1 = hasBubble ? Math.min(1 + Math.floor((waveNum - 6) * 0.2), 3) : 1;
-  const bubCount2 = hasBubble ? Math.min(2 + Math.floor((waveNum - 6) * 0.2), 4) : 1;
-  const bubCount3 = hasBubble ? Math.min(2 + Math.floor((waveNum - 6) * 0.25), 5) : 1;
+  const bubSpeed = capAt(BUBBLE_SPEED + (waveNum - 6) * 5, 200);
+  const bubCount1 = hasBubble ? capAt(1 + Math.floor((waveNum - 6) * 0.2), 3) : 1;
+  const bubCount2 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.2), 4) : 1;
+  const bubCount3 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.25), 5) : 1;
 
   return {
     waveNumber: waveNum,
