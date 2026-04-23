@@ -85,7 +85,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(hiScoreLabel);
 
   // ── Level reached ─────────────────────────────────────────────────────────
-  const clearedLevel = won ? gameResult.currentLevel - 1 : gameResult.currentLevel;
+  const clearedLevel = gameResult.playedLevel;
   const clearedLevelConfig = createLevel(clearedLevel);
   const levelStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
