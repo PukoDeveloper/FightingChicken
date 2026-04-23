@@ -10,12 +10,14 @@ import {
 import { TitleScene } from './scenes/TitleScene';
 import { GameScene } from './scenes/GameScene';
 import { GameOverScene } from './scenes/GameOverScene';
+import { GAME_W, GAME_H } from './constants';
 
 async function main(): Promise<void> {
   const { core } = await createEngine({
     container: '#app',
     background: 0x000011,
-    resizeTo: window,
+    width: GAME_W,
+    height: GAME_H,
     antialias: true,
     plugins: [
       new InputManager(),
@@ -27,19 +29,34 @@ async function main(): Promise<void> {
       {
         namespace: 'game-bootstrap',
         async init(c) {
-          // Fix 1: Use device pixel ratio for crisp rendering on high-DPI screens.
+          // Use device pixel ratio for crisp rendering on high-DPI screens.
           const dpr = window.devicePixelRatio || 1;
           c.app.renderer.resolution = dpr;
-          c.app.renderer.view.autoDensity = true;
-          c.app.renderer.resize(c.app.screen.width, c.app.screen.height);
 
-          // Fix 2: The engine Camera offsets the world layer by (W/2, H/2) so that
+          // Scale the canvas via CSS so it always fits within the viewport while
+          // maintaining the fixed GAME_W × GAME_H aspect ratio.  This replaces the
+          // old resizeTo: window approach and works reliably on all mobile browsers.
+          const canvas = c.app.canvas as HTMLCanvasElement;
+          function scaleCanvas(): void {
+            const scaleX = window.innerWidth / GAME_W;
+            const scaleY = window.innerHeight / GAME_H;
+            const scale = Math.min(scaleX, scaleY);
+            canvas.style.width  = `${GAME_W * scale}px`;
+            canvas.style.height = `${GAME_H * scale}px`;
+          }
+          scaleCanvas();
+          window.addEventListener('resize', scaleCanvas);
+
+          // Clean up the resize listener when the engine is destroyed.
+          c.events.on('game-bootstrap', 'core/destroy', () => {
+            window.removeEventListener('resize', scaleCanvas);
+          });
+
+          // The engine Camera offsets the world layer by (W/2, H/2) so that
           // world-space (0,0) maps to the screen centre.  The game uses screen-space
           // coordinates (top-left origin), so cancel the offset by positioning the
           // camera at (W/2, H/2).  This makes world (0,0) → screen (0,0).
-          const W = c.app.screen.width;
-          const H = c.app.screen.height;
-          c.events.emitSync('camera/move', { x: W / 2, y: H / 2 });
+          c.events.emitSync('camera/move', { x: GAME_W / 2, y: GAME_H / 2 });
 
           c.events.emitSync('scene/register', { scene: TitleScene });
           c.events.emitSync('scene/register', { scene: GameScene });
