@@ -157,6 +157,12 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
     if (buff.id === 'berserker' && effectiveHpMax <= 2) {
       return false;
     }
+    // Skip blood_price when max HP is already at the minimum (1):
+    // the -1 HP penalty would be silently capped to no effect, making it a
+    // free damage buff with no trade-off.
+    if (buff.id === 'blood_price' && effectiveHpMax <= 1) {
+      return false;
+    }
     // Skip buffs that have reached their stack cap
     const maxStacks = MAX_BUFF_STACKS[buff.id];
     if (maxStacks !== undefined) {
