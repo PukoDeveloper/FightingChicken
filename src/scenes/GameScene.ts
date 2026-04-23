@@ -301,12 +301,14 @@ async function enter(core: Core): Promise<void> {
   // Effective invincibility duration: base + 600 ms per long_invincible stack
   const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
+  // Level itemDropMult further scales the intervals (< 1 = more frequent drops for hard levels)
+  const levelItemDropMult = levelConfig?.itemDropMult ?? 1.0;
   const itemSpawnMinMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * Math.pow(0.75, buffItemDropCount)), 2000)
-    : ITEM_SPAWN_MIN_MS;
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
+    : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
   const itemSpawnMaxMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, buffItemDropCount)), 4000)
-    : ITEM_SPAWN_MAX_MS;
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
+    : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
   // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
   const regenIntervalMs = buffRegenCount > 0
     ? Math.max(15000 - buffRegenCount * 3000, 6000)
@@ -970,6 +972,18 @@ async function enter(core: Core): Promise<void> {
     } else if (activeSkillId === 'burst_fire') {
       // Activate burst fire for 4 s
       skillActiveMs = 4000;
+      flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffcc00, alpha: 1 });
+      flashOverlay.alpha = 0.18;
+      phaseFlashTimer = Math.max(phaseFlashTimer, 250);
+      core.events.emitSync('particle/emit', {
+        config: {
+          x: playerEntity.position.x, y: playerEntity.position.y,
+          burst: true, burstCount: 20, speed: 150, speedVariance: 60,
+          spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+          startScale: 1.4, endScale: 0,
+          startColor: 0xffcc00, endColor: 0xff8800, radius: 5,
+        },
+      });
     } else if (activeSkillId === 'bullet_clear') {
       // Clear all enemy projectiles
       for (let i = enemyBullets.length - 1; i >= 0; i--) {
