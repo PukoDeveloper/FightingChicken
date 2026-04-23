@@ -169,6 +169,11 @@ export function sfxEnemyDeath(): void {
   tone(400, 100, 0.52, 0.10, 'square');
 }
 
+/** Short UI click / menu button press. */
+export function sfxMenuClick(): void {
+  tone(800, 600, 0.045, 0.045, 'square');
+}
+
 // ─── Background music ─────────────────────────────────────────────────────────
 // A looping chiptune arpeggio in Pentatonic Minor (C Eb F G Bb).
 

@@ -3,7 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
 import { endlessState } from '../game/store';
-import { startBgm, stopBgm } from '../game/audio';
+import { startBgm } from '../game/audio';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
@@ -236,13 +236,11 @@ async function enter(core: Core): Promise<void> {
 
   // Click / touch start
   btn.on('pointerdown', async () => {
-    stopBgm();
     endlessState.active = false;
     await core.events.emit('scene/load', { key: 'levelselect' });
   });
 
   endlessBtn.on('pointerdown', async () => {
-    stopBgm();
     endlessState.active = true;
     endlessState.wave = 1;
     endlessState.buffs = [];
