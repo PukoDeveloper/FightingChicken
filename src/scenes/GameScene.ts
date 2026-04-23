@@ -48,6 +48,7 @@ import { gameResult, devConfig, endlessState, costumeState } from '../game/store
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
+import { saveProgress } from '../game/persistence';
 
 // ─── Bullet data ─────────────────────────────────────────────────────────────
 interface BulletData {
@@ -1306,6 +1307,7 @@ async function enter(core: Core): Promise<void> {
       endlessState.bestWave = endlessState.wave;
     }
 
+    saveProgress();
     await core.events.emit('scene/load', { key: 'endlessbuff' });
   }
 
@@ -1369,6 +1371,8 @@ async function enter(core: Core): Promise<void> {
         });
       }
     }
+
+    saveProgress();
 
     // Brief delay before switching scene
     await new Promise<void>((resolve) => setTimeout(resolve, 800));
