@@ -2,12 +2,11 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import type { Entity } from '@inkshot/engine';
+import { ObjectPool } from '@inkshot/engine';
 import {
   createPlayerChicken,
   createEnemyDisplay,
   createEnemyHitFlash,
-  createPlayerBullet,
-  createEnemyBullet,
   createTrapBubble,
   createTrapRing,
   createStarfield,
@@ -42,6 +41,7 @@ import {
   BUBBLE_HITBOX_R,
   TRAP_DURATION_MS,
   TRAP_SLOW_FACTOR,
+  COL_BULLET_P1,
   COL_BUBBLE,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState } from '../game/store';
@@ -49,6 +49,46 @@ import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
 import { saveProgress } from '../game/persistence';
+import {
+  sfxShoot,
+  sfxEnemyHit,
+  sfxPlayerHit,
+  sfxShockwave,
+  sfxBubble,
+  sfxPickup,
+  sfxPhaseChange,
+  sfxWaveClear,
+  sfxVictory,
+  sfxDefeat,
+  sfxEnemyDeath,
+  startBgm,
+  stopBgm,
+} from '../game/audio';
+
+// ─── Object pools for bullets ────────────────────────────────────────────────
+
+/** Pooled player bullet Graphics (yellow circle, drawn once and reused). */
+const playerBulletPool = new ObjectPool<Graphics>(
+  () => {
+    const g = new Graphics();
+    g.circle(0, 0, 7).fill({ color: 0xffff88, alpha: 0.3 });
+    g.circle(0, 0, 5).fill(0xffff44);
+    return g;
+  },
+  200,
+  (g) => { g.x = 0; g.y = 0; g.visible = false; },
+);
+
+/** Pooled enemy bullet Graphics (redrawn with the required colour on acquire). */
+const enemyBulletPool = new ObjectPool<Graphics>(
+  () => new Graphics(),
+  400,
+  (g) => { g.x = 0; g.y = 0; g.visible = false; },
+);
+
+/** Pre-warm pools at module load to avoid allocation spikes on first wave. */
+playerBulletPool.prewarm(30);
+enemyBulletPool.prewarm(60);
 
 // ─── Bullet data ─────────────────────────────────────────────────────────────
 interface BulletData {
@@ -178,6 +218,29 @@ async function enter(core: Core): Promise<void> {
   });
   const enemyEntity = enemyOut.entity as Entity;
 
+  // ── Dynamic lighting ──────────────────────────────────────────────────────
+  // Player gets a warm yellow glow; enemy gets a red glow.
+  const { output: playerLightOut } = core.events.emitSync('lighting/light:add', {
+    x: playerEntity.position.x,
+    y: playerEntity.position.y,
+    radius: 110,
+    color: 0xffdd88,
+    intensity: 0.85,
+  });
+  const playerLightId = (playerLightOut as { id: string }).id;
+
+  const { output: enemyLightOut } = core.events.emitSync('lighting/light:add', {
+    x: enemyEntity.position.x,
+    y: enemyEntity.position.y,
+    radius: 150,
+    color: 0xff4422,
+    intensity: 0.90,
+  });
+  const enemyLightId = (enemyLightOut as { id: string }).id;
+
+  // ── BGM ───────────────────────────────────────────────────────────────────
+  startBgm();
+
   // ── Bullet arrays ────────────────────────────────────────────────────────
   const playerBullets: BulletData[] = [];
   const enemyBullets: BulletData[] = [];
@@ -272,6 +335,11 @@ async function enter(core: Core): Promise<void> {
   let waveTransitioning = false;
   let trappedMs = 0; // ms remaining on player trap (bubble hit)
   let trapAnimMs = 0; // accumulated ms for trap ring pulse animation
+  // Tracks whether the player has been hit this run (for the no-damage achievement).
+  let playerHitThisRun = false;
+  // Score thresholds already notified (for score achievements).
+  let score1000Notified = false;
+  let score10000Notified = false;
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -451,27 +519,37 @@ async function enter(core: Core): Promise<void> {
     vx: number, vy: number,
     color: number
   ): void {
-    const display = createEnemyBullet(color);
+    const display = enemyBulletPool.acquire();
+    display.clear();
+    display.circle(0, 0, 9).fill({ color, alpha: 0.25 });
+    display.circle(0, 0, 6).fill(color);
+    display.circle(0, 0, 3).fill({ color: 0xffffff, alpha: 0.4 });
     display.x = x;
     display.y = y;
+    display.visible = true;
     enemyBulletsContainer.addChild(display);
     enemyBullets.push({ display, x, y, vx, vy });
   }
 
   // ── Helper: spawn player bullet ───────────────────────────────────────────
   function spawnPlayerBullet(x: number, y: number): void {
-    const display = createPlayerBullet();
+    const display = playerBulletPool.acquire();
     display.x = x;
     display.y = y;
+    display.visible = true;
     playerBulletsContainer.addChild(display);
     playerBullets.push({ display, x, y, vx: 0, vy: -PLAYER_BULLET_SPEED });
   }
 
-  // ── Helper: remove bullet ─────────────────────────────────────────────────
-  function removeBullet(arr: BulletData[], idx: number, container: Container): void {
+  // ── Helper: remove bullet (returns display to its pool) ──────────────────
+  function removeBullet(arr: BulletData[], idx: number, container: Container, isPlayer: boolean): void {
     const b = arr[idx];
     container.removeChild(b.display);
-    b.display.destroy();
+    if (isPlayer) {
+      playerBulletPool.release(b.display);
+    } else {
+      enemyBulletPool.release(b.display);
+    }
     arr.splice(idx, 1);
   }
 
@@ -562,12 +640,14 @@ async function enter(core: Core): Promise<void> {
     const newPhase: 1 | 2 | 3 = frac > waveConfig.phase2Frac ? 1 : frac > waveConfig.phase3Frac ? 2 : 3;
     if (newPhase !== phase) {
       phase = newPhase;
-      // Trigger phase flash
+      // Trigger phase flash + audio + camera shake
       phaseFlashTimer = 600;
+      sfxPhaseChange();
+      core.events.emitSync('camera/shake', { intensity: 6, duration: 250 });
       // Clear bullets for brief pause
       for (let i = enemyBullets.length - 1; i >= 0; i--) {
         enemyBulletsContainer.removeChild(enemyBullets[i].display);
-        enemyBullets[i].display.destroy();
+        enemyBulletPool.release(enemyBullets[i].display);
       }
       enemyBullets.length = 0;
     }
@@ -752,6 +832,18 @@ async function enter(core: Core): Promise<void> {
       enemyBobTimer += dt;
       enemyEntity.position.y = H * 0.18 + Math.sin(enemyBobTimer / 800) * 12;
 
+      // ── Update dynamic lighting positions ─────────────────────────────────
+      core.events.emitSync('lighting/light:update', {
+        id: playerLightId,
+        x: playerEntity.position.x,
+        y: playerEntity.position.y,
+      });
+      core.events.emitSync('lighting/light:update', {
+        id: enemyLightId,
+        x: enemyEntity.position.x,
+        y: enemyEntity.position.y,
+      });
+
       // ── Phase flash ───────────────────────────────────────────────────────
       if (phaseFlashTimer > 0) {
         phaseFlashTimer -= dt;
@@ -831,6 +923,7 @@ async function enter(core: Core): Promise<void> {
           const offset = (k - (centreBullets - 1) / 2) * 8;
           spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22);
         }
+        sfxShoot();
       }
 
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
@@ -894,7 +987,7 @@ async function enter(core: Core): Promise<void> {
 
         // Off-screen
         if (b.y < -20) {
-          removeBullet(playerBullets, i, playerBulletsContainer);
+          removeBullet(playerBullets, i, playerBulletsContainer, true);
           continue;
         }
 
@@ -906,10 +999,21 @@ async function enter(core: Core): Promise<void> {
         const dy = b.y - enemyEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
-          removeBullet(playerBullets, i, playerBulletsContainer);
+          removeBullet(playerBullets, i, playerBulletsContainer, true);
           enemyHP = Math.max(0, enemyHP - bulletDamage);
           score += SCORE_PER_HIT * bulletDamage;
           hitFlashTimer = 80;
+          sfxEnemyHit();
+
+          // Score milestone achievements
+          if (!score1000Notified && score >= 1000) {
+            score1000Notified = true;
+            core.events.emitSync('game/score_1000', {});
+          }
+          if (!score10000Notified && score >= 10000) {
+            score10000Notified = true;
+            core.events.emitSync('game/score_10000', {});
+          }
 
           // Emit explosion particles
           core.events.emitSync('particle/emit', {
@@ -962,7 +1066,7 @@ async function enter(core: Core): Promise<void> {
 
         // Off-screen
         if (b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
-          removeBullet(enemyBullets, i, enemyBulletsContainer);
+          removeBullet(enemyBullets, i, enemyBulletsContainer, false);
           continue;
         }
 
@@ -974,7 +1078,7 @@ async function enter(core: Core): Promise<void> {
         const dy = b.y - playerEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_BULLET_R + PLAYER_HITBOX_R) {
-          removeBullet(enemyBullets, i, enemyBulletsContainer);
+          removeBullet(enemyBullets, i, enemyBulletsContainer, false);
 
           // Evasion roll: skip damage but still remove the bullet
           if (evasionChance > 0 && Math.random() < evasionChance) {
@@ -993,6 +1097,11 @@ async function enter(core: Core): Promise<void> {
 
           playerHP = Math.max(0, playerHP - 1);
           invincibleMs = effectiveInvincibleMs;
+          playerHitThisRun = true;
+
+          // Audio + camera shake on hit
+          sfxPlayerHit();
+          core.events.emitSync('camera/shake', { intensity: 8, duration: 320 });
 
           // Screen flash red on hit
           flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff0000, alpha: 1 });
@@ -1084,6 +1193,10 @@ async function enter(core: Core): Promise<void> {
 
             playerHP = Math.max(0, playerHP - 1);
             invincibleMs = effectiveInvincibleMs;
+            playerHitThisRun = true;
+
+            sfxShockwave();
+            core.events.emitSync('camera/shake', { intensity: 10, duration: 350 });
 
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffee00, alpha: 1 });
             flashOverlay.alpha = 0.45;
@@ -1129,6 +1242,7 @@ async function enter(core: Core): Promise<void> {
             bub.display.destroy();
             bubbles.splice(i, 1);
             trappedMs = TRAP_DURATION_MS;
+            sfxBubble();
 
             core.events.emitSync('particle/emit', {
               config: {
@@ -1173,6 +1287,8 @@ async function enter(core: Core): Promise<void> {
           } else {
             powerUpTimer = POWER_UP_DURATION_MS;
           }
+          sfxPickup();
+          core.events.emitSync('game/item:collected', {});
           // Sparkle burst on collect
           core.events.emitSync('particle/emit', {
             config: {
@@ -1213,10 +1329,13 @@ async function enter(core: Core): Promise<void> {
   async function advanceWave(nextWaveIdx: number): Promise<void> {
     waveTransitioning = true;
 
-    // Clear all enemy bullets
+    sfxWaveClear();
+    core.events.emitSync('camera/shake', { intensity: 10, duration: 400 });
+
+    // Clear all enemy bullets (return to pool)
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
       enemyBulletsContainer.removeChild(enemyBullets[i].display);
-      enemyBullets[i].display.destroy();
+      enemyBulletPool.release(enemyBullets[i].display);
     }
     enemyBullets.length = 0;
 
@@ -1283,6 +1402,12 @@ async function enter(core: Core): Promise<void> {
     if (gameEnded) return;
     gameEnded = true; // prevent further updates while transitioning
 
+    sfxWaveClear();
+    core.events.emitSync('camera/shake', { intensity: 10, duration: 400 });
+
+    // Fire endless wave achievement event
+    core.events.emitSync('game/endless_wave', { wave: endlessState.wave });
+
     // Show wave-clear banner briefly
     waveBannerText.text = `第 ${endlessState.wave} 波通關！`;
     waveBannerText.alpha = 1;
@@ -1307,7 +1432,7 @@ async function enter(core: Core): Promise<void> {
       endlessState.bestWave = endlessState.wave;
     }
 
-    saveProgress();
+    await saveProgress();
     await core.events.emit('scene/load', { key: 'endlessbuff' });
   }
 
@@ -1342,13 +1467,22 @@ async function enter(core: Core): Promise<void> {
         // Track cleared level for costume unlock system
         costumeState.clearedLevels.add(gameResult.currentLevel);
         gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+
+        // Achievement events
+        core.events.emitSync('game/win', {});
+        if (!playerHitThisRun) {
+          core.events.emitSync('game/no_damage_win', {});
+        }
       } else {
         gameResult.playedLevel = gameResult.currentLevel;
       }
     }
 
-    // Big explosion on enemy if won
+    // Audio feedback + camera shake
     if (won) {
+      sfxVictory();
+      core.events.emitSync('camera/shake', { intensity: 14, duration: 500 });
+      // Big explosion on enemy
       for (let k = 0; k < 6; k++) {
         core.events.emitSync('particle/emit', {
           config: {
@@ -1370,9 +1504,18 @@ async function enter(core: Core): Promise<void> {
           },
         });
       }
+    } else {
+      sfxDefeat();
+      core.events.emitSync('camera/shake', { intensity: 16, duration: 600 });
     }
 
-    saveProgress();
+    stopBgm();
+
+    // Remove dynamic lights for this scene
+    core.events.emitSync('lighting/light:remove', { id: playerLightId });
+    core.events.emitSync('lighting/light:remove', { id: enemyLightId });
+
+    await saveProgress();
 
     // Brief delay before switching scene
     await new Promise<void>((resolve) => setTimeout(resolve, 800));
@@ -1391,14 +1534,14 @@ async function enter(core: Core): Promise<void> {
     unsubPointerMove();
     unsubPointerUp();
 
-    // Destroy all bullets
+    // Destroy all bullets (return to pools)
     for (const b of playerBullets) {
       playerBulletsContainer.removeChild(b.display);
-      b.display.destroy();
+      playerBulletPool.release(b.display);
     }
     for (const b of enemyBullets) {
       enemyBulletsContainer.removeChild(b.display);
-      b.display.destroy();
+      enemyBulletPool.release(b.display);
     }
     playerBullets.length = 0;
     enemyBullets.length = 0;
@@ -1456,6 +1599,11 @@ async function enter(core: Core): Promise<void> {
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
+
+    // Remove dynamic lights for this scene (no-op if already removed by endGame)
+    stopBgm();
+    core.events.emitSync('lighting/light:remove', { id: playerLightId });
+    core.events.emitSync('lighting/light:remove', { id: enemyLightId });
   };
 }
 

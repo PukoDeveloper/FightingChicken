@@ -116,8 +116,18 @@ async function enter(core: Core): Promise<void> {
 
     card.x = (W - cardW) / 2;
     card.y = cardsStartY + i * (cardH + cardGap);
+    card.alpha = 0;
     uiLayer.addChild(card);
     cardContainers.push(card);
+
+    // Staggered fade-in
+    core.events.emitSync('tween/to', {
+      target: card as unknown as Record<string, unknown>,
+      props: { alpha: 1 },
+      duration: 350,
+      ease: 'easeOutQuad',
+      delay: 100 + i * 100,
+    });
 
     card.on('pointerover', () => {
       bg.clear();

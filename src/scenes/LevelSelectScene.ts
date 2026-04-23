@@ -130,6 +130,18 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'title' });
   });
 
+  // ── Entry animations via TweenManager ────────────────────────────────────
+  levelBtns.forEach((btn, i) => {
+    btn.alpha = 0;
+    core.events.emitSync('tween/to', {
+      target: btn as unknown as Record<string, unknown>,
+      props: { alpha: 1 },
+      duration: 350,
+      ease: 'easeOutQuad',
+      delay: 80 + i * 70,
+    });
+  });
+
   // ── Animate title ──────────────────────────────────────────────────────────
   const unsubTick = core.events.on('levelselect', 'core/tick', () => {
     titleLabel.y = H * 0.15 + Math.sin(Date.now() / 900) * 3;

@@ -33,18 +33,19 @@ async function enter(core: Core): Promise<void> {
   character.x = W * 0.5;
   character.y = H * 0.42;
   if (!won) {
-    // Make chicken look defeated — tilt it
     character.rotation = 0.4;
   }
   worldLayer.addChild(character);
 
   // X mark over courage if defeated
+  let xMark: Graphics | null = null;
   if (won) {
-    const xMark = new Graphics();
+    xMark = new Graphics();
     xMark.moveTo(-35, -35).lineTo(35, 35).stroke({ color: 0xff0000, width: 8, alpha: 0.9 });
     xMark.moveTo(35, -35).lineTo(-35, 35).stroke({ color: 0xff0000, width: 8, alpha: 0.9 });
     xMark.x = W * 0.5;
     xMark.y = H * 0.42;
+    xMark.alpha = 0;
     worldLayer.addChild(xMark);
   }
 
@@ -63,6 +64,8 @@ async function enter(core: Core): Promise<void> {
   titleLabel.anchor.set(0.5);
   titleLabel.x = W * 0.5;
   titleLabel.y = H * 0.2;
+  titleLabel.scale.set(0.5);
+  titleLabel.alpha = 0;
   uiLayer.addChild(titleLabel);
 
   // ── Score ──────────────────────────────────────────────────────────────────
@@ -76,6 +79,7 @@ async function enter(core: Core): Promise<void> {
   scoreLabel.anchor.set(0.5);
   scoreLabel.x = W * 0.5;
   scoreLabel.y = H * 0.60;
+  scoreLabel.alpha = 0;
   uiLayer.addChild(scoreLabel);
 
   const hiScoreStyle = new TextStyle({
@@ -87,6 +91,7 @@ async function enter(core: Core): Promise<void> {
   hiScoreLabel.anchor.set(0.5);
   hiScoreLabel.x = W * 0.5;
   hiScoreLabel.y = H * 0.67;
+  hiScoreLabel.alpha = 0;
   uiLayer.addChild(hiScoreLabel);
 
   // ── Level / endless wave reached ──────────────────────────────────────────
@@ -111,6 +116,7 @@ async function enter(core: Core): Promise<void> {
   levelLabel.anchor.set(0.5);
   levelLabel.x = W * 0.5;
   levelLabel.y = H * 0.74;
+  levelLabel.alpha = 0;
   uiLayer.addChild(levelLabel);
 
   // ── Result message ────────────────────────────────────────────────────────
@@ -129,6 +135,7 @@ async function enter(core: Core): Promise<void> {
   msgLabel.anchor.set(0.5);
   msgLabel.x = W * 0.5;
   msgLabel.y = H * 0.3;
+  msgLabel.alpha = 0;
   uiLayer.addChild(msgLabel);
 
   // ── Replay button ─────────────────────────────────────────────────────────
@@ -157,11 +164,11 @@ async function enter(core: Core): Promise<void> {
 
   btn.x = W * 0.5;
   btn.y = H * 0.84;
+  btn.alpha = 0;
   uiLayer.addChild(btn);
 
   btn.on('pointerdown', async () => {
     if (isEndlessGameOver) {
-      // Restart endless mode from wave 1 with fresh buffs
       endlessState.active = true;
       endlessState.wave = 1;
       endlessState.buffs = [];
@@ -197,6 +204,7 @@ async function enter(core: Core): Promise<void> {
 
   titleBtn.x = W * 0.5;
   titleBtn.y = H * 0.92;
+  titleBtn.alpha = 0;
   uiLayer.addChild(titleBtn);
 
   titleBtn.on('pointerdown', async () => {
@@ -204,27 +212,72 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'title' });
   });
 
-  // ── Animations ────────────────────────────────────────────────────────────
-  let btnScale = 1;
-  let btnDir = 1;
+  // ── Entry animations via TweenManager ────────────────────────────────────
+  // Title pops in with a scale bounce
+  core.events.emitSync('tween/to', {
+    target: titleLabel as unknown as Record<string, unknown>,
+    props: { alpha: 1 },
+    duration: 300,
+    ease: 'easeOutQuad',
+    delay: 100,
+  });
+  core.events.emitSync('tween/to', {
+    target: titleLabel.scale as unknown as Record<string, unknown>,
+    props: { x: 1, y: 1 },
+    duration: 400,
+    ease: 'easeOutBack',
+    delay: 100,
+  });
+  if (xMark) {
+    core.events.emitSync('tween/to', {
+      target: xMark as unknown as Record<string, unknown>,
+      props: { alpha: 1 },
+      duration: 250,
+      ease: 'easeOutQuad',
+      delay: 500,
+    });
+  }
+  const fadeInItems = [msgLabel, scoreLabel, hiScoreLabel, levelLabel, btn, titleBtn] as unknown as Record<string, unknown>[];
+  const fadeDelays = [300, 450, 600, 700, 800, 900];
+  fadeInItems.forEach((t, i) => {
+    core.events.emitSync('tween/to', {
+      target: t,
+      props: { alpha: 1 },
+      duration: 400,
+      ease: 'easeOutQuad',
+      delay: fadeDelays[i],
+    });
+  });
 
-  const unsubTick = core.events.on('gameover', 'core/tick', ({ delta }: { delta: number }) => {
-    btnScale += 0.0007 * btnDir * delta;
-    if (btnScale > 1.05) btnDir = -1;
-    if (btnScale < 0.97) btnDir = 1;
-    btn.scale.set(btnScale);
+  // Replay button pulse
+  core.events.emitSync('tween/to', {
+    target: btn.scale as unknown as Record<string, unknown>,
+    props: { x: 1.05, y: 1.05 },
+    duration: 850,
+    ease: 'easeInOutSine',
+    loop: true,
+    yoyo: true,
+    delay: 1000,
+  });
 
+  // ── Floating character animation (tick-driven) ────────────────────────────
+  const unsubTick = core.events.on('gameover', 'core/tick', () => {
     character.y = H * 0.42 + Math.sin(Date.now() / 800) * 6;
   });
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   _cleanup = () => {
     core.events.removeNamespace('gameover');
+    core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     unsubTick();
 
     worldLayer.removeChild(stars, character);
     stars.destroy({ children: true });
     character.destroy({ children: true });
+    if (xMark) {
+      worldLayer.removeChild(xMark);
+      xMark.destroy();
+    }
 
     uiLayer.removeChild(titleLabel, msgLabel, scoreLabel, hiScoreLabel, levelLabel, btn, titleBtn);
     titleLabel.destroy();
@@ -234,10 +287,6 @@ async function enter(core: Core): Promise<void> {
     levelLabel.destroy();
     btn.destroy({ children: true });
     titleBtn.destroy({ children: true });
-
-    if (won) {
-      // xMark is a sibling on worldLayer
-    }
   };
 }
 
