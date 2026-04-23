@@ -1,6 +1,7 @@
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 import type { BuffId } from './endless';
 import type { CostumeId } from './costumes';
+import type { SkillId } from './skills';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -53,5 +54,11 @@ export const costumeState = {
    * Used to determine which costumes are unlocked.
    */
   clearedLevels: new Set<number>(),
+};
+
+/** Skill state for the current run. Reset when SkillSelectScene is entered. */
+export const skillState = {
+  /** The skill selected before the current run, or null for no skill. */
+  selected: null as SkillId | null,
 };
 
