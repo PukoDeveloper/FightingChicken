@@ -26,7 +26,7 @@ export type BuffId =
   | 'periodic_shield' // gain 2 s invincibility every 12 s
   | 'blood_price'     // max HP -1 (min 1), but each bullet deals +2 damage (stackable)
   | 'bullet_power'    // each bullet deals +1 bonus damage (stackable)
-  | 'evasion'         // +25% chance to nullify incoming damage (stackable, capped at 75%)
+  | 'evasion'         // +10% chance to nullify incoming damage (stackable, capped at 30%)
   | 'regen'           // heal 1 HP every 12 s (stackable: each stack reduces interval by 3 s, min 6 s)
   | 'long_invincible' // +600 ms invincibility after taking damage (stackable)
   | 'item_drop_up';   // item spawn interval reduced 25% per stack (stackable, capped at 75% reduction)
@@ -99,7 +99,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'evasion',
     name: '閃避本能',
-    desc: '受到攻擊時有 25% 機率\n完全無效化傷害（最高 75%）',
+    desc: '受到攻擊時有 10% 機率\n完全無效化傷害（最高 30%）',
     color: 0x000a0a,
     borderColor: 0x00eebb,
   },
@@ -131,7 +131,7 @@ const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
 
 /** Maximum stack counts for buffs that have a hard cap on usefulness. */
 const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
-  evasion: 3,        // 3 × 25% = 75% dodge cap; a 4th stack is wasted
+  evasion: 3,        // 3 × 10% = 30% dodge cap; a 4th stack is wasted
   item_drop_up: 4,   // 4 stacks reduces spawn to ~31.6% of base, near the 2 s floor
 };
 

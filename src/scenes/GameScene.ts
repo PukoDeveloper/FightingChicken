@@ -211,8 +211,8 @@ async function enter(core: Core): Promise<void> {
   );
   // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
   const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
-  // Evasion chance: 25% per stack, capped at 75%
-  const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
+  // Evasion chance: 10% per stack, capped at 30%
+  const evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
   // Effective invincibility duration: base + 600 ms per long_invincible stack
   const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
