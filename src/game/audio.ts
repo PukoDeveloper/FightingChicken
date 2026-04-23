@@ -8,9 +8,15 @@
 
 let _ctx: AudioContext | null = null;
 
+/**
+ * True while the Page Visibility API has explicitly suspended audio.
+ * Prevents getCtx() from auto-resuming the AudioContext during that window.
+ */
+let _visibilitySuspended = false;
+
 function getCtx(): AudioContext {
   if (!_ctx) _ctx = new AudioContext();
-  if (_ctx.state === 'suspended') void _ctx.resume();
+  if (_ctx.state === 'suspended' && !_visibilitySuspended) void _ctx.resume();
   return _ctx;
 }
 
@@ -205,6 +211,8 @@ const BGM_STEP_MS = (60_000 / BGM_BPM) / 4; // ≈ 101 ms
 let _bgmTimer = 0;
 let _bgmStep = 0;
 let _bgmRunning = false;
+/** True when the BGM timer has been paused by the visibility handler. */
+let _bgmPausedByVisibility = false;
 
 function _bgmTick(): void {
   if (!_bgmRunning) return;
@@ -232,6 +240,7 @@ function _bgmTick(): void {
 export function startBgm(): void {
   if (_bgmRunning) return;
   _bgmRunning = true;
+  _bgmPausedByVisibility = false;
   _bgmStep = 0;
   _bgmTick();
 }
@@ -239,5 +248,37 @@ export function startBgm(): void {
 /** Stop the background music loop. */
 export function stopBgm(): void {
   _bgmRunning = false;
+  _bgmPausedByVisibility = false;
   clearTimeout(_bgmTimer);
 }
+
+// ─── Page Visibility API ──────────────────────────────────────────────────────
+// Pause all audio (BGM timer + AudioContext) when the browser tab becomes hidden
+// so that music does not play in the background.
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // Pause the BGM setTimeout loop without clearing the running flag, so we
+    // can resume from where we left off when the page becomes visible again.
+    if (_bgmRunning && !_bgmPausedByVisibility) {
+      _bgmPausedByVisibility = true;
+      clearTimeout(_bgmTimer);
+    }
+    // Suspend the AudioContext so no buffered audio plays while hidden.
+    if (_ctx && _ctx.state === 'running') {
+      _visibilitySuspended = true;
+      void _ctx.suspend();
+    }
+  } else {
+    // Page is visible again – resume the AudioContext first.
+    _visibilitySuspended = false;
+    if (_ctx && _ctx.state === 'suspended') {
+      void _ctx.resume();
+    }
+    // Restart the BGM timer if it was paused by the visibility handler.
+    if (_bgmPausedByVisibility) {
+      _bgmPausedByVisibility = false;
+      _bgmTimer = window.setTimeout(_bgmTick, BGM_STEP_MS);
+    }
+  }
+});
