@@ -3,6 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
 import { endlessState } from '../game/store';
+import { startBgm, stopBgm } from '../game/audio';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
@@ -61,6 +62,7 @@ async function enter(core: Core): Promise<void> {
   title.anchor.set(0.5);
   title.x = W * 0.5;
   title.y = H * 0.22;
+  title.alpha = 0;
   uiLayer.addChild(title);
 
   const subtitleStyle = new TextStyle({
@@ -72,6 +74,7 @@ async function enter(core: Core): Promise<void> {
   subtitle.anchor.set(0.5);
   subtitle.x = W * 0.5;
   subtitle.y = H * 0.29;
+  subtitle.alpha = 0;
   uiLayer.addChild(subtitle);
 
   // ── Controls hint ─────────────────────────────────────────────────────────
@@ -85,6 +88,7 @@ async function enter(core: Core): Promise<void> {
   hint.anchor.set(0.5);
   hint.x = W * 0.5;
   hint.y = H * 0.65;
+  hint.alpha = 0;
   uiLayer.addChild(hint);
 
   // ── Start button ──────────────────────────────────────────────────────────
@@ -112,6 +116,7 @@ async function enter(core: Core): Promise<void> {
 
   btn.x = W * 0.5;
   btn.y = H * 0.74;
+  btn.alpha = 0;
   uiLayer.addChild(btn);
 
   // ── Endless Mode button ───────────────────────────────────────────────────
@@ -153,6 +158,7 @@ async function enter(core: Core): Promise<void> {
 
   endlessBtn.x = W * 0.5;
   endlessBtn.y = H * 0.84;
+  endlessBtn.alpha = 0;
   uiLayer.addChild(endlessBtn);
 
   // ── DEV button (bottom-right corner) ─────────────────────────────────────
@@ -184,40 +190,59 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'devmenu' });
   });
 
-  // ── Button animation & interaction ────────────────────────────────────────
-  let btnScale = 1;
-  let btnScaleDir = 1;
-  let endlessBtnScale = 1;
-  let endlessBtnDir = 1;
+  // ── Scene fade-in via TweenManager ────────────────────────────────────────
+  const fadeTargets = [title, subtitle, hint, btn, endlessBtn] as unknown as Record<string, unknown>[];
+  const delays = [0, 150, 600, 350, 500];
+  fadeTargets.forEach((t, i) => {
+    core.events.emitSync('tween/to', {
+      target: t,
+      props: { alpha: 1 },
+      duration: 500,
+      ease: 'easeOutQuad',
+      delay: delays[i],
+    });
+  });
 
+  // ── Button pulse animations via TweenManager ──────────────────────────────
+  core.events.emitSync('tween/to', {
+    target: btn.scale as unknown as Record<string, unknown>,
+    props: { x: 1.05, y: 1.05 },
+    duration: 800,
+    ease: 'easeInOutSine',
+    loop: true,
+    yoyo: true,
+    delay: 700,
+  });
+  core.events.emitSync('tween/to', {
+    target: endlessBtn.scale as unknown as Record<string, unknown>,
+    props: { x: 1.04, y: 1.04 },
+    duration: 900,
+    ease: 'easeInOutSine',
+    loop: true,
+    yoyo: true,
+    delay: 900,
+  });
+
+  // ── Background music ──────────────────────────────────────────────────────
+  startBgm();
+
+  // ── Float characters (tick-driven) ────────────────────────────────────────
   const unsubTick = core.events.on('title', 'core/tick', ({ delta }: { delta: number }) => {
     const dt = delta;
-    btnScale += 0.0008 * btnScaleDir * dt;
-    if (btnScale > 1.05) btnScaleDir = -1;
-    if (btnScale < 0.96) btnScaleDir = 1;
-    btn.scale.set(btnScale);
-
-    // Endless button pulses slightly out of phase
-    endlessBtnScale += 0.0006 * endlessBtnDir * dt;
-    if (endlessBtnScale > 1.04) endlessBtnDir = -1;
-    if (endlessBtnScale < 0.97) endlessBtnDir = 1;
-    endlessBtn.scale.set(endlessBtnScale);
-
-    // Pulse VS text
     vsText.rotation += 0.002 * dt;
-
-    // Float characters
     chickenPreview.y = H * 0.5 + Math.sin(Date.now() / 600) * 10;
     couragePreview.y = H * 0.5 + Math.sin(Date.now() / 600 + Math.PI) * 10;
   });
 
   // Click / touch start
   btn.on('pointerdown', async () => {
+    stopBgm();
     endlessState.active = false;
     await core.events.emit('scene/load', { key: 'levelselect' });
   });
 
   endlessBtn.on('pointerdown', async () => {
+    stopBgm();
     endlessState.active = true;
     endlessState.wave = 1;
     endlessState.buffs = [];
@@ -229,6 +254,8 @@ async function enter(core: Core): Promise<void> {
 
   _cleanup = () => {
     core.events.removeNamespace('title');
+    core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
+    core.events.emitSync('tween/kill', { target: endlessBtn.scale as unknown as Record<string, unknown> });
     worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
     uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, devBtn);
     stars.destroy({ children: true });

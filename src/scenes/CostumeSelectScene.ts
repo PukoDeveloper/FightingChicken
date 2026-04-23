@@ -236,7 +236,7 @@ async function enter(core: Core): Promise<void> {
 
   confirmBtn.on('pointerdown', async () => {
     costumeState.selected = selectedId;
-    saveProgress();
+    await saveProgress();
     await core.events.emit('scene/load', { key: 'game' });
   });
   confirmBtn.on('pointerover', () => confirmBtn.scale.set(1.04));
