@@ -7,8 +7,10 @@ import { startBgm } from '../game/audio';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
+let _transitioning = false;
 
 async function enter(core: Core): Promise<void> {
+  _transitioning = false;
   const W = core.app.screen.width;
   const H = core.app.screen.height;
 
@@ -264,11 +266,15 @@ async function enter(core: Core): Promise<void> {
 
   // Click / touch start
   btn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
     endlessState.active = false;
     await core.events.emit('scene/load', { key: 'levelselect' });
   });
 
   endlessBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
     endlessState.active = true;
     endlessState.wave = 1;
     endlessState.buffs = [];
@@ -279,6 +285,8 @@ async function enter(core: Core): Promise<void> {
   });
 
   achBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
     await core.events.emit('scene/load', { key: 'achievements' });
   });
 

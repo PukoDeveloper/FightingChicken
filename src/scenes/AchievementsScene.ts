@@ -13,8 +13,10 @@ type AchEntry = {
 };
 
 let _cleanup: (() => void) | null = null;
+let _enterTime = 0;
 
 async function enter(core: Core): Promise<void> {
+  _enterTime = Date.now();
   const W = core.app.screen.width;
   const H = core.app.screen.height;
 
@@ -155,6 +157,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(btn);
 
   btn.on('pointerup', async () => {
+    if (Date.now() - _enterTime < 300) return;
     await core.events.emit('scene/load', { key: 'title' });
   });
 
