@@ -57,7 +57,7 @@ export const ALL_BUFFS: BuffDef[] = [
   {
     id: 'fire_rate_up',
     name: '射速提升',
-    desc: '射擊頻率提高 15%\n（可多次疊加）',
+    desc: '射擊頻率提高 10%\n（可多次疊加）',
     color: 0x0a0a1a,
     borderColor: 0x44aaff,
   },
@@ -126,9 +126,34 @@ export const ALL_BUFFS: BuffDef[] = [
   },
 ];
 
-/** Pick `count` unique random buffs from the full pool. */
-export function pickRandomBuffs(count: number): BuffDef[] {
-  const pool = [...ALL_BUFFS];
+/** Non-stackable buff IDs: only one copy can be held at a time. */
+const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
+
+/** Maximum stack counts for buffs that have a hard cap on usefulness. */
+const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
+  evasion: 3,        // 3 × 25% = 75% dodge cap; a 4th stack is wasted
+  item_drop_up: 4,   // 4 stacks reduces spawn to ~31.6% of base, near the 2 s floor
+};
+
+/**
+ * Pick `count` unique random buffs from the full pool,
+ * filtering out non-stackable buffs already acquired and buffs at max stacks.
+ */
+export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): BuffDef[] {
+  const pool = ALL_BUFFS.filter(buff => {
+    // Skip non-stackable buffs the player already has
+    if (NON_STACKABLE_BUFFS.includes(buff.id) && currentBuffs.includes(buff.id)) {
+      return false;
+    }
+    // Skip buffs that have reached their stack cap
+    const maxStacks = MAX_BUFF_STACKS[buff.id];
+    if (maxStacks !== undefined) {
+      const held = currentBuffs.filter(b => b === buff.id).length;
+      if (held >= maxStacks) return false;
+    }
+    return true;
+  });
+
   const result: BuffDef[] = [];
   while (result.length < count && pool.length > 0) {
     const idx = Math.floor(Math.random() * pool.length);
@@ -156,11 +181,11 @@ export function endlessEnemyType(waveNum: number): EnemyType {
  * Difficulty scales smoothly with `waveNum` (1-based).
  */
 export function createEndlessWaveConfig(waveNum: number): WaveConfig {
-  // Each wave is ~12% harder than the previous.
-  const d = Math.pow(1.12, waveNum - 1);
+  // Each wave is ~15% harder than the previous.
+  const d = Math.pow(1.15, waveNum - 1);
 
   // Enemy HP grows with difficulty (capped to keep it fun).
-  const hp = Math.min(Math.round(120 * d), 900);
+  const hp = Math.min(Math.round(150 * d), 1200);
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
