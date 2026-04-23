@@ -20,22 +20,14 @@ import {
   PLAYER_FIRE_INTERVAL,
   PLAYER_BULLET_R,
   INVINCIBLE_MS,
-  ENEMY_HP_MAX,
   ENEMY_HITBOX_R,
-  BULLET_SPEED_SLOW,
-  BULLET_SPEED_MEDIUM,
-  BULLET_SPEED_FAST,
   ENEMY_BULLET_R,
-  PHASE2_FRAC,
-  PHASE3_FRAC,
   SCORE_PER_HIT,
   SCORE_BONUS_WIN,
-  COL_BULLET_P1,
-  COL_BULLET_P2,
-  COL_BULLET_P3,
-  COL_BULLET_RING,
 } from '../constants';
 import { gameResult } from '../game/store';
+import { createLevel, TOTAL_LEVELS } from '../game/levels';
+import type { WaveConfig } from '../game/levels';
 
 // ─── Bullet data ─────────────────────────────────────────────────────────────
 interface BulletData {
@@ -63,6 +55,12 @@ function toCanvas(clientX: number, clientY: number, core: Core): { x: number; y:
 async function enter(core: Core): Promise<void> {
   const W = core.app.screen.width;
   const H = core.app.screen.height;
+
+  // ── Level / wave config ────────────────────────────────────────────────────
+  const levelConfig = createLevel(gameResult.currentLevel);
+  let waveIdx = 0;
+  let waveConfig: WaveConfig = levelConfig.waves[waveIdx];
+  let waveMaxHp = waveConfig.enemyHp;
 
   // ── Layers ──────────────────────────────────────────────────────────────
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
@@ -117,11 +115,12 @@ async function enter(core: Core): Promise<void> {
 
   // ── Game state ───────────────────────────────────────────────────────────
   let playerHP = PLAYER_HP_MAX;
-  let enemyHP = ENEMY_HP_MAX;
+  let enemyHP = waveMaxHp;
   let score = 0;
   let phase: 1 | 2 | 3 = 1;
   let invincibleMs = 0;
   let gameEnded = false;
+  let waveTransitioning = false;
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -198,6 +197,38 @@ async function enter(core: Core): Promise<void> {
   phaseText.y = 48;
   uiLayer.addChild(phaseText);
 
+  // Level & wave info text (bottom-right)
+  const levelWaveStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xaaddff,
+    fontWeight: 'bold',
+  });
+  const levelWaveText = new Text({
+    text: `LVL ${levelConfig.levelNumber}  WAVE 1/${levelConfig.waves.length}`,
+    style: levelWaveStyle,
+  });
+  levelWaveText.anchor.set(1, 1);
+  levelWaveText.x = W - 10;
+  levelWaveText.y = H - 10;
+  uiLayer.addChild(levelWaveText);
+
+  // Wave-clear banner (hidden by default, shown between waves)
+  const waveBannerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 38,
+    fontWeight: 'bold',
+    fill: 0xffee44,
+    stroke: { color: 0x553300, width: 5 },
+    dropShadow: { color: 0xff8800, distance: 4, alpha: 0.9, blur: 3 },
+  });
+  const waveBannerText = new Text({ text: '', style: waveBannerStyle });
+  waveBannerText.anchor.set(0.5);
+  waveBannerText.x = W * 0.5;
+  waveBannerText.y = H * 0.5;
+  waveBannerText.alpha = 0;
+  uiLayer.addChild(waveBannerText);
+
   // Flash overlay (for phase transitions & hits)
   const flashOverlay = createFlashOverlay(W, H);
   sysLayer.addChild(flashOverlay);
@@ -245,23 +276,24 @@ async function enter(core: Core): Promise<void> {
     }
 
     // Boss HP bar
-    const frac = Math.max(0, enemyHP / ENEMY_HP_MAX);
+    const frac = Math.max(0, enemyHP / waveMaxHp);
     hpBarFill.clear();
     if (frac > 0) {
-      const barColor = frac > PHASE2_FRAC ? 0xff2222
-        : frac > PHASE3_FRAC ? 0xff8800 : 0xaa00ff;
+      const barColor = frac > waveConfig.phase2Frac ? 0xff2222
+        : frac > waveConfig.phase3Frac ? 0xff8800 : 0xaa00ff;
       hpBarFill.rect(0, 0, BAR_W * frac, 18).fill(barColor);
     }
 
-    // Score
+    // Score / phase / wave
     scoreText.text = `SCORE: ${score}`;
     phaseText.text = `PHASE ${phase}`;
+    levelWaveText.text = `LVL ${levelConfig.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig.waves.length}`;
   }
 
   // ── Helper: check phase ───────────────────────────────────────────────────
   function checkPhase(): void {
-    const frac = enemyHP / ENEMY_HP_MAX;
-    const newPhase: 1 | 2 | 3 = frac > PHASE2_FRAC ? 1 : frac > PHASE3_FRAC ? 2 : 3;
+    const frac = enemyHP / waveMaxHp;
+    const newPhase: 1 | 2 | 3 = frac > waveConfig.phase2Frac ? 1 : frac > waveConfig.phase3Frac ? 2 : 3;
     if (newPhase !== phase) {
       phase = newPhase;
       // Trigger phase flash
@@ -435,64 +467,39 @@ async function enter(core: Core): Promise<void> {
         spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18);
       }
 
-      // ── Enemy bullet patterns ─────────────────────────────────────────────
-      if (phaseFlashTimer <= 0) {
-        if (phase === 1) {
-          // Slow spiral (5-way)
+      // ── Enemy bullet patterns (driven by wave config) ─────────────────────
+      if (phaseFlashTimer <= 0 && !waveTransitioning) {
+        const p = waveConfig.phases[phase - 1];
+
+        if (p.spiralInterval > 0) {
           spiralTimer -= dt;
           if (spiralTimer <= 0) {
-            spiralTimer = 240;
-            fireSpiral(5, BULLET_SPEED_SLOW, COL_BULLET_P1);
+            spiralTimer = p.spiralInterval;
+            fireSpiral(p.spiralWays, p.spiralSpeed, p.spiralColor);
           }
-          // Aimed double shot
+        }
+
+        if (p.aimInterval > 0) {
           aimTimer -= dt;
           if (aimTimer <= 0) {
-            aimTimer = 1400;
-            fireAimed(2, 0.25, BULLET_SPEED_MEDIUM, COL_BULLET_P1);
+            aimTimer = p.aimInterval;
+            fireAimed(p.aimWays, p.aimSpread, p.aimSpeed, p.aimColor);
           }
-        } else if (phase === 2) {
-          // Medium spiral (8-way)
-          spiralTimer -= dt;
-          if (spiralTimer <= 0) {
-            spiralTimer = 180;
-            fireSpiral(8, BULLET_SPEED_MEDIUM, COL_BULLET_P2);
-          }
-          // Wider aimed spread
-          aimTimer -= dt;
-          if (aimTimer <= 0) {
-            aimTimer = 900;
-            fireAimed(3, 0.3, BULLET_SPEED_MEDIUM, COL_BULLET_P2);
-          }
-          // Fan spread
+        }
+
+        if (p.spreadInterval > 0) {
           spreadTimer -= dt;
           if (spreadTimer <= 0) {
-            spreadTimer = 1600;
-            fireAimed(5, 0.22, BULLET_SPEED_SLOW, COL_BULLET_P2);
+            spreadTimer = p.spreadInterval;
+            fireAimed(p.spreadWays, p.spreadAngle, p.spreadSpeed, p.spreadColor);
           }
-        } else {
-          // Fast dense spiral (12-way)
-          spiralTimer -= dt;
-          if (spiralTimer <= 0) {
-            spiralTimer = 110;
-            fireSpiral(12, BULLET_SPEED_FAST, COL_BULLET_P3);
-          }
-          // Aimed burst
-          aimTimer -= dt;
-          if (aimTimer <= 0) {
-            aimTimer = 600;
-            fireAimed(3, 0.2, BULLET_SPEED_FAST, COL_BULLET_P3);
-          }
-          // Ring burst
+        }
+
+        if (p.ringInterval > 0) {
           ringTimer -= dt;
           if (ringTimer <= 0) {
-            ringTimer = 3200;
-            fireRing(24, BULLET_SPEED_MEDIUM, COL_BULLET_RING);
-          }
-          // Extra spread
-          spreadTimer -= dt;
-          if (spreadTimer <= 0) {
-            spreadTimer = 800;
-            fireAimed(7, 0.2, BULLET_SPEED_SLOW, COL_BULLET_P3);
+            ringTimer = p.ringInterval;
+            fireRing(p.ringCount, p.ringSpeed, p.ringColor);
           }
         }
       }
@@ -508,6 +515,9 @@ async function enter(core: Core): Promise<void> {
           removeBullet(playerBullets, i, playerBulletsContainer);
           continue;
         }
+
+        // Skip hitting enemy during wave transition
+        if (waveTransitioning) continue;
 
         // Hit enemy
         const dx = b.x - enemyEntity.position.x;
@@ -545,7 +555,12 @@ async function enter(core: Core): Promise<void> {
 
           if (enemyHP <= 0) {
             score += SCORE_BONUS_WIN;
-            endGame(true);
+            const nextWaveIdx = waveIdx + 1;
+            if (nextWaveIdx < levelConfig.waves.length) {
+              advanceWave(nextWaveIdx);
+            } else {
+              endGame(true);
+            }
             return;
           }
         }
@@ -615,6 +630,50 @@ async function enter(core: Core): Promise<void> {
     }
   );
 
+  // ── Advance to the next wave ─────────────────────────────────────────────────
+  // nextWaveIdx is the 0-based index of the wave to load.
+  async function advanceWave(nextWaveIdx: number): Promise<void> {
+    waveTransitioning = true;
+
+    // Clear all enemy bullets
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(enemyBullets[i].display);
+      enemyBullets[i].display.destroy();
+    }
+    enemyBullets.length = 0;
+
+    // Show wave-clear banner (1-based wave number for display)
+    waveBannerText.text = `第 ${nextWaveIdx + 1} 波！`;
+    waveBannerText.alpha = 1;
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+
+    if (gameEnded) return;
+
+    waveBannerText.alpha = 0;
+
+    // Switch to new wave config
+    waveIdx = nextWaveIdx;
+    waveConfig = levelConfig.waves[waveIdx];
+    waveMaxHp = waveConfig.enemyHp;
+    enemyHP = waveMaxHp;
+    phase = 1;
+    spiralTimer = 0;
+    aimTimer = 0;
+    spreadTimer = 0;
+    ringTimer = 0;
+    phaseFlashTimer = 0;
+    flashOverlay.alpha = 0;
+
+    // Reset enemy position
+    enemyEntity.position.x = W * 0.5;
+    enemyEntity.position.y = H * 0.18;
+    enemyBobTimer = 0;
+
+    updateHUD();
+    waveTransitioning = false;
+  }
+
   // ── End game ────────────────────────────────────────────────────────────────
   async function endGame(won: boolean): Promise<void> {
     if (gameEnded) return;
@@ -623,6 +682,13 @@ async function enter(core: Core): Promise<void> {
     gameResult.won = won;
     gameResult.score = score;
     if (score > gameResult.highScore) gameResult.highScore = score;
+
+    // Advance level on win, reset on loss
+    if (won) {
+      gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+    } else {
+      gameResult.currentLevel = 1;
+    }
 
     // Big explosion on enemy if won
     if (won) {
@@ -691,12 +757,14 @@ async function enter(core: Core): Promise<void> {
     enemyBulletsContainer.destroy({ children: true });
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
     scoreText.destroy();
     phaseText.destroy();
+    levelWaveText.destroy();
+    waveBannerText.destroy();
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();

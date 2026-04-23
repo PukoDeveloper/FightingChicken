@@ -3,6 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createChickenDisplay, createCourageDisplay } from '../game/sprites';
 import { gameResult } from '../game/store';
+import { createLevel } from '../game/levels';
 
 let _cleanup: (() => void) | null = null;
 
@@ -69,7 +70,7 @@ async function enter(core: Core): Promise<void> {
   const scoreLabel = new Text({ text: `得分：${score}`, style: scoreStyle });
   scoreLabel.anchor.set(0.5);
   scoreLabel.x = W * 0.5;
-  scoreLabel.y = H * 0.64;
+  scoreLabel.y = H * 0.60;
   uiLayer.addChild(scoreLabel);
 
   const hiScoreStyle = new TextStyle({
@@ -80,8 +81,27 @@ async function enter(core: Core): Promise<void> {
   const hiScoreLabel = new Text({ text: `最高分：${highScore}`, style: hiScoreStyle });
   hiScoreLabel.anchor.set(0.5);
   hiScoreLabel.x = W * 0.5;
-  hiScoreLabel.y = H * 0.71;
+  hiScoreLabel.y = H * 0.67;
   uiLayer.addChild(hiScoreLabel);
+
+  // ── Level reached ─────────────────────────────────────────────────────────
+  const clearedLevel = won ? gameResult.currentLevel - 1 : gameResult.currentLevel;
+  const clearedLevelConfig = createLevel(clearedLevel);
+  const levelStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 16,
+    fill: 0xaaddff,
+  });
+  const levelLabel = new Text({
+    text: won
+      ? `通關第 ${clearedLevel} 關「${clearedLevelConfig.name}」！`
+      : `挑戰第 ${clearedLevel} 關「${clearedLevelConfig.name}」`,
+    style: levelStyle,
+  });
+  levelLabel.anchor.set(0.5);
+  levelLabel.x = W * 0.5;
+  levelLabel.y = H * 0.74;
+  uiLayer.addChild(levelLabel);
 
   // ── Result message ────────────────────────────────────────────────────────
   const msgStyle = new TextStyle({
@@ -183,11 +203,12 @@ async function enter(core: Core): Promise<void> {
     stars.destroy({ children: true });
     character.destroy({ children: true });
 
-    uiLayer.removeChild(titleLabel, msgLabel, scoreLabel, hiScoreLabel, btn, titleBtn);
+    uiLayer.removeChild(titleLabel, msgLabel, scoreLabel, hiScoreLabel, levelLabel, btn, titleBtn);
     titleLabel.destroy();
     msgLabel.destroy();
     scoreLabel.destroy();
     hiScoreLabel.destroy();
+    levelLabel.destroy();
     btn.destroy({ children: true });
     titleBtn.destroy({ children: true });
 
