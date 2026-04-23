@@ -16,6 +16,7 @@ import { costumeState } from '../game/store';
 import { endlessState } from '../game/store';
 import { COSTUMES, isCostumeUnlocked } from '../game/costumes';
 import type { CostumeId } from '../game/costumes';
+import { saveProgress } from '../game/persistence';
 
 let _cleanup: (() => void) | null = null;
 
@@ -235,6 +236,7 @@ async function enter(core: Core): Promise<void> {
 
   confirmBtn.on('pointerdown', async () => {
     costumeState.selected = selectedId;
+    saveProgress();
     await core.events.emit('scene/load', { key: 'game' });
   });
   confirmBtn.on('pointerover', () => confirmBtn.scale.set(1.04));

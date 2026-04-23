@@ -6,7 +6,8 @@ import type { CostumeId } from './costumes';
 export const gameResult = {
   won: false,
   score: 0,
-  highScore: 0,
+  /** Per-level best scores keyed by 1-based level number. Independent of endless mode. */
+  levelHighScores: {} as Record<number, number>,
   /** 1-based current level number. Set by LevelSelectScene; increments on win for auto-advance. */
   currentLevel: 1,
   /** The level that was just played. Set by GameScene before it mutates currentLevel. */
@@ -31,6 +32,8 @@ export const endlessState = {
   buffs: [] as BuffId[],
   /** Best (highest) wave reached in endless mode. */
   bestWave: 1,
+  /** Best score achieved in endless mode. */
+  highScore: 0,
   /** HP carried over from the previous wave (0 = start fresh at base HP). */
   currentHp: 0,
   /** Cumulative score across all waves in the current endless run. */

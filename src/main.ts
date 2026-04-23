@@ -15,6 +15,7 @@ import { DevMenuScene } from './scenes/DevMenuScene';
 import { EndlessBuffScene } from './scenes/EndlessBuffScene';
 import { CostumeSelectScene } from './scenes/CostumeSelectScene';
 import { GAME_W, GAME_H } from './constants';
+import { loadProgress } from './game/persistence';
 
 async function main(): Promise<void> {
   const { core } = await createEngine({
@@ -69,6 +70,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: DevMenuScene });
           c.events.emitSync('scene/register', { scene: EndlessBuffScene });
           c.events.emitSync('scene/register', { scene: CostumeSelectScene });
+          loadProgress();
           await c.events.emit('scene/load', { key: 'title' });
         },
       },
