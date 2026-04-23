@@ -39,6 +39,8 @@ export const PHASE2_FRAC = 0.66;
 export const PHASE3_FRAC = 0.33;
 
 // ─── Pickups ─────────────────────────────────────────────────────────────────
+/** Pickup falling speed in px/s */
+export const ITEM_FALL_SPEED = 120;
 /** Collection radius for pickups (px) */
 export const ITEM_COLLECT_R = 22;
 /** Time before an uncollected pickup disappears (ms) */

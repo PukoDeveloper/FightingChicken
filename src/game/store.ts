@@ -1,4 +1,4 @@
-import { PLAYER_MOVE_SPEED } from '../constants';
+import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -15,4 +15,6 @@ export const gameResult = {
 export const devConfig = {
   /** Player movement speed in px/s. Initialised from PLAYER_MOVE_SPEED constant. */
   playerMoveSpeed: PLAYER_MOVE_SPEED,
+  /** Item fall speed in px/s. Initialised from ITEM_FALL_SPEED constant. */
+  itemFallSpeed: ITEM_FALL_SPEED,
 };

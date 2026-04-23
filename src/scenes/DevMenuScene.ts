@@ -1,7 +1,7 @@
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { devConfig } from '../game/store';
-import { PLAYER_MOVE_SPEED } from '../constants';
+import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 
 // ─── DevMenu overlay (HTML) ──────────────────────────────────────────────────
 // Renders a simple HTML panel on top of the canvas so we can use native
@@ -56,6 +56,18 @@ async function enter(core: Core): Promise<void> {
       style="width:100%;margin-bottom:16px;accent-color:#ff6644;"
     />
 
+    <label style="display:block;margin-bottom:6px;font-size:14px;color:#ffccaa;">
+      道具下落速度
+      <span id="dev-fall-val" style="margin-left:8px;color:#ffee44;font-weight:bold;">
+        ${devConfig.itemFallSpeed} px/s
+      </span>
+    </label>
+    <input id="dev-fall" type="range"
+      min="20" max="600" step="10"
+      value="${devConfig.itemFallSpeed}"
+      style="width:100%;margin-bottom:16px;accent-color:#ff6644;"
+    />
+
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button id="dev-reset"
         style="padding:8px 16px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:14px;">
@@ -74,6 +86,8 @@ async function enter(core: Core): Promise<void> {
   // ── Wire up controls ──────────────────────────────────────────────────────
   const speedSlider = panel.querySelector<HTMLInputElement>('#dev-speed')!;
   const speedVal    = panel.querySelector<HTMLElement>('#dev-speed-val')!;
+  const fallSlider  = panel.querySelector<HTMLInputElement>('#dev-fall')!;
+  const fallVal     = panel.querySelector<HTMLElement>('#dev-fall-val')!;
   const resetBtn    = panel.querySelector<HTMLButtonElement>('#dev-reset')!;
   const closeBtn    = panel.querySelector<HTMLButtonElement>('#dev-close')!;
 
@@ -82,20 +96,28 @@ async function enter(core: Core): Promise<void> {
     speedVal.textContent = `${devConfig.playerMoveSpeed} px/s`;
   });
 
+  fallSlider.addEventListener('input', () => {
+    devConfig.itemFallSpeed = Number(fallSlider.value);
+    fallVal.textContent = `${devConfig.itemFallSpeed} px/s`;
+  });
+
   resetBtn.addEventListener('click', () => {
     devConfig.playerMoveSpeed = PLAYER_MOVE_SPEED;
     speedSlider.value = String(PLAYER_MOVE_SPEED);
     speedVal.textContent = `${PLAYER_MOVE_SPEED} px/s`;
+    devConfig.itemFallSpeed = ITEM_FALL_SPEED;
+    fallSlider.value = String(ITEM_FALL_SPEED);
+    fallVal.textContent = `${ITEM_FALL_SPEED} px/s`;
   });
 
   closeBtn.addEventListener('click', async () => {
-    await core.events.emit('scene/load', { key: 'game' });
+    await core.events.emit('scene/load', { key: 'title' });
   });
 
   // Close on clicking the dark backdrop (outside the panel)
   overlay.addEventListener('click', async (e) => {
     if (e.target === overlay) {
-      await core.events.emit('scene/load', { key: 'game' });
+      await core.events.emit('scene/load', { key: 'title' });
     }
   });
 }
