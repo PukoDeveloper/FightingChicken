@@ -240,7 +240,7 @@ async function enter(core: Core): Promise<void> {
     sfxMenuClick();
     costumeState.selected = selectedId;
     await saveProgress();
-    await core.events.emit('scene/load', { key: 'game' });
+    await core.events.emit('scene/load', { key: 'skillselect' });
   });
   confirmBtn.on('pointerover', () => confirmBtn.scale.set(1.04));
   confirmBtn.on('pointerout',  () => confirmBtn.scale.set(1.0));

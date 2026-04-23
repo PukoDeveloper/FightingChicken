@@ -45,10 +45,11 @@ import {
   COL_BULLET_BOMB,
   COL_BULLET_LASER,
 } from '../constants';
-import { gameResult, devConfig, endlessState, costumeState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState, skillState } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
+import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
 import {
   sfxShoot,
@@ -285,7 +286,9 @@ async function enter(core: Core): Promise<void> {
   const hasPeriodicShield  = isEndless && endlessState.buffs.includes('periodic_shield');
 
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
-  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount, 1), 10);
+  // iron_will skill: +1 max HP
+  const skillIronWill = skillState.selected === 'iron_will';
+  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
   // Effective base fire interval (reduced by 10% per fire_rate_up stack, floored at 60 ms)
   const effectiveFireInterval = Math.max(
     Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)),
@@ -391,6 +394,21 @@ async function enter(core: Core): Promise<void> {
   let touchActive = false;
   let touchTargetX = playerEntity.position.x;
   let touchTargetY = playerEntity.position.y;
+
+  // ── Skill state ──────────────────────────────────────────────────────────
+  const activeSkillId = skillState.selected;
+  const activeSkillDef = activeSkillId !== null
+    ? SKILLS.find(s => s.id === activeSkillId) ?? null
+    : null;
+  const isActiveSkill = activeSkillDef?.type === 'active';
+  // Cooldown in ms for the active skill (0 = ready to use)
+  let skillCooldownMs = 0;
+  // Active skill effect timer (ms remaining while the skill effect is active)
+  let skillActiveMs = 0;
+  // Position constants for the skill button (bottom-right corner)
+  const SKILL_BTN_X = W - 38;
+  const SKILL_BTN_Y = H - 72;
+  const SKILL_BTN_R = 26; // tap hitbox radius
 
   // ── HUD ──────────────────────────────────────────────────────────────────
   // HP hearts
@@ -523,17 +541,88 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0x006633, distance: 2, alpha: 0.8, blur: 2 },
   });
+  const skillTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xffcc44,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x884400, distance: 2, alpha: 0.8, blur: 2 },
+  });
   const powerUpText       = new Text({ text: '', style: powerUpStyle });
   const trappedTimerText  = new Text({ text: '', style: trappedTimerStyle });
   const shieldTimerText   = new Text({ text: '', style: shieldTimerStyle });
   const regenTimerText    = new Text({ text: '', style: regenTimerStyle });
-  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText].forEach(t => {
+  const skillTimerText    = new Text({ text: '', style: skillTimerStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText].forEach(t => {
     t.anchor.set(0, 1);
     t.x = 10;
     t.y = H - 38;
     t.visible = false;
     uiLayer.addChild(t);
   });
+
+  // ── Active skill button (bottom-right) ────────────────────────────────────
+  // Only rendered when an active skill is selected.
+  const skillBtnContainer = new Container();
+  skillBtnContainer.visible = isActiveSkill;
+  const skillBtnBg = new Graphics();
+  const skillBtnCooldownArc = new Graphics();
+  const skillBtnLabelStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 10,
+    fill: 0xffffff,
+    align: 'center',
+    fontWeight: 'bold',
+    wordWrap: true,
+    wordWrapWidth: SKILL_BTN_R * 2 - 4,
+  });
+  const skillBtnLabel = new Text({ text: '', style: skillBtnLabelStyle });
+  skillBtnLabel.anchor.set(0.5);
+  skillBtnContainer.addChild(skillBtnBg, skillBtnCooldownArc, skillBtnLabel);
+  skillBtnContainer.x = SKILL_BTN_X;
+  skillBtnContainer.y = SKILL_BTN_Y;
+  uiLayer.addChild(skillBtnContainer);
+
+  function redrawSkillBtn(): void {
+    if (!activeSkillDef) return;
+    const ready = skillCooldownMs <= 0;
+    const borderColor = ready ? activeSkillDef.borderColor : 0x555566;
+    const fillColor = ready ? activeSkillDef.color : 0x111122;
+
+    skillBtnBg.clear();
+    skillBtnBg.circle(0, 0, SKILL_BTN_R)
+      .fill({ color: fillColor, alpha: 0.9 });
+    skillBtnBg.circle(0, 0, SKILL_BTN_R)
+      .stroke({ color: borderColor, width: ready ? 2 : 1 });
+
+    // Cooldown sweep arc (dark overlay, clockwise from top)
+    skillBtnCooldownArc.clear();
+    if (!ready) {
+      const totalMs = activeSkillDef.cooldownMs ?? 15000;
+      const frac = skillCooldownMs / totalMs;
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + frac * Math.PI * 2;
+      skillBtnCooldownArc
+        .moveTo(0, 0)
+        .arc(0, 0, SKILL_BTN_R - 2, startAngle, endAngle)
+        .closePath()
+        .fill({ color: 0x000000, alpha: 0.55 });
+    }
+
+    // Label: skill name when ready, countdown seconds when cooling down
+    if (ready) {
+      skillBtnLabel.text = activeSkillDef.name;
+      skillBtnLabel.style.fill = 0xffffff;
+    } else {
+      skillBtnLabel.text = `${Math.ceil(skillCooldownMs / 1000)}s`;
+      skillBtnLabel.style.fill = 0x888888;
+    }
+  }
+
+  if (isActiveSkill) redrawSkillBtn();
+
+  // eagle_eye skill: enemy bullet speed multiplier
+  const eagleEyeSpeedMult = skillState.selected === 'eagle_eye' ? 0.80 : 1.0;
 
   function spawnEnemyBullet(
     x: number, y: number,
@@ -549,7 +638,7 @@ async function enter(core: Core): Promise<void> {
     display.y = y;
     display.visible = true;
     enemyBulletsContainer.addChild(display);
-    enemyBullets.push({ display, x, y, vx, vy });
+    enemyBullets.push({ display, x, y, vx: vx * eagleEyeSpeedMult, vy: vy * eagleEyeSpeedMult });
   }
 
   // ── Helper: spawn player bullet ───────────────────────────────────────────
@@ -641,10 +730,12 @@ async function enter(core: Core): Promise<void> {
     if (trappedMs > 0) timerEntries.push([trappedTimerText, `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`]);
     if (hasPeriodicShield && periodicShieldTimer > 0) timerEntries.push([shieldTimerText, `🛡 護盾 ${Math.ceil(periodicShieldTimer / 1000)}s`]);
     if (regenIntervalMs > 0 && regenTimer > 0) timerEntries.push([regenTimerText, `💚 再生 ${Math.ceil(regenTimer / 1000)}s`]);
+    // burst_fire skill: show active duration
+    if (activeSkillId === 'burst_fire' && skillActiveMs > 0) timerEntries.push([skillTimerText, `🔥 爆發射擊 ${Math.ceil(skillActiveMs / 1000)}s`]);
 
     const timerBaseY = H - 38;
     const timerLineH = 18;
-    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText].forEach(t => {
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText].forEach(t => {
       t.text = '';
       t.visible = false;
     });
@@ -855,12 +946,98 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  // ── Active skill activation helper ───────────────────────────────────────
+  function tryActivateSkill(): boolean {
+    if (!isActiveSkill || gameEnded || skillCooldownMs > 0) return false;
+    const cooldown = activeSkillDef?.cooldownMs ?? 15000;
+    skillCooldownMs = cooldown;
+
+    if (activeSkillId === 'swift_dodge') {
+      // Grant 2 s invincibility
+      invincibleMs = Math.max(invincibleMs, 2000);
+      flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0x44aaff, alpha: 1 });
+      flashOverlay.alpha = 0.20;
+      phaseFlashTimer = Math.max(phaseFlashTimer, 250);
+      core.events.emitSync('particle/emit', {
+        config: {
+          x: playerEntity.position.x, y: playerEntity.position.y,
+          burst: true, burstCount: 14, speed: 100, speedVariance: 50,
+          spread: 180, lifetime: 450, startAlpha: 1, endAlpha: 0,
+          startScale: 1.2, endScale: 0,
+          startColor: 0x44aaff, endColor: 0xaaddff, radius: 5,
+        },
+      });
+    } else if (activeSkillId === 'burst_fire') {
+      // Activate burst fire for 4 s
+      skillActiveMs = 4000;
+    } else if (activeSkillId === 'bullet_clear') {
+      // Clear all enemy projectiles
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        enemyBulletsContainer.removeChild(enemyBullets[i].display);
+        enemyBulletPool.release(enemyBullets[i].display);
+      }
+      enemyBullets.length = 0;
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        shockwavesContainer.removeChild(shockwaves[i].display);
+        shockwaves[i].display.destroy();
+      }
+      shockwaves.length = 0;
+      for (let i = bubbles.length - 1; i >= 0; i--) {
+        bubblesContainer.removeChild(bubbles[i].display);
+        bubbles[i].display.destroy();
+      }
+      bubbles.length = 0;
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        enemyBulletsContainer.removeChild(bombs[i].display);
+        bombs[i].display.destroy();
+      }
+      bombs.length = 0;
+      for (let i = curveBullets.length - 1; i >= 0; i--) {
+        enemyBulletsContainer.removeChild(curveBullets[i].display);
+        enemyBulletPool.release(curveBullets[i].display);
+      }
+      curveBullets.length = 0;
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        lasersContainer.removeChild(lasers[i].display);
+        lasers[i].display.destroy();
+      }
+      lasers.length = 0;
+      flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xcc44ff, alpha: 1 });
+      flashOverlay.alpha = 0.25;
+      phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+      core.events.emitSync('camera/shake', { intensity: 6, duration: 200 });
+      core.events.emitSync('particle/emit', {
+        config: {
+          x: W * 0.5, y: H * 0.5,
+          burst: true, burstCount: 24, speed: 180, speedVariance: 80,
+          spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+          startScale: 1.5, endScale: 0,
+          startColor: 0xcc44ff, endColor: 0xffffff, radius: 6,
+        },
+      });
+    }
+
+    redrawSkillBtn();
+    return true;
+  }
+
   // ── Touch input ────────────────────────────────────────────────────────────
+  function isOverSkillBtn(canvasX: number, canvasY: number): boolean {
+    if (!isActiveSkill) return false;
+    const dx = canvasX - SKILL_BTN_X;
+    const dy = canvasY - SKILL_BTN_Y;
+    return Math.sqrt(dx * dx + dy * dy) <= SKILL_BTN_R + 10;
+  }
+
   const unsubTouchStart = core.events.on(
     'game',
     'input/touch:start',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
+      if (isOverSkillBtn(pos.x, pos.y)) {
+        tryActivateSkill();
+        return;
+      }
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
@@ -888,6 +1065,10 @@ async function enter(core: Core): Promise<void> {
     'input/pointer:down',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
+      if (isOverSkillBtn(pos.x, pos.y)) {
+        tryActivateSkill();
+        return;
+      }
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
@@ -1019,6 +1200,17 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Active skill cooldown & effect countdown ──────────────────────────
+      if (isActiveSkill) {
+        if (skillCooldownMs > 0) {
+          skillCooldownMs = Math.max(0, skillCooldownMs - dt);
+          redrawSkillBtn();
+        }
+        if (skillActiveMs > 0) {
+          skillActiveMs = Math.max(0, skillActiveMs - dt);
+        }
+      }
+
       // ── Player auto-fire ──────────────────────────────────────────────────
       playerFireTimer -= dt;
       if (playerFireTimer <= 0) {
@@ -1027,7 +1219,13 @@ async function enter(core: Core): Promise<void> {
         const baseInterval = berserkerActive
           ? Math.max(effectiveFireInterval / 2, 60)
           : effectiveFireInterval;
-        const fireInterval = powerUpTimer > 0 ? POWER_FIRE_INTERVAL : baseInterval;
+        // burst_fire skill: halve fire interval while skillActiveMs > 0
+        const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
+        const fireInterval = powerUpTimer > 0
+          ? POWER_FIRE_INTERVAL
+          : burstFireActive
+            ? Math.max(Math.round(baseInterval / 2), 60)
+            : baseInterval;
         playerFireTimer = fireInterval;
         spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18);
         spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18);
@@ -1682,6 +1880,19 @@ async function enter(core: Core): Promise<void> {
           } else {
             powerUpTimer = POWER_UP_DURATION_MS;
           }
+          // fortune skill: 25% chance to heal 1 HP on any pickup
+          if (skillState.selected === 'fortune' && Math.random() < 0.25 && playerHP < effectiveHpMax) {
+            playerHP = Math.min(effectiveHpMax, playerHP + 1);
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: item.x, y: item.y,
+                burst: true, burstCount: 8, speed: 80, speedVariance: 30,
+                spread: 180, lifetime: 350, startAlpha: 0.9, endAlpha: 0,
+                startScale: 1.0, endScale: 0,
+                startColor: 0xffaa22, endColor: 0xff6600, radius: 4,
+              },
+            });
+          }
           sfxPickup();
           core.events.emitSync('game/item:collected', {});
           // Sparkle burst on collect
@@ -2021,7 +2232,7 @@ async function enter(core: Core): Promise<void> {
     trapRing.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, skillBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -2033,6 +2244,8 @@ async function enter(core: Core): Promise<void> {
     trappedTimerText.destroy();
     shieldTimerText.destroy();
     regenTimerText.destroy();
+    skillTimerText.destroy();
+    skillBtnContainer.destroy({ children: true });
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
