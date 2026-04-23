@@ -713,12 +713,12 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
-  /** Ring: fires n bullets in a full circle centred on the enemy. */
+  /** Ring: fires n bullets in a full circle centered on the enemy. */
   function fireRing(n: number, speed: number, color: number): void {
     fireRingAt(enemyEntity.position.x, enemyEntity.position.y, n, speed, color);
   }
 
-  /** Shockwave: spawns an expanding ring centred on the enemy's current position. */
+  /** Shockwave: spawns an expanding ring centered on the enemy's current position. */
   function fireShockwave(speed: number, color: number): void {
     const ex = enemyEntity.position.x;
     const ey = enemyEntity.position.y;
@@ -757,12 +757,19 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  // ── Attack-specific constants ────────────────────────────────────────────────
+  const BOMB_SPEED = 85;                   // px/s, slow tracking projectile
+  const BOMB_PULSE_PERIOD_MS = 120;        // controls pulse frequency as fuse counts down
+  const LASER_MARGIN = 50;                 // px from screen edge for random laser column position
+  const LASER_COL_SPREAD = 14;             // px horizontal jitter within a laser column
+  const LASER_COL_SPACING = 9;            // px vertical spacing between bullets in a column
+  const LASER_DOUBLE_THRESHOLD = 6;       // min bullet count that triggers a second column
+
   /** Bomb: slow projectile aimed at the player; explodes into a ring after fuseMs. */
   function fireBomb(
     count: number, fuseMs: number,
     ringCount: number, ringSpeed: number, color: number
   ): void {
-    const BOMB_SPEED = 85;
     const ex = enemyEntity.position.x;
     const ey = enemyEntity.position.y;
     const px = playerEntity.position.x;
@@ -792,18 +799,18 @@ async function enter(core: Core): Promise<void> {
   /** Laser: fires a dense column of bullets from a random x-position at the top
    *  of the screen, all moving straight down at `speed`. */
   function fireLaser(count: number, speed: number, color: number): void {
-    const laserX = 50 + Math.random() * (W - 100);
+    const laserX = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
     for (let i = 0; i < count; i++) {
-      const x = laserX + (Math.random() - 0.5) * 14;
-      const y = -20 - i * 9; // stagger upward so they form a column as they enter
+      const x = laserX + (Math.random() - 0.5) * LASER_COL_SPREAD;
+      const y = -20 - i * LASER_COL_SPACING; // stagger upward so they form a column as they enter
       spawnEnemyBullet(x, y, 0, speed, color);
     }
-    // Optional: fire a second independent column for dense laser waves
-    if (count >= 6) {
-      const laserX2 = 50 + Math.random() * (W - 100);
+    // Fire a second independent column for dense laser waves
+    if (count >= LASER_DOUBLE_THRESHOLD) {
+      const laserX2 = LASER_MARGIN + Math.random() * (W - LASER_MARGIN * 2);
       for (let i = 0; i < Math.floor(count / 2); i++) {
-        const x = laserX2 + (Math.random() - 0.5) * 14;
-        const y = -20 - i * 9;
+        const x = laserX2 + (Math.random() - 0.5) * LASER_COL_SPREAD;
+        const y = -20 - i * LASER_COL_SPACING;
         spawnEnemyBullet(x, y, 0, speed, color);
       }
     }
@@ -1382,7 +1389,7 @@ async function enter(core: Core): Promise<void> {
         bomb.fuseMs -= dt;
 
         // Pulse scale to signal fuse countdown
-        const pulseScale = 1 + 0.20 * Math.abs(Math.sin((bomb.fuseMs / 120) * Math.PI));
+        const pulseScale = 1 + 0.20 * Math.abs(Math.sin((bomb.fuseMs / BOMB_PULSE_PERIOD_MS) * Math.PI));
         bomb.display.scale.set(pulseScale);
 
         // Helper: explode this bomb
