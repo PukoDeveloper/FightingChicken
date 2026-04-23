@@ -140,9 +140,19 @@ const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
  * filtering out non-stackable buffs already acquired and buffs at max stacks.
  */
 export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): BuffDef[] {
+  // Compute effective max HP so we can hide berserker when it would be trivially permanent.
+  const hpUp         = currentBuffs.filter(b => b === 'hp_up').length;
+  const bloodPrice   = currentBuffs.filter(b => b === 'blood_price').length;
+  const effectiveHpMax = Math.min(Math.max(5 + hpUp - bloodPrice, 1), 10);
+
   const pool = ALL_BUFFS.filter(buff => {
     // Skip non-stackable buffs the player already has
     if (NON_STACKABLE_BUFFS.includes(buff.id) && currentBuffs.includes(buff.id)) {
+      return false;
+    }
+    // Skip berserker when max HP ≤ 2: the HP ≤ 2 trigger would be permanently true,
+    // making the buff a free unconditional bonus with no meaningful trade-off.
+    if (buff.id === 'berserker' && effectiveHpMax <= 2) {
       return false;
     }
     // Skip buffs that have reached their stack cap
