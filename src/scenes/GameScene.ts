@@ -29,7 +29,6 @@ import {
   SCORE_BONUS_WAVE_MULT,
   ITEM_COLLECT_R,
   ITEM_LIFETIME_MS,
-  ITEM_FALL_SPEED,
   ITEM_SPAWN_MIN_MS,
   ITEM_SPAWN_MAX_MS,
   POWER_UP_DURATION_MS,
@@ -315,7 +314,7 @@ async function enter(core: Core): Promise<void> {
     items.push({
       display, x, y,
       vx: 0,
-      vy: ITEM_FALL_SPEED,
+      vy: devConfig.itemFallSpeed,
       type,
       lifetime: ITEM_LIFETIME_MS,
     });
