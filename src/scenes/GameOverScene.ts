@@ -1,8 +1,8 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
-import { createStarfield, createChickenDisplay, createCourageDisplay } from '../game/sprites';
-import { gameResult } from '../game/store';
+import { createStarfield, createPlayerChicken, createCourageDisplay } from '../game/sprites';
+import { gameResult, costumeState } from '../game/store';
 import { endlessState } from '../game/store';
 import { createLevel } from '../game/levels';
 
@@ -24,7 +24,7 @@ async function enter(core: Core): Promise<void> {
   // ── Character display ────────────────────────────────────────────────────
   const { won, score, highScore } = gameResult;
 
-  const character = won ? createCourageDisplay() : createChickenDisplay();
+  const character = won ? createCourageDisplay() : createPlayerChicken(costumeState.selected);
   character.scale.set(won ? 1.8 : 1.6);
   character.x = W * 0.5;
   character.y = H * 0.42;
