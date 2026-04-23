@@ -12,6 +12,7 @@ import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { GameScene } from './scenes/GameScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { DevMenuScene } from './scenes/DevMenuScene';
+import { EndlessBuffScene } from './scenes/EndlessBuffScene';
 import { GAME_W, GAME_H } from './constants';
 
 async function main(): Promise<void> {
@@ -65,6 +66,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: GameScene });
           c.events.emitSync('scene/register', { scene: GameOverScene });
           c.events.emitSync('scene/register', { scene: DevMenuScene });
+          c.events.emitSync('scene/register', { scene: EndlessBuffScene });
           await c.events.emit('scene/load', { key: 'title' });
         },
       },

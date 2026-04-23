@@ -1,4 +1,5 @@
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
+import type { BuffId } from './endless';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -18,3 +19,18 @@ export const devConfig = {
   /** Item fall speed in px/s. Initialised from ITEM_FALL_SPEED constant. */
   itemFallSpeed: ITEM_FALL_SPEED,
 };
+
+/** Endless mode state shared between GameScene and EndlessBuffScene. */
+export const endlessState = {
+  /** Whether the current game session is endless mode. */
+  active: false,
+  /** 1-based number of the wave currently being (or about to be) played. */
+  wave: 1,
+  /** Accumulated buff IDs chosen by the player so far. */
+  buffs: [] as BuffId[],
+  /** Best (highest) wave reached in endless mode. */
+  bestWave: 1,
+  /** HP carried over from the previous wave (0 = start fresh at base HP). */
+  currentHp: 0,
+};
+

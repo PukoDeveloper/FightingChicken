@@ -69,7 +69,7 @@ export interface LevelConfig {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
+export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
   return {
     spiralInterval: 0,
     spiralWays: 0,

@@ -44,9 +44,10 @@ import {
   TRAP_SLOW_FACTOR,
   COL_BUBBLE,
 } from '../constants';
-import { gameResult, devConfig } from '../game/store';
+import { gameResult, devConfig, endlessState } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
+import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
 
 // ─── Bullet data ─────────────────────────────────────────────────────────────
 interface BulletData {
@@ -106,10 +107,23 @@ async function enter(core: Core): Promise<void> {
   const H = core.app.screen.height;
 
   // ── Level / wave config ────────────────────────────────────────────────────
-  const levelConfig = createLevel(gameResult.currentLevel);
+  const isEndless = endlessState.active;
+
+  // For endless mode we compute a single-wave "level" from endlessState.wave;
+  // for normal mode we load the full level and set up multi-wave progression.
+  const levelConfig = isEndless
+    ? null
+    : createLevel(gameResult.currentLevel);
+
   let waveIdx = 0;
-  let waveConfig: WaveConfig = levelConfig.waves[waveIdx];
+  let waveConfig: WaveConfig = isEndless
+    ? createEndlessWaveConfig(endlessState.wave)
+    : levelConfig!.waves[waveIdx];
   let waveMaxHp = waveConfig.enemyHp;
+
+  const enemyTypeForDisplay = isEndless
+    ? endlessEnemyType(endlessState.wave)
+    : levelConfig!.enemyType;
 
   // ── Layers ──────────────────────────────────────────────────────────────
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
@@ -149,9 +163,9 @@ async function enter(core: Core): Promise<void> {
   const playerEntity = playerOut.entity as Entity;
 
   // ── Enemy entity ─────────────────────────────────────────────────────────
-  const enemyDisplay = createEnemyDisplay(levelConfig.enemyType);
-  const enemyHitFlashRadius = levelConfig.enemyType === 'chaos' ? 48
-    : levelConfig.enemyType === 'phantom' ? 42 : 44;
+  const enemyDisplay = createEnemyDisplay(enemyTypeForDisplay);
+  const enemyHitFlashRadius = enemyTypeForDisplay === 'chaos' ? 48
+    : enemyTypeForDisplay === 'phantom' ? 42 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
 
@@ -174,8 +188,72 @@ async function enter(core: Core): Promise<void> {
   let itemSpawnTimer = 5000; // first item spawns after 5 s
   let powerUpTimer = 0;      // ms remaining on current damage power-up
 
+  // ── Endless-mode buff state ───────────────────────────────────────────────
+  // Derive effective player stats from accumulated buffs.
+  const buffHpUpCount      = isEndless ? endlessState.buffs.filter(b => b === 'hp_up').length : 0;
+  const buffFireRateCount  = isEndless ? endlessState.buffs.filter(b => b === 'fire_rate_up').length : 0;
+  const buffTripleCount    = isEndless ? endlessState.buffs.filter(b => b === 'triple_shot').length : 0;
+  const buffBloodPriceCount = isEndless ? endlessState.buffs.filter(b => b === 'blood_price').length : 0;
+  const buffBulletPowerCount = isEndless ? endlessState.buffs.filter(b => b === 'bullet_power').length : 0;
+  const buffEvasionCount   = isEndless ? endlessState.buffs.filter(b => b === 'evasion').length : 0;
+  const buffRegenCount     = isEndless ? endlessState.buffs.filter(b => b === 'regen').length : 0;
+  const buffLongInvCount   = isEndless ? endlessState.buffs.filter(b => b === 'long_invincible').length : 0;
+  const buffItemDropCount  = isEndless ? endlessState.buffs.filter(b => b === 'item_drop_up').length : 0;
+  const hasBerserker       = isEndless && endlessState.buffs.includes('berserker');
+  const hasPeriodicShield  = isEndless && endlessState.buffs.includes('periodic_shield');
+
+  // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
+  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount, 1), 10);
+  // Effective base fire interval (reduced by 15% per fire_rate_up stack, floored at 60 ms)
+  const effectiveFireInterval = Math.max(
+    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.85, buffFireRateCount)),
+    60,
+  );
+  // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
+  const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
+  // Evasion chance: 25% per stack, capped at 75%
+  const evasionChance = Math.min(buffEvasionCount * 0.25, 0.75);
+  // Effective invincibility duration: base + 600 ms per long_invincible stack
+  const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
+  // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
+  const itemSpawnMinMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * Math.pow(0.75, buffItemDropCount)), 2000)
+    : ITEM_SPAWN_MIN_MS;
+  const itemSpawnMaxMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, buffItemDropCount)), 4000)
+    : ITEM_SPAWN_MAX_MS;
+  // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
+  const regenIntervalMs = buffRegenCount > 0
+    ? Math.max(15000 - buffRegenCount * 3000, 6000)
+    : 0;
+
+  // Periodic shield: counts down ms until next activation
+  let periodicShieldTimer = hasPeriodicShield ? 12000 : 0;
+
   // ── Game state ───────────────────────────────────────────────────────────
-  let playerHP = PLAYER_HP_MAX;
+  // In endless mode, carry HP from the previous wave; on wave 1 start at full HP.
+  // Then apply the most recently chosen buff (last in the buffs array) if it's hp_restore.
+  const latestBuff = isEndless && endlessState.buffs.length > 0
+    ? endlessState.buffs[endlessState.buffs.length - 1]
+    : null;
+  let playerHP: number;
+  if (!isEndless) {
+    playerHP = PLAYER_HP_MAX;
+  } else if (endlessState.currentHp <= 0) {
+    // First wave — start at full effective max
+    playerHP = effectiveHpMax;
+  } else {
+    // Carry over HP from last wave, clamped to new max (hp_up may have raised it)
+    playerHP = Math.min(endlessState.currentHp, effectiveHpMax);
+    // hp_restore: heal ceil(effectiveHpMax / 2) when this buff was just chosen
+    if (latestBuff === 'hp_restore') {
+      playerHP = Math.min(effectiveHpMax, playerHP + Math.ceil(effectiveHpMax / 2));
+    }
+    // hp_up: the max increased by 1 — grant that extra HP on pickup
+    if (latestBuff === 'hp_up') {
+      playerHP = Math.min(effectiveHpMax, playerHP + 1);
+    }
+  }
   let enemyHP = waveMaxHp;
   let score = 0;
   let phase: 1 | 2 | 3 = 1;
@@ -197,6 +275,7 @@ async function enter(core: Core): Promise<void> {
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
   let phaseFlashTimer = 0;
+  let regenTimer = regenIntervalMs; // counts down to next HP regen tick
 
   // Touch tracking
   let touchActive = false;
@@ -207,7 +286,7 @@ async function enter(core: Core): Promise<void> {
   // HP hearts
   const heartsContainer = new Container();
   const hearts: Graphics[] = [];
-  for (let i = 0; i < PLAYER_HP_MAX; i++) {
+  for (let i = 0; i < effectiveHpMax; i++) {
     const h = createHeart(true);
     h.scale.set(1.1);
     h.x = 18 + i * 26;
@@ -270,7 +349,9 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
   });
   const levelWaveText = new Text({
-    text: `LVL ${levelConfig.levelNumber}  WAVE 1/${levelConfig.waves.length}`,
+    text: isEndless
+      ? `∞ 無盡  第 ${endlessState.wave} 波`
+      : `LVL ${levelConfig!.levelNumber}  WAVE 1/${levelConfig!.waves.length}`,
     style: levelWaveStyle,
   });
   levelWaveText.anchor.set(1, 1);
@@ -374,7 +455,7 @@ async function enter(core: Core): Promise<void> {
   // ── Helper: update HUD ────────────────────────────────────────────────────
   function updateHUD(): void {
     // Hearts
-    for (let i = 0; i < PLAYER_HP_MAX; i++) {
+    for (let i = 0; i < effectiveHpMax; i++) {
       const filled = i < playerHP;
       hearts[i].clear();
       const col = filled ? 0xff2244 : 0x444444;
@@ -395,13 +476,26 @@ async function enter(core: Core): Promise<void> {
     // Score / phase / wave
     scoreText.text = `SCORE: ${score}`;
     phaseText.text = `PHASE ${phase}`;
-    levelWaveText.text = `LVL ${levelConfig.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig.waves.length}`;
+
+    // Build bottom-right status line
+    let statusLine = isEndless
+      ? `∞ 無盡  第 ${endlessState.wave} 波`
+      : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`;
+    if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
+    if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
+    if (buffLongInvCount > 0) statusLine += `  INV:${(effectiveInvincibleMs / 1000).toFixed(1)}s`;
+    if (buffItemDropCount > 0) statusLine += `  ITEM:${Math.round(itemSpawnMinMs / 1000)}s`;
+    levelWaveText.text = statusLine;
 
     // Power-up indicator
     if (powerUpTimer > 0) {
       powerUpText.text = `⚡ 火力提升 ${Math.ceil(powerUpTimer / 1000)}s`;
     } else if (trappedMs > 0) {
       powerUpText.text = `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`;
+    } else if (hasPeriodicShield && periodicShieldTimer > 0) {
+      powerUpText.text = `🛡 護盾 ${Math.ceil(periodicShieldTimer / 1000)}s`;
+    } else if (regenIntervalMs > 0 && regenTimer > 0) {
+      powerUpText.text = `💚 再生 ${Math.ceil(regenTimer / 1000)}s`;
     } else {
       powerUpText.text = '';
     }
@@ -630,16 +724,57 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Periodic shield (endless buff) ───────────────────────────────────
+      if (hasPeriodicShield) {
+        periodicShieldTimer -= dt;
+        if (periodicShieldTimer <= 0) {
+          // Activate 2 s invincibility and reset timer
+          invincibleMs = Math.max(invincibleMs, 2000);
+          periodicShieldTimer = 12000;
+          flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xaaddff, alpha: 1 });
+          flashOverlay.alpha = 0.25;
+          phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+        }
+      }
+
+      // ── Regen (endless buff) ─────────────────────────────────────────────
+      if (regenIntervalMs > 0) {
+        regenTimer -= dt;
+        if (regenTimer <= 0) {
+          regenTimer = regenIntervalMs;
+          if (playerHP < effectiveHpMax) {
+            playerHP = Math.min(effectiveHpMax, playerHP + 1);
+            updateHUD();
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 10, speed: 70, speedVariance: 30,
+                spread: 180, lifetime: 400, startAlpha: 0.9, endAlpha: 0,
+                startScale: 1.0, endScale: 0,
+                startColor: 0x44ff88, endColor: 0x00cc44, radius: 4,
+              },
+            });
+          }
+        }
+      }
+
       // ── Player auto-fire ──────────────────────────────────────────────────
       playerFireTimer -= dt;
       if (playerFireTimer <= 0) {
-        const fireInterval = powerUpTimer > 0 ? POWER_FIRE_INTERVAL : PLAYER_FIRE_INTERVAL;
+        // Berserker: halve fire interval when HP ≤ 2
+        const berserkerActive = hasBerserker && playerHP <= 2;
+        const baseInterval = berserkerActive
+          ? Math.max(effectiveFireInterval / 2, 60)
+          : effectiveFireInterval;
+        const fireInterval = powerUpTimer > 0 ? POWER_FIRE_INTERVAL : baseInterval;
         playerFireTimer = fireInterval;
         spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18);
         spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18);
-        if (powerUpTimer > 0) {
-          // Extra centre bullet while powered up
-          spawnPlayerBullet(playerEntity.position.x, playerEntity.position.y - 22);
+        // Centre bullet(s) from power-up or triple_shot buffs
+        const centreBullets = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
+        for (let k = 0; k < centreBullets; k++) {
+          const offset = (k - (centreBullets - 1) / 2) * 8;
+          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22);
         }
       }
 
@@ -717,8 +852,8 @@ async function enter(core: Core): Promise<void> {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
           removeBullet(playerBullets, i, playerBulletsContainer);
-          enemyHP = Math.max(0, enemyHP - 1);
-          score += SCORE_PER_HIT;
+          enemyHP = Math.max(0, enemyHP - bulletDamage);
+          score += SCORE_PER_HIT * bulletDamage;
           hitFlashTimer = 80;
 
           // Emit explosion particles
@@ -747,11 +882,15 @@ async function enter(core: Core): Promise<void> {
 
           if (enemyHP <= 0) {
             score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
-            const nextWaveIdx = waveIdx + 1;
-            if (nextWaveIdx < levelConfig.waves.length) {
-              advanceWave(nextWaveIdx);
+            if (isEndless) {
+              advanceEndlessWave();
             } else {
-              endGame(true);
+              const nextWaveIdx = waveIdx + 1;
+              if (nextWaveIdx < levelConfig!.waves.length) {
+                advanceWave(nextWaveIdx);
+              } else {
+                endGame(true);
+              }
             }
             return;
           }
@@ -781,8 +920,24 @@ async function enter(core: Core): Promise<void> {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_BULLET_R + PLAYER_HITBOX_R) {
           removeBullet(enemyBullets, i, enemyBulletsContainer);
+
+          // Evasion roll: skip damage but still remove the bullet
+          if (evasionChance > 0 && Math.random() < evasionChance) {
+            // Show a brief "dodge" flash in green
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                startScale: 0.9, endScale: 0,
+                startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+              },
+            });
+            continue;
+          }
+
           playerHP = Math.max(0, playerHP - 1);
-          invincibleMs = INVINCIBLE_MS;
+          invincibleMs = effectiveInvincibleMs;
 
           // Screen flash red on hit
           flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff0000, alpha: 1 });
@@ -822,7 +977,7 @@ async function enter(core: Core): Promise<void> {
       if (!waveTransitioning) {
         itemSpawnTimer -= dt;
         if (itemSpawnTimer <= 0) {
-          itemSpawnTimer = ITEM_SPAWN_MIN_MS + Math.random() * (ITEM_SPAWN_MAX_MS - ITEM_SPAWN_MIN_MS);
+          itemSpawnTimer = itemSpawnMinMs + Math.random() * (itemSpawnMaxMs - itemSpawnMinMs);
           spawnItem();
         }
       }
@@ -857,8 +1012,23 @@ async function enter(core: Core): Promise<void> {
             shockwavesContainer.removeChild(sw.display);
             sw.display.destroy();
             shockwaves.splice(i, 1);
+
+            // Evasion roll for shockwave
+            if (evasionChance > 0 && Math.random() < evasionChance) {
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: playerEntity.position.x, y: playerEntity.position.y,
+                  burst: true, burstCount: 6, speed: 80, speedVariance: 30,
+                  spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0x00ffaa, endColor: 0x00cc88, radius: 4,
+                },
+              });
+              continue;
+            }
+
             playerHP = Math.max(0, playerHP - 1);
-            invincibleMs = INVINCIBLE_MS;
+            invincibleMs = effectiveInvincibleMs;
 
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffee00, alpha: 1 });
             flashOverlay.alpha = 0.45;
@@ -943,7 +1113,7 @@ async function enter(core: Core): Promise<void> {
         const cdy = item.y - playerEntity.position.y;
         if (Math.sqrt(cdx * cdx + cdy * cdy) < ITEM_COLLECT_R + 14) {
           if (item.type === 'health') {
-            playerHP = Math.min(PLAYER_HP_MAX, playerHP + 1);
+            playerHP = Math.min(effectiveHpMax, playerHP + 1);
             invincibleMs = Math.max(invincibleMs, HEALTH_ITEM_INVINCIBLE_MS);
           } else {
             powerUpTimer = POWER_UP_DURATION_MS;
@@ -1028,7 +1198,7 @@ async function enter(core: Core): Promise<void> {
 
     // Switch to new wave config
     waveIdx = nextWaveIdx;
-    waveConfig = levelConfig.waves[waveIdx];
+    waveConfig = levelConfig!.waves[waveIdx];
     waveMaxHp = waveConfig.enemyHp;
     enemyHP = waveMaxHp;
     phase = 1;
@@ -1053,6 +1223,35 @@ async function enter(core: Core): Promise<void> {
     waveTransitioning = false;
   }
 
+  // ── Advance to the next endless wave (go to buff selection scene) ───────────
+  async function advanceEndlessWave(): Promise<void> {
+    if (gameEnded) return;
+    gameEnded = true; // prevent further updates while transitioning
+
+    // Show wave-clear banner briefly
+    waveBannerText.text = `第 ${endlessState.wave} 波通關！`;
+    waveBannerText.alpha = 1;
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 1400));
+
+    waveBannerText.alpha = 0;
+
+    // Store accumulated score
+    gameResult.score = score;
+    if (score > gameResult.highScore) gameResult.highScore = score;
+
+    // Carry the player's current HP into the next wave
+    endlessState.currentHp = playerHP;
+
+    // Advance wave counter for the next round
+    endlessState.wave += 1;
+    if (endlessState.wave > endlessState.bestWave) {
+      endlessState.bestWave = endlessState.wave;
+    }
+
+    await core.events.emit('scene/load', { key: 'endlessbuff' });
+  }
+
   // ── End game ────────────────────────────────────────────────────────────────
   async function endGame(won: boolean): Promise<void> {
     if (gameEnded) return;
@@ -1062,12 +1261,21 @@ async function enter(core: Core): Promise<void> {
     gameResult.score = score;
     if (score > gameResult.highScore) gameResult.highScore = score;
 
-    // Advance level on win, reset on loss
-    if (won) {
-      gameResult.playedLevel = gameResult.currentLevel;
-      gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+    if (isEndless) {
+      // In endless mode, record the wave reached and reset the session
+      if (endlessState.wave > endlessState.bestWave) {
+        endlessState.bestWave = endlessState.wave;
+      }
+      endlessState.currentHp = 0; // reset for next attempt
+      gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
-      gameResult.playedLevel = gameResult.currentLevel;
+      // Advance level on win, reset on loss
+      if (won) {
+        gameResult.playedLevel = gameResult.currentLevel;
+        gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+      } else {
+        gameResult.playedLevel = gameResult.currentLevel;
+      }
     }
 
     // Big explosion on enemy if won
