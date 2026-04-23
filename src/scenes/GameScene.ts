@@ -3,7 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import type { Entity } from '@inkshot/engine';
 import {
-  createChickenDisplay,
+  createPlayerChicken,
   createEnemyDisplay,
   createEnemyHitFlash,
   createPlayerBullet,
@@ -44,7 +44,7 @@ import {
   TRAP_SLOW_FACTOR,
   COL_BUBBLE,
 } from '../constants';
-import { gameResult, devConfig, endlessState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
@@ -153,7 +153,7 @@ async function enter(core: Core): Promise<void> {
   worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, itemsContainer, playerBulletsContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
-  const chickenDisplay = createChickenDisplay();
+  const chickenDisplay = createPlayerChicken(costumeState.selected);
   const { output: playerOut } = await core.events.emit('entity/create', {
     id: 'player',
     tags: ['player'],
@@ -1330,6 +1330,8 @@ async function enter(core: Core): Promise<void> {
       // Advance level on win, reset on loss
       if (won) {
         gameResult.playedLevel = gameResult.currentLevel;
+        // Track cleared level for costume unlock system
+        costumeState.clearedLevels.add(gameResult.currentLevel);
         gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
       } else {
         gameResult.playedLevel = gameResult.currentLevel;

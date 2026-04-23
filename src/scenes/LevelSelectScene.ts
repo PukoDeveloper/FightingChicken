@@ -93,7 +93,7 @@ async function enter(core: Core): Promise<void> {
     const level = i;
     btn.on('pointerdown', async () => {
       gameResult.currentLevel = level;
-      await core.events.emit('scene/load', { key: 'game' });
+      await core.events.emit('scene/load', { key: 'costumeselect' });
     });
 
     btn.on('pointerover', () => btn.scale.set(1.04));
