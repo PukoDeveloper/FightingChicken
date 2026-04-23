@@ -196,6 +196,51 @@ export function createBossHpBar(w: number): { container: Container; fill: Graphi
   return { container, fill };
 }
 
+// ─── Pickup items ─────────────────────────────────────────────────────────────
+/** Health pickup: glowing green circle with a white heart inside. */
+export function createHealthItem(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer glow
+  g.circle(0, 0, 20).fill({ color: 0x00ff88, alpha: 0.22 });
+  // Body
+  g.circle(0, 0, 14).fill(0x00bb55);
+  // White heart
+  g.circle(-4, -3, 5).fill(0xffffff);
+  g.circle(4, -3, 5).fill(0xffffff);
+  g.moveTo(-9, -1).lineTo(0, 10).lineTo(9, -1).closePath().fill(0xffffff);
+
+  c.addChild(g);
+  return c;
+}
+
+/** Power pickup: glowing orange circle with a yellow star inside. */
+export function createPowerItem(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer glow
+  g.circle(0, 0, 20).fill({ color: 0xffcc00, alpha: 0.28 });
+  // Body
+  g.circle(0, 0, 14).fill(0xff8800);
+
+  // 5-pointed star
+  const n = 5;
+  const outerR = 9;
+  const innerR = 4;
+  const starPoints: number[] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2;
+    starPoints.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.poly(starPoints).fill(0xffee44);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Screen flash overlay ────────────────────────────────────────────────────
 export function createFlashOverlay(w: number, h: number): Graphics {
   const g = new Graphics();
