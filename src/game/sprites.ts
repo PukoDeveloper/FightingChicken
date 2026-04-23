@@ -1,4 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
+import type { EnemyType } from '../constants';
 
 // ─── Chicken (小雞) ──────────────────────────────────────────────────────────
 /**
@@ -111,12 +112,152 @@ export function createCourageDisplay(): Container {
 }
 
 // ─── Courage hit-flash overlay ───────────────────────────────────────────────
-/** Returns a full-red circle to layer over the courage sprite on hit. */
-export function createCourageHitFlash(): Graphics {
+/** Returns a full-white circle to layer over the enemy sprite on hit. */
+export function createEnemyHitFlash(radius: number): Graphics {
   const g = new Graphics();
-  g.circle(0, 0, 44).fill({ color: 0xffffff, alpha: 0.6 });
+  g.circle(0, 0, radius).fill({ color: 0xffffff, alpha: 0.6 });
   g.visible = false;
   return g;
+}
+
+/** @deprecated Use createEnemyHitFlash(44) instead. */
+export function createCourageHitFlash(): Graphics {
+  return createEnemyHitFlash(44);
+}
+
+// ─── Enemy factory ────────────────────────────────────────────────────────────
+
+/** Create the correct enemy display Container for the given enemy type. */
+export function createEnemyDisplay(type: EnemyType): Container {
+  switch (type) {
+    case 'phantom': return createPhantomDisplay();
+    case 'chaos':   return createChaosDisplay();
+    default:        return createCourageDisplay();
+  }
+}
+
+// ─── Phantom Boss (幽靈) ──────────────────────────────────────────────────────
+/**
+ * Build a Container for the Phantom boss.
+ * A spectral blue-purple ghost with glowing cyan eyes.
+ * Origin at centre of face.
+ */
+export function createPhantomDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer ethereal aura
+  g.circle(0, 0, 58).fill({ color: 0x2244cc, alpha: 0.14 });
+  g.circle(0, 0, 50).fill({ color: 0x4466ff, alpha: 0.10 });
+
+  // Left wispy tendril
+  g.ellipse(-34, 30, 7, 22).fill({ color: 0x3355dd, alpha: 0.55 });
+  // Right wispy tendril
+  g.ellipse(34, 30, 7, 22).fill({ color: 0x3355dd, alpha: 0.55 });
+  // Centre tendril
+  g.ellipse(0, 38, 9, 20).fill({ color: 0x2244cc, alpha: 0.55 });
+
+  // Body base (dark)
+  g.circle(0, 0, 44).fill(0x1a0a44);
+  // Body skin (translucent blue)
+  g.circle(0, 0, 40).fill({ color: 0x3344bb, alpha: 0.92 });
+  // Inner body highlight
+  g.ellipse(-8, -8, 20, 16).fill({ color: 0x5566ee, alpha: 0.30 });
+
+  // Left eyebrow (calm, slight arch)
+  g.moveTo(-28, -22).lineTo(-10, -26).lineTo(-10, -22).lineTo(-28, -18).closePath().fill(0x110033);
+  // Right eyebrow
+  g.moveTo(10, -26).lineTo(28, -22).lineTo(28, -18).lineTo(10, -22).closePath().fill(0x110033);
+
+  // Left eye glow (outer)
+  g.circle(-16, -8, 12).fill({ color: 0x00ddff, alpha: 0.35 });
+  // Left eye white
+  g.circle(-16, -8, 9).fill(0xaaeeff);
+  // Left pupil (slit-like)
+  g.ellipse(-16, -8, 3, 7).fill(0x000022);
+  // Left glint
+  g.circle(-13, -11, 2).fill(0xffffff);
+
+  // Right eye glow
+  g.circle(16, -8, 12).fill({ color: 0x00ddff, alpha: 0.35 });
+  // Right eye white
+  g.circle(16, -8, 9).fill(0xaaeeff);
+  // Right pupil
+  g.ellipse(16, -8, 3, 7).fill(0x000022);
+  // Right glint
+  g.circle(19, -11, 2).fill(0xffffff);
+
+  // Jagged spectral mouth
+  const mouthPts = [-20, 14, -12, 10, -6, 16, 0, 10, 6, 16, 12, 10, 20, 14];
+  g.poly([-20, 20, ...mouthPts, 20, 20]).fill(0x110033);
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Chaos Boss (混沌) ────────────────────────────────────────────────────────
+/**
+ * Build a Container for the Chaos boss.
+ * A dark, many-eyed swirling entity with a jagged outer shell.
+ * Origin at centre of face.
+ */
+export function createChaosDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer chaotic aura
+  g.circle(0, 0, 62).fill({ color: 0x660000, alpha: 0.16 });
+  g.circle(0, 0, 54).fill({ color: 0xcc00cc, alpha: 0.10 });
+
+  // Spiky outer shell (12-point star)
+  const spikes = 12;
+  const spikeOuter = 52;
+  const spikeInner = 42;
+  const spikePoints: number[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? spikeOuter : spikeInner;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    spikePoints.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.poly(spikePoints).fill(0x220022);
+
+  // Body base
+  g.circle(0, 0, 42).fill(0x1a0022);
+  // Body inner
+  g.circle(0, 0, 38).fill(0x2d0035);
+  // Swirl highlight
+  g.ellipse(10, -6, 18, 14).fill({ color: 0x880088, alpha: 0.28 });
+  g.ellipse(-12, 10, 16, 12).fill({ color: 0x0044cc, alpha: 0.20 });
+
+  // Six small red eyes arranged in a ring
+  const eyeCount = 6;
+  for (let i = 0; i < eyeCount; i++) {
+    const a = (i / eyeCount) * Math.PI * 2 - Math.PI / 2;
+    const ex = Math.cos(a) * 22;
+    const ey = Math.sin(a) * 22;
+    g.circle(ex, ey, 7).fill({ color: 0xff2200, alpha: 0.45 });
+    g.circle(ex, ey, 5).fill(0xff4400);
+    g.circle(ex, ey, 2.5).fill(0x000000);
+    g.circle(ex + 1.5, ey - 1.5, 1).fill(0xffffff);
+  }
+
+  // Central large eye
+  g.circle(0, 0, 11).fill({ color: 0xff8800, alpha: 0.5 });
+  g.circle(0, 0, 8).fill(0xffcc00);
+  g.circle(0, 0, 4).fill(0x110000);
+  g.circle(2, -2, 1.5).fill(0xffffff);
+
+  // Jagged maw at bottom
+  const mawPts: number[] = [];
+  for (let i = 0; i <= 8; i++) {
+    const jx = -24 + i * 6;
+    const jy = i % 2 === 0 ? 30 : 22;
+    mawPts.push(jx, jy);
+  }
+  g.poly([-24, 38, ...mawPts, 24, 38]).fill(0x110000);
+
+  c.addChild(g);
+  return c;
 }
 
 // ─── Bullet factories ────────────────────────────────────────────────────────
@@ -246,5 +387,24 @@ export function createFlashOverlay(w: number, h: number): Graphics {
   const g = new Graphics();
   g.rect(0, 0, w, h).fill(0xffffff);
   g.alpha = 0;
+  return g;
+}
+
+// ─── Trap Bubble ─────────────────────────────────────────────────────────────
+/** Enemy trap bubble: translucent cyan sphere that slows the player on contact. */
+export function createTrapBubble(color: number): Graphics {
+  const g = new Graphics();
+  g.circle(0, 0, 20).fill({ color, alpha: 0.16 }); // outer glow
+  g.circle(0, 0, 12).fill({ color, alpha: 0.40 }); // body
+  g.circle(0, 0, 12).stroke({ color: 0xffffff, width: 1.5, alpha: 0.50 }); // rim
+  g.circle(4, -4, 3).fill({ color: 0xffffff, alpha: 0.45 }); // highlight
+  return g;
+}
+
+// ─── Trap Ring (player visual when trapped) ───────────────────────────────────
+/** Pulsing cyan ring drawn around the player while they are trapped. Redrawn each frame. */
+export function createTrapRing(): Graphics {
+  const g = new Graphics();
+  g.visible = false;
   return g;
 }

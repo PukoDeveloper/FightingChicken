@@ -4,10 +4,12 @@ import type { Core } from '@inkshot/engine';
 import type { Entity } from '@inkshot/engine';
 import {
   createChickenDisplay,
-  createCourageDisplay,
-  createCourageHitFlash,
+  createEnemyDisplay,
+  createEnemyHitFlash,
   createPlayerBullet,
   createEnemyBullet,
+  createTrapBubble,
+  createTrapRing,
   createStarfield,
   createHeart,
   createBossHpBar,
@@ -35,6 +37,12 @@ import {
   POWER_FIRE_INTERVAL,
   HEALTH_ITEM_PROB,
   HEALTH_ITEM_INVINCIBLE_MS,
+  SHOCKWAVE_MAX_RADIUS,
+  SHOCKWAVE_THICKNESS,
+  BUBBLE_HITBOX_R,
+  TRAP_DURATION_MS,
+  TRAP_SLOW_FACTOR,
+  COL_BUBBLE,
 } from '../constants';
 import { gameResult, devConfig } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
@@ -58,6 +66,25 @@ interface ItemData {
   vy: number; // px/s (vertical fall speed)
   type: 'health' | 'power';
   lifetime: number; // ms remaining
+}
+
+// ─── Shockwave data ───────────────────────────────────────────────────────────
+interface ShockwaveData {
+  display: Graphics;
+  x: number;
+  y: number;
+  radius: number; // current radius in px (grows over time)
+  speed: number;  // expansion speed px/s
+  color: number;
+}
+
+// ─── Trap Bubble data ─────────────────────────────────────────────────────────
+interface BubbleData {
+  display: Graphics;
+  x: number;
+  y: number;
+  vx: number; // px/s
+  vy: number; // px/s
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -107,7 +134,9 @@ async function enter(core: Core): Promise<void> {
   const playerBulletsContainer = new Container();
   const enemyBulletsContainer = new Container();
   const itemsContainer = new Container();
-  worldLayer.addChild(enemyBulletsContainer, itemsContainer, playerBulletsContainer);
+  const shockwavesContainer = new Container();
+  const bubblesContainer = new Container();
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, itemsContainer, playerBulletsContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createChickenDisplay();
@@ -120,21 +149,25 @@ async function enter(core: Core): Promise<void> {
   const playerEntity = playerOut.entity as Entity;
 
   // ── Enemy entity ─────────────────────────────────────────────────────────
-  const courageDisplay = createCourageDisplay();
-  const courageHitFlash = createCourageHitFlash();
-  courageDisplay.addChild(courageHitFlash);
+  const enemyDisplay = createEnemyDisplay(levelConfig.enemyType);
+  const enemyHitFlashRadius = levelConfig.enemyType === 'chaos' ? 48
+    : levelConfig.enemyType === 'phantom' ? 42 : 44;
+  const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
+  enemyDisplay.addChild(enemyHitFlash);
 
   const { output: enemyOut } = await core.events.emit('entity/create', {
     id: 'enemy',
     tags: ['enemy'],
     position: { x: W * 0.5, y: H * 0.18 },
-    display: courageDisplay,
+    display: enemyDisplay,
   });
   const enemyEntity = enemyOut.entity as Entity;
 
   // ── Bullet arrays ────────────────────────────────────────────────────────
   const playerBullets: BulletData[] = [];
   const enemyBullets: BulletData[] = [];
+  const shockwaves: ShockwaveData[] = [];
+  const bubbles: BubbleData[] = [];
 
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
@@ -149,6 +182,8 @@ async function enter(core: Core): Promise<void> {
   let invincibleMs = 0;
   let gameEnded = false;
   let waveTransitioning = false;
+  let trappedMs = 0; // ms remaining on player trap (bubble hit)
+  let trapAnimMs = 0; // accumulated ms for trap ring pulse animation
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -156,6 +191,8 @@ async function enter(core: Core): Promise<void> {
   let aimTimer = 0;
   let spreadTimer = 0;
   let ringTimer = 0;
+  let shockwaveTimer = 0;
+  let bubbleTimer = 0;
   let spiralAngle = 0;
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
@@ -261,6 +298,10 @@ async function enter(core: Core): Promise<void> {
   const flashOverlay = createFlashOverlay(W, H);
   sysLayer.addChild(flashOverlay);
 
+  // Trap ring (shown around player while trapped by a bubble)
+  const trapRing = createTrapRing();
+  worldLayer.addChild(trapRing);
+
   // Power-up indicator (bottom-left, above hearts)
   const powerUpStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
@@ -359,6 +400,8 @@ async function enter(core: Core): Promise<void> {
     // Power-up indicator
     if (powerUpTimer > 0) {
       powerUpText.text = `⚡ 火力提升 ${Math.ceil(powerUpTimer / 1000)}s`;
+    } else if (trappedMs > 0) {
+      powerUpText.text = `🫧 行動遲緩 ${Math.ceil(trappedMs / 1000)}s`;
     } else {
       powerUpText.text = '';
     }
@@ -415,6 +458,45 @@ async function enter(core: Core): Promise<void> {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
       spawnEnemyBullet(ex, ey, Math.cos(a) * speed, Math.sin(a) * speed, color);
+    }
+  }
+
+  /** Shockwave: spawns an expanding ring centred on the enemy's current position. */
+  function fireShockwave(speed: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const display = new Graphics();
+    display.x = ex;
+    display.y = ey;
+    shockwavesContainer.addChild(display);
+    shockwaves.push({ display, x: ex, y: ey, radius: 0, speed, color });
+
+    // Initial small burst particles to signal the shockwave
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: ex, y: ey, burst: true, burstCount: 12, speed: 60, speedVariance: 30,
+        spread: 180, lifetime: 400, startAlpha: 0.9, endAlpha: 0,
+        startScale: 1, endScale: 0, startColor: color, endColor: 0xffffff, radius: 4,
+      },
+    });
+  }
+
+  /** Bubble: fires count bubbles aimed roughly toward the player. Traps on contact. */
+  function fireBubble(count: number, speed: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const px = playerEntity.position.x;
+    const py = playerEntity.position.y;
+    const baseAngle = Math.atan2(py - ey, px - ex);
+    const spreadPerBullet = count > 1 ? 0.28 : 0;
+    const half = (count - 1) / 2;
+    for (let i = 0; i < count; i++) {
+      const a = baseAngle + (i - half) * spreadPerBullet;
+      const display = createTrapBubble(color);
+      display.x = ex;
+      display.y = ey;
+      bubblesContainer.addChild(display);
+      bubbles.push({ display, x: ex, y: ey, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed });
     }
   }
 
@@ -492,7 +574,8 @@ async function enter(core: Core): Promise<void> {
         const dx = targetX - playerEntity.position.x;
         const dy = targetY - playerEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxMove = devConfig.playerMoveSpeed * (dt / 1000);
+        const speedMult = trappedMs > 0 ? TRAP_SLOW_FACTOR : 1;
+        const maxMove = devConfig.playerMoveSpeed * speedMult * (dt / 1000);
         if (dist < maxMove) {
           playerEntity.position.x = targetX;
           playerEntity.position.y = targetY;
@@ -500,6 +583,20 @@ async function enter(core: Core): Promise<void> {
           playerEntity.position.x += (dx / dist) * maxMove;
           playerEntity.position.y += (dy / dist) * maxMove;
         }
+      }
+
+      // ── Trap countdown & visual ring ──────────────────────────────────────
+      if (trappedMs > 0) {
+        trappedMs = Math.max(0, trappedMs - dt);
+        trapAnimMs += dt;
+        trapRing.visible = true;
+        trapRing.x = playerEntity.position.x;
+        trapRing.y = playerEntity.position.y;
+        const pulse = 1 + 0.08 * Math.sin(trapAnimMs / 180);
+        trapRing.clear();
+        trapRing.circle(0, 0, 26 * pulse).fill({ color: COL_BUBBLE, alpha: 0.12 });
+        trapRing.circle(0, 0, 26 * pulse).stroke({ color: COL_BUBBLE, width: 3, alpha: 0.70 });
+        if (trappedMs <= 0) { trapRing.visible = false; trapAnimMs = 0; }
       }
 
       // ── Enemy bobbing animation ───────────────────────────────────────────
@@ -525,10 +622,10 @@ async function enter(core: Core): Promise<void> {
       // ── Hit flash on enemy ────────────────────────────────────────────────
       if (hitFlashTimer > 0) {
         hitFlashTimer -= dt;
-        courageHitFlash.visible = true;
-        courageHitFlash.alpha = hitFlashTimer / 80;
+        enemyHitFlash.visible = true;
+        enemyHitFlash.alpha = hitFlashTimer / 80;
         if (hitFlashTimer <= 0) {
-          courageHitFlash.visible = false;
+          enemyHitFlash.visible = false;
           hitFlashTimer = 0;
         }
       }
@@ -579,6 +676,22 @@ async function enter(core: Core): Promise<void> {
           if (ringTimer <= 0) {
             ringTimer = p.ringInterval;
             fireRing(p.ringCount, p.ringSpeed, p.ringColor);
+          }
+        }
+
+        if (p.shockwaveInterval > 0) {
+          shockwaveTimer -= dt;
+          if (shockwaveTimer <= 0) {
+            shockwaveTimer = p.shockwaveInterval;
+            fireShockwave(p.shockwaveSpeed, p.shockwaveColor);
+          }
+        }
+
+        if (p.bubbleInterval > 0) {
+          bubbleTimer -= dt;
+          if (bubbleTimer <= 0) {
+            bubbleTimer = p.bubbleInterval;
+            fireBubble(p.bubbleCount, p.bubbleSpeed, p.bubbleColor);
           }
         }
       }
@@ -714,6 +827,97 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Expand shockwave rings ────────────────────────────────────────────
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.radius += sw.speed * (dt / 1000);
+
+        // Redraw ring at updated radius
+        const opacity = Math.max(0, 1 - sw.radius / SHOCKWAVE_MAX_RADIUS) * 0.85;
+        sw.display.clear();
+        if (sw.radius > 0) {
+          sw.display.circle(0, 0, sw.radius).stroke({ color: sw.color, width: SHOCKWAVE_THICKNESS, alpha: opacity });
+        }
+
+        // Despawn when fully expanded
+        if (sw.radius >= SHOCKWAVE_MAX_RADIUS) {
+          shockwavesContainer.removeChild(sw.display);
+          sw.display.destroy();
+          shockwaves.splice(i, 1);
+          continue;
+        }
+
+        // Collision: player inside the ring boundary
+        if (invincibleMs <= 0) {
+          const sdx = playerEntity.position.x - sw.x;
+          const sdy = playerEntity.position.y - sw.y;
+          const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
+          const halfThick = SHOCKWAVE_THICKNESS / 2;
+          if (Math.abs(sdist - sw.radius) < halfThick + PLAYER_HITBOX_R) {
+            shockwavesContainer.removeChild(sw.display);
+            sw.display.destroy();
+            shockwaves.splice(i, 1);
+            playerHP = Math.max(0, playerHP - 1);
+            invincibleMs = INVINCIBLE_MS;
+
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffee00, alpha: 1 });
+            flashOverlay.alpha = 0.45;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 14, speed: 140, speedVariance: 70,
+                spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+                startScale: 1.2, endScale: 0,
+                startColor: 0xffee00, endColor: 0xff8800, radius: 5,
+              },
+            });
+
+            if (playerHP <= 0) { endGame(false); return; }
+          }
+        }
+      }
+
+      // ── Move trap bubbles ─────────────────────────────────────────────────
+      for (let i = bubbles.length - 1; i >= 0; i--) {
+        const bub = bubbles[i];
+        bub.x += bub.vx * (dt / 1000);
+        bub.y += bub.vy * (dt / 1000);
+        bub.display.x = bub.x;
+        bub.display.y = bub.y;
+
+        // Off-screen
+        if (bub.x < -30 || bub.x > W + 30 || bub.y < -30 || bub.y > H + 30) {
+          bubblesContainer.removeChild(bub.display);
+          bub.display.destroy();
+          bubbles.splice(i, 1);
+          continue;
+        }
+
+        // Trap player on contact (no HP damage)
+        if (invincibleMs <= 0) {
+          const bdx = bub.x - playerEntity.position.x;
+          const bdy = bub.y - playerEntity.position.y;
+          if (Math.sqrt(bdx * bdx + bdy * bdy) < BUBBLE_HITBOX_R + PLAYER_HITBOX_R) {
+            bubblesContainer.removeChild(bub.display);
+            bub.display.destroy();
+            bubbles.splice(i, 1);
+            trappedMs = TRAP_DURATION_MS;
+
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 16, speed: 80, speedVariance: 40,
+                spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+                startScale: 1.1, endScale: 0,
+                startColor: 0x44ddff, endColor: 0x0088cc, radius: 5,
+              },
+            });
+          }
+        }
+      }
+
       // ── Move and collect items ────────────────────────────────────────────
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
@@ -791,6 +995,20 @@ async function enter(core: Core): Promise<void> {
     }
     enemyBullets.length = 0;
 
+    // Clear shockwaves
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      shockwavesContainer.removeChild(shockwaves[i].display);
+      shockwaves[i].display.destroy();
+    }
+    shockwaves.length = 0;
+
+    // Clear bubbles
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      bubblesContainer.removeChild(bubbles[i].display);
+      bubbles[i].display.destroy();
+    }
+    bubbles.length = 0;
+
     // Clear any leftover items between waves
     for (let i = items.length - 1; i >= 0; i--) {
       itemsContainer.removeChild(items[i].display);
@@ -818,6 +1036,10 @@ async function enter(core: Core): Promise<void> {
     aimTimer = 0;
     spreadTimer = 0;
     ringTimer = 0;
+    shockwaveTimer = 0;
+    bubbleTimer = 0;
+    trappedMs = 0;
+    trapAnimMs = 0;
     phaseFlashTimer = 0;
     flashOverlay.alpha = 0;
     itemSpawnTimer = 3000; // first item spawns 3 s into new wave
@@ -902,6 +1124,20 @@ async function enter(core: Core): Promise<void> {
     playerBullets.length = 0;
     enemyBullets.length = 0;
 
+    // Destroy all shockwaves
+    for (const sw of shockwaves) {
+      shockwavesContainer.removeChild(sw.display);
+      sw.display.destroy();
+    }
+    shockwaves.length = 0;
+
+    // Destroy all bubbles
+    for (const bub of bubbles) {
+      bubblesContainer.removeChild(bub.display);
+      bub.display.destroy();
+    }
+    bubbles.length = 0;
+
     // Destroy all items
     for (const item of items) {
       itemsContainer.removeChild(item.display);
@@ -914,13 +1150,16 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, trapRing);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
     playerBulletsContainer.destroy({ children: true });
     itemsContainer.destroy({ children: true });
     enemyBulletsContainer.destroy({ children: true });
+    shockwavesContainer.destroy({ children: true });
+    bubblesContainer.destroy({ children: true });
+    trapRing.destroy();
 
     // Destroy UI
     uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText);
