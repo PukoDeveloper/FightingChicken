@@ -2,6 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
+import { gameResult } from '../game/store';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
@@ -134,6 +135,7 @@ async function enter(core: Core): Promise<void> {
 
   // Click / touch start
   btn.on('pointerdown', async () => {
+    gameResult.currentLevel = 1;
     await core.events.emit('scene/load', { key: 'game' });
   });
 
