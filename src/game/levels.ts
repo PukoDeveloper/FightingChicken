@@ -823,3 +823,50 @@ export function createLevel(levelNumber: number): LevelConfig {
   const idx = Math.max(0, Math.min(levelNumber - 1, LEVELS.length - 1));
   return LEVELS[idx];
 }
+
+// ─── Story-exclusive levels ───────────────────────────────────────────────────
+
+/** Story Chapter 1 battle – introductory single wave vs 勇氣. */
+const STORY_CH1_LEVEL: LevelConfig = {
+  levelNumber: 1,
+  name: '遇見勇氣',
+  enemyType: 'courage',
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 130,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 300, spiralWays: 4, spiralSpeed: BULLET_SPEED_SLOW, spiralColor: COL_BULLET_P1,
+          aimInterval: 1800,   aimWays: 2,   aimSpread: 0.20,                 aimSpeed: BULLET_SPEED_SLOW, aimColor: COL_BULLET_P1,
+        }),
+        phase({
+          spiralInterval: 240, spiralWays: 6,  spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1400,   aimWays: 2,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          spreadInterval: 2200, spreadWays: 4, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
+        }),
+        phase({
+          spiralInterval: 180, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
+          aimInterval: 1000,   aimWays: 3,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P3,
+          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_SLOW,   spreadColor: COL_BULLET_P3,
+          ringInterval: 4500,  ringCount: 14,  ringSpeed: BULLET_SPEED_SLOW,     ringColor: COL_BULLET_RING,
+        }),
+      ],
+    },
+  ],
+};
+
+/** Story-mode level map keyed by 1-based chapter number. */
+const STORY_LEVELS: Record<number, LevelConfig> = {
+  1: STORY_CH1_LEVEL,
+};
+
+/**
+ * Returns the story-exclusive LevelConfig for the given 1-based chapter number,
+ * or null if no story level has been defined for that chapter.
+ */
+export function getStoryLevel(chapter: number): LevelConfig | null {
+  return STORY_LEVELS[chapter] ?? null;
+}
