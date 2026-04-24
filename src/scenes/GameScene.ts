@@ -39,6 +39,7 @@ import {
   POWER_FIRE_INTERVAL,
   HEALTH_ITEM_PROB,
   HEALTH_ITEM_INVINCIBLE_MS,
+  MOOSE_GIFT_PROB,
   SHOCKWAVE_MAX_RADIUS,
   SHOCKWAVE_THICKNESS,
   BUBBLE_HITBOX_R,
@@ -492,10 +493,9 @@ async function enter(core: Core): Promise<void> {
   const COSTUME_BTN_R = 26;
 
   // ── Moose costume passive state ──────────────────────────────────────────
-  // Passive: every 18 s a gift box spawns at a random position; collecting it awards a random buff.
+  // Passive: each time a normal item spawns there is a MOOSE_GIFT_PROB chance that a gift box
+  // also spawns at a random position; collecting it awards a random buff.
   const isMooseCostume = costumeState.selected === 'moose';
-  const MOOSE_GIFT_INTERVAL_MS = 10000;
-  let mooseGiftTimer = isMooseCostume ? MOOSE_GIFT_INTERVAL_MS : 0;
 
   // ── Fox costume passive state ─────────────────────────────────────────────
   // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
@@ -969,6 +969,17 @@ async function enter(core: Core): Promise<void> {
       type,
       lifetime: ITEM_LIFETIME_MS,
     });
+
+    // Moose costume passive: each item spawn has a random chance to also drop a gift box.
+    if (isMooseCostume && Math.random() < MOOSE_GIFT_PROB) {
+      const gx = 30 + Math.random() * (W - 60);
+      const gy = -20;
+      const gDisplay = createGiftBoxItem();
+      gDisplay.x = gx;
+      gDisplay.y = gy;
+      itemsContainer.addChild(gDisplay);
+      items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
+    }
   }
 
   // ── Helper: remove pickup item ────────────────────────────────────────────
@@ -1867,22 +1878,6 @@ async function enter(core: Core): Promise<void> {
           costumeRing.circle(0, 0, 32 * pulse).fill({ color: 0xff88cc, alpha: 0.10 });
           costumeRing.circle(0, 0, 32 * pulse).stroke({ color: 0xff88cc, width: 3, alpha: 0.75 });
           if (deflectActiveMs <= 0) { costumeRing.visible = false; deflectAnimMs = 0; }
-        }
-      }
-
-      // ── Moose costume: gift box passive timer ──────────────────────────────
-      if (isMooseCostume && !waveTransitioning) {
-        mooseGiftTimer -= dt;
-        if (mooseGiftTimer <= 0) {
-          mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS;
-          // Spawn a gift box at a random horizontal position near the top of the play area
-          const gx = 30 + Math.random() * (W - 60);
-          const gy = -20; // start just above the screen so it falls in
-          const gDisplay = createGiftBoxItem();
-          gDisplay.x = gx;
-          gDisplay.y = gy;
-          itemsContainer.addChild(gDisplay);
-          items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
         }
       }
 
