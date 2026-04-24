@@ -7,6 +7,7 @@ import {
   createPlayerChicken,
   createEnemyDisplay,
   createEnemyHitFlash,
+  createPetDisplay,
   createTrapBubble,
   createTrapRing,
   createStarfield,
@@ -164,6 +165,21 @@ interface LaserBeamData {
   hitDealt: boolean;    // only deal damage once per active phase
 }
 
+// ─── Pet Guardian data ────────────────────────────────────────────────────────
+interface PetData {
+  display: Container;
+  hitFlash: Graphics;
+  hpBarContainer: Container;
+  hpBarFill: Graphics;
+  hp: number;
+  maxHp: number;
+  x: number;
+  y: number;
+  bobTimer: number;
+  fireTimer: number;
+  hitFlashMs: number;
+}
+
 // ─── Module-level cleanup handle ────────────────────────────────────────────
 let _cleanup: (() => void) | null = null;
 
@@ -227,7 +243,8 @@ async function enter(core: Core): Promise<void> {
   const shockwavesContainer = new Container();
   const bubblesContainer = new Container();
   const lasersContainer = new Container();
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, itemsContainer, playerBulletsContainer);
+  const petsContainer = new Container();
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -363,6 +380,22 @@ async function enter(core: Core): Promise<void> {
   // Score thresholds already notified (for score achievements).
   let score1000Notified = false;
   let score10000Notified = false;
+
+  // ── Pet guardian state (Level 5, last wave, phase 3 only) ────────────────
+  const pets: PetData[] = [];
+  let petPhaseActive = false;
+  let petPhaseTriggered = false;
+  let petBannerTimer = 0;
+
+  // Pet constants
+  const PET_HP = 55;
+  const PET_HITBOX_R = 18;
+  const PET_FIRE_INTERVAL = 1400; // ms between pet aimed shots
+  const PET_BULLET_WAYS = 2;
+  const PET_BULLET_SPREAD = 0.38;
+  const PET_BULLET_SPEED = 200; // BULLET_SPEED_MEDIUM
+  const PET_BULLET_COLOR = 0xaa44ff;
+  const PET_BAR_W = 54;
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -786,6 +819,18 @@ async function enter(core: Core): Promise<void> {
       bombTimer = 0;
       laserTimer = 0;
       curveTimer = 0;
+
+      // When entering phase 3 on the final wave of level 5: summon pet guardians
+      if (
+        newPhase === 3 &&
+        !petPhaseTriggered &&
+        !isEndless &&
+        levelConfig?.levelNumber === 5 &&
+        waveIdx === levelConfig.waves.length - 1
+      ) {
+        petPhaseTriggered = true;
+        spawnPets();
+      }
     }
   }
 
@@ -946,6 +991,149 @@ async function enter(core: Core): Promise<void> {
       enemyBulletsContainer.addChild(display);
       curveBullets.push({ display, x: ex, y: ey, angle, speed, turnRate });
     }
+  }
+
+  /** Aimed shots fired from an arbitrary world position (used by pet guardians). */
+  function fireAimedFrom(ox: number, oy: number, nWay: number, spreadRad: number, speed: number, color: number): void {
+    const px = playerEntity.position.x;
+    const py = playerEntity.position.y;
+    const baseAngle = Math.atan2(py - oy, px - ox);
+    const half = (nWay - 1) / 2;
+    for (let i = 0; i < nWay; i++) {
+      const a = baseAngle + (i - half) * spreadRad;
+      spawnEnemyBullet(ox, oy, Math.cos(a) * speed, Math.sin(a) * speed, color);
+    }
+  }
+
+  // ── Pet guardian helpers ─────────────────────────────────────────────────
+
+  /** Spawn the two pet guardians flanking the boss. */
+  function spawnPets(): void {
+    petPhaseActive = true;
+    // Clear all existing boss bullets for a dramatic pause
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(enemyBullets[i].display);
+      enemyBulletPool.release(enemyBullets[i].display);
+    }
+    enemyBullets.length = 0;
+    for (let i = bombs.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(bombs[i].display);
+      bombs[i].display.destroy();
+    }
+    bombs.length = 0;
+    for (let i = curveBullets.length - 1; i >= 0; i--) {
+      enemyBulletsContainer.removeChild(curveBullets[i].display);
+      enemyBulletPool.release(curveBullets[i].display);
+    }
+    curveBullets.length = 0;
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasersContainer.removeChild(lasers[i].display);
+      lasers[i].display.destroy();
+    }
+    lasers.length = 0;
+
+    const petPositions: Array<{ x: number; y: number }> = [
+      { x: W * 0.25, y: H * 0.20 },
+      { x: W * 0.75, y: H * 0.20 },
+    ];
+    for (const pos of petPositions) {
+      const display = createPetDisplay();
+      display.x = pos.x;
+      display.y = pos.y;
+      petsContainer.addChild(display);
+
+      const hitFlash = createEnemyHitFlash(20);
+      display.addChild(hitFlash);
+
+      // HP bar background + fill
+      const hpBarContainer = new Container();
+      const hpBarBg = new Graphics();
+      hpBarBg.roundRect(0, 0, PET_BAR_W, 7, 2).fill({ color: 0x220033, alpha: 0.85 });
+      hpBarContainer.addChild(hpBarBg);
+      const hpBarFill = new Graphics();
+      hpBarFill.rect(0, 0, PET_BAR_W, 7).fill(0xcc44ff);
+      hpBarContainer.addChild(hpBarFill);
+      const hpBarBorder = new Graphics();
+      hpBarBorder.roundRect(0, 0, PET_BAR_W, 7, 2).stroke({ color: 0xee88ff, width: 1 });
+      hpBarContainer.addChild(hpBarBorder);
+      // Centre bar above the pet
+      hpBarContainer.x = pos.x - PET_BAR_W / 2;
+      hpBarContainer.y = pos.y - 32;
+      petsContainer.addChild(hpBarContainer);
+
+      pets.push({
+        display,
+        hitFlash,
+        hpBarContainer,
+        hpBarFill,
+        hp: PET_HP,
+        maxHp: PET_HP,
+        x: pos.x,
+        y: pos.y,
+        bobTimer: 0,
+        fireTimer: 600, // first shot fires after a short delay
+        hitFlashMs: 0,
+      });
+    }
+
+    // Show summoning banner
+    waveBannerText.text = '護衛召喚！';
+    waveBannerText.alpha = 1;
+    petBannerTimer = 2000;
+
+    // Camera shake + flash
+    core.events.emitSync('camera/shake', { intensity: 10, duration: 400 });
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xaa00ff, alpha: 1 });
+    flashOverlay.alpha = 0.28;
+    phaseFlashTimer = Math.max(phaseFlashTimer, 500);
+
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: W * 0.5, y: H * 0.20,
+        burst: true, burstCount: 28, speed: 160, speedVariance: 80,
+        spread: 180, lifetime: 700, startAlpha: 1, endAlpha: 0,
+        startScale: 1.4, endScale: 0,
+        startColor: 0xcc44ff, endColor: 0x660088, radius: 6,
+      },
+    });
+  }
+
+  /** Remove a pet at index pi. Returns true if it was the last pet. */
+  function removePet(pi: number): boolean {
+    const pet = pets[pi];
+    // Death particle burst
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: pet.x, y: pet.y,
+        burst: true, burstCount: 22, speed: 140, speedVariance: 70,
+        spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+        startScale: 1.4, endScale: 0,
+        startColor: 0xcc44ff, endColor: 0x440066, radius: 6,
+      },
+    });
+    core.events.emitSync('camera/shake', { intensity: 8, duration: 250 });
+    sfxEnemyDeath();
+    petsContainer.removeChild(pet.display);
+    petsContainer.removeChild(pet.hpBarContainer);
+    pet.display.destroy();
+    pets.splice(pi, 1);
+    return pets.length === 0;
+  }
+
+  /** Called when all pets are defeated — resume boss attacks. */
+  function onAllPetsDefeated(): void {
+    petPhaseActive = false;
+    // Flash to signal boss resuming
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff4400, alpha: 1 });
+    flashOverlay.alpha = 0.30;
+    phaseFlashTimer = Math.max(phaseFlashTimer, 600);
+    core.events.emitSync('camera/shake', { intensity: 12, duration: 350 });
+    waveBannerText.text = '護衛消滅！';
+    waveBannerText.alpha = 1;
+    petBannerTimer = 1600;
+    // Reset all boss attack timers so there is a brief pause before the first shot
+    spiralTimer = 0; aimTimer = 0; spreadTimer = 0; ringTimer = 0;
+    shockwaveTimer = 0; bubbleTimer = 0; bombTimer = 0; laserTimer = 0; curveTimer = 0;
   }
 
   // ── Active skill activation helper ───────────────────────────────────────
@@ -1253,7 +1441,8 @@ async function enter(core: Core): Promise<void> {
       }
 
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
-      if (phaseFlashTimer <= 0 && !waveTransitioning) {
+      // Boss does not attack while pet guardians are active.
+      if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive) {
         const p = waveConfig.phases[phase - 1];
 
         if (p.spiralInterval > 0) {
@@ -1329,6 +1518,44 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Pet guardian update (fire + bob + hit-flash) ──────────────────────
+      if (petPhaseActive && !waveTransitioning) {
+        for (const pet of pets) {
+          // Bob animation
+          pet.bobTimer += dt;
+          const bobY = pet.y + Math.sin(pet.bobTimer / 600) * 8;
+          pet.display.y = bobY;
+          pet.hpBarContainer.y = bobY - 32;
+
+          // Hit-flash fade
+          if (pet.hitFlashMs > 0) {
+            pet.hitFlashMs = Math.max(0, pet.hitFlashMs - dt);
+            pet.hitFlash.visible = true;
+            pet.hitFlash.alpha = pet.hitFlashMs / 80;
+            if (pet.hitFlashMs <= 0) pet.hitFlash.visible = false;
+          }
+
+          // Aimed fire at player
+          pet.fireTimer -= dt;
+          if (pet.fireTimer <= 0) {
+            pet.fireTimer = PET_FIRE_INTERVAL;
+            fireAimedFrom(pet.x, pet.display.y, PET_BULLET_WAYS, PET_BULLET_SPREAD, PET_BULLET_SPEED, PET_BULLET_COLOR);
+          }
+        }
+
+        // Pet summoning banner fade
+        if (petBannerTimer > 0) {
+          petBannerTimer = Math.max(0, petBannerTimer - dt);
+          waveBannerText.alpha = petBannerTimer < 400 ? petBannerTimer / 400 : 1;
+          if (petBannerTimer <= 0) waveBannerText.alpha = 0;
+        }
+      } else if (petBannerTimer > 0) {
+        // Handle banner fade-out even when pet phase just ended
+        petBannerTimer = Math.max(0, petBannerTimer - dt);
+        waveBannerText.alpha = petBannerTimer < 400 ? petBannerTimer / 400 : 1;
+        if (petBannerTimer <= 0) waveBannerText.alpha = 0;
+      }
+
       // ── Move player bullets ───────────────────────────────────────────────
       for (let i = playerBullets.length - 1; i >= 0; i--) {
         const b = playerBullets[i];
@@ -1343,6 +1570,48 @@ async function enter(core: Core): Promise<void> {
 
         // Skip hitting enemy during wave transition
         if (waveTransitioning) continue;
+
+        // During pet phase: only pets can be hit; boss is invulnerable
+        if (petPhaseActive) {
+          for (let pi = pets.length - 1; pi >= 0; pi--) {
+            const pet = pets[pi];
+            const pdx = b.x - pet.x;
+            const pdy = b.y - pet.display.y;
+            if (Math.sqrt(pdx * pdx + pdy * pdy) < PET_HITBOX_R + PLAYER_BULLET_R) {
+              removeBullet(playerBullets, i, playerBulletsContainer, true);
+              pet.hp = Math.max(0, pet.hp - bulletDamage);
+              pet.hitFlashMs = 80;
+              score += SCORE_PER_HIT * bulletDamage;
+              sfxEnemyHit();
+
+              // Update pet HP bar fill
+              const barFrac = Math.max(0, pet.hp / pet.maxHp);
+              pet.hpBarFill.clear();
+              if (barFrac > 0) {
+                pet.hpBarFill.rect(0, 0, PET_BAR_W * barFrac, 7).fill(0xcc44ff);
+              }
+
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: pet.x + (Math.random() - 0.5) * 20,
+                  y: pet.display.y + (Math.random() - 0.5) * 20,
+                  burst: true, burstCount: 7, speed: 80, speedVariance: 35,
+                  spread: 180, lifetime: 300, startAlpha: 1, endAlpha: 0,
+                  startScale: 1, endScale: 0,
+                  startColor: 0xcc44ff, endColor: 0x880088, radius: 4,
+                },
+              });
+
+              if (pet.hp <= 0) {
+                const allDead = removePet(pi);
+                if (allDead) onAllPetsDefeated();
+              }
+              break;
+            }
+          }
+          // Skip boss hit check during pet phase — boss is invulnerable while pets are alive
+          continue;
+        }
 
         // Hit enemy
         const dx = b.x - enemyEntity.position.x;
@@ -2001,6 +2270,18 @@ async function enter(core: Core): Promise<void> {
     }
     items.length = 0;
 
+    // Clear any pet guardians (safety — normally they are only on last wave)
+    for (let i = pets.length - 1; i >= 0; i--) {
+      petsContainer.removeChild(pets[i].display);
+      petsContainer.removeChild(pets[i].hpBarContainer);
+      pets[i].display.destroy();
+    }
+    pets.length = 0;
+    petPhaseActive = false;
+    petPhaseTriggered = false;
+    petBannerTimer = 0;
+    waveBannerText.alpha = 0;
+
     // Show wave-clear banner (1-based wave number for display)
     waveBannerText.text = `第 ${nextWaveIdx + 1} 波！`;
     waveBannerText.alpha = 1;
@@ -2228,12 +2509,20 @@ async function enter(core: Core): Promise<void> {
     }
     items.length = 0;
 
+    // Destroy all pet guardians
+    for (const pet of pets) {
+      petsContainer.removeChild(pet.display);
+      petsContainer.removeChild(pet.hpBarContainer);
+      pet.display.destroy();
+    }
+    pets.length = 0;
+
     // Destroy entities
     core.events.emitSync('entity/destroy', { id: 'player' });
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, trapRing);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -2243,6 +2532,7 @@ async function enter(core: Core): Promise<void> {
     shockwavesContainer.destroy({ children: true });
     bubblesContainer.destroy({ children: true });
     lasersContainer.destroy({ children: true });
+    petsContainer.destroy({ children: true });
     trapRing.destroy();
 
     // Destroy UI

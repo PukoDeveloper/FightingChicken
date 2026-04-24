@@ -126,6 +126,45 @@ export function createCourageHitFlash(): Graphics {
   return createEnemyHitFlash(44);
 }
 
+// ─── Pet Guardian (寵物護衛) ──────────────────────────────────────────────────
+/**
+ * A compact purple guardian creature that protects the Chaos boss in phase 3.
+ * Smaller than the boss; origin at centre.
+ */
+export function createPetDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer glow
+  g.circle(0, 0, 28).fill({ color: 0x8800cc, alpha: 0.14 });
+
+  // Swept-back wings
+  g.ellipse(-20, 4, 12, 6).fill({ color: 0x5500aa, alpha: 0.88 });
+  g.ellipse(20, 4, 12, 6).fill({ color: 0x5500aa, alpha: 0.88 });
+
+  // Body outer ring
+  g.circle(0, 0, 18).fill(0x200028);
+  // Body inner
+  g.circle(0, 0, 14).fill(0x3c0048);
+  // Swirl highlight
+  g.ellipse(5, -3, 7, 5).fill({ color: 0x9900cc, alpha: 0.30 });
+
+  // Four eyes in a diamond arrangement
+  const eyePos: [number, number][] = [[-8, -6], [8, -6], [-5, 5], [5, 5]];
+  for (const [ex, ey] of eyePos) {
+    g.circle(ex, ey, 4).fill({ color: 0xff44ee, alpha: 0.45 });
+    g.circle(ex, ey, 2.5).fill(0xff88ff);
+    g.circle(ex, ey, 1.2).fill(0x110011);
+    g.circle(ex + 0.8, ey - 0.8, 0.7).fill(0xffffff);
+  }
+
+  // Tiny jagged maw
+  g.poly([-7, 12, -4, 9, -1, 12, 2, 9, 5, 12, 7, 9, 7, 14, -7, 14]).fill(0x110011);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Enemy factory ────────────────────────────────────────────────────────────
 
 /** Create the correct enemy display Container for the given enemy type. */
