@@ -73,7 +73,7 @@ async function enter(core: Core): Promise<void> {
 
   const previewContainer = new Container();
   previewContainer.x = W * 0.5;
-  previewContainer.y = H * 0.23;
+  previewContainer.y = H * 0.20;
   worldLayer.addChild(previewContainer);
 
   let currentPreview = buildPreview(selectedId);
@@ -90,7 +90,7 @@ async function enter(core: Core): Promise<void> {
   const nameLabel = new Text({ text: '', style: nameStyle });
   nameLabel.anchor.set(0.5);
   nameLabel.x = W * 0.5;
-  nameLabel.y = H * 0.37;
+  nameLabel.y = H * 0.33;
   uiLayer.addChild(nameLabel);
 
   const descStyle = new TextStyle({
@@ -102,7 +102,7 @@ async function enter(core: Core): Promise<void> {
   const descLabel = new Text({ text: '', style: descStyle });
   descLabel.anchor.set(0.5);
   descLabel.x = W * 0.5;
-  descLabel.y = H * 0.43;
+  descLabel.y = H * 0.39;
   uiLayer.addChild(descLabel);
 
   function refreshLabels(id: CostumeId): void {
@@ -116,7 +116,7 @@ async function enter(core: Core): Promise<void> {
   const cardW = 148, cardH = 72;
   const cols = 2;
   const startX = W * 0.5 - (cols * cardW + (cols - 1) * 10) / 2 + cardW / 2;
-  const startY = H * 0.52;
+  const startY = H * 0.50;
   const gapX = cardW + 12;
   const gapY = cardH + 12;
 
@@ -294,7 +294,7 @@ async function enter(core: Core): Promise<void> {
     if (confirmScale < 0.97) confirmDir = 1;
     confirmBtn.scale.set(confirmScale);
 
-    previewContainer.y = H * 0.23 + Math.sin(Date.now() / 700) * 6;
+    previewContainer.y = H * 0.20 + Math.sin(Date.now() / 700) * 6;
   });
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
