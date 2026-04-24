@@ -482,7 +482,7 @@ async function enter(core: Core): Promise<void> {
   // ── Elegant costume ability state ────────────────────────────────────────
   // Active ability: 彈幕反彈 – deflects all enemy bullets back at the enemy for 4 s.
   const isElegantCostume = costumeState.selected === 'elegant';
-  const DEFLECT_DURATION_MS = 4000;
+  const DEFLECT_DURATION_MS = 2000;
   const DEFLECT_COOLDOWN_MS = 18000;
   let deflectActiveMs   = 0; // ms remaining while deflect shield is on
   let deflectCooldownMs = 0; // ms until ability is ready again (0 = ready)
