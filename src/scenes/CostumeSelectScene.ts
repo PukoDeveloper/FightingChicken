@@ -110,11 +110,13 @@ async function enter(core: Core): Promise<void> {
     fontSize: 13,
     fill: 0xffdd66,
     align: 'center',
+    wordWrap: true,
+    wordWrapWidth: W * 0.85,
   });
   const abilityLabel = new Text({ text: '', style: abilityStyle });
   abilityLabel.anchor.set(0.5);
   abilityLabel.x = W * 0.5;
-  abilityLabel.y = H * 0.44;
+  abilityLabel.y = H * 0.42;
   uiLayer.addChild(abilityLabel);
 
   function refreshLabels(id: CostumeId): void {
@@ -210,6 +212,8 @@ async function enter(core: Core): Promise<void> {
       uiLayer.addChild(card);
       cards.push(card);
     });
+    // Bring the ability label to front so card backgrounds don't cover it
+    uiLayer.addChild(abilityLabel);
   }
 
   function rebuildPreview(): void {
