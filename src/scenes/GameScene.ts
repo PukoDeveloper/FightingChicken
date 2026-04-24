@@ -17,6 +17,7 @@ import {
   createHealthItem,
   createPowerItem,
   createGiftBoxItem,
+  createFireball,
 } from '../game/sprites';
 import {
   PLAYER_HP_MAX,
@@ -104,6 +105,8 @@ interface BulletData {
   vy: number; // px/s
   /** True when this enemy bullet has been deflected toward the enemy by the elegant costume ability. */
   deflected?: boolean;
+  /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
+  damage?: number;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -478,6 +481,22 @@ async function enter(core: Core): Promise<void> {
   const MOOSE_GIFT_INTERVAL_MS = 18000;
   let mooseGiftTimer = isMooseCostume ? MOOSE_GIFT_INTERVAL_MS : 0;
 
+  // ── Fox costume passive state ─────────────────────────────────────────────
+  // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
+  const isFoxCostume = costumeState.selected === 'fox';
+  const FOX_ATTRACT_RADIUS = 150;
+  const FOX_ATTRACT_ACCEL  = 280; // extra px/s added toward player each second
+
+  // ── Wizard costume active state ───────────────────────────────────────────
+  // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
+  const isWizardCostume = costumeState.selected === 'wizard';
+  const WIZARD_CHANNEL_MS       = 2000;  // charge duration in ms
+  const WIZARD_COOLDOWN_MS      = 15000; // cooldown after firing in ms
+  const WIZARD_FIREBALL_DAMAGE  = 15;    // HP damage dealt to enemy on hit
+  const WIZARD_FIREBALL_SPEED   = 360;   // px/s
+  let wizardCooldownMs    = 0;
+  let wizardChannelingMs  = 0; // counts DOWN from WIZARD_CHANNEL_MS while charging (0 = not charging)
+
   // ── HUD ──────────────────────────────────────────────────────────────────
   // HP hearts
   const heartsContainer = new Container();
@@ -623,13 +642,21 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0x660044, distance: 2, alpha: 0.8, blur: 2 },
   });
+  const wizardTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xffcc00,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x885500, distance: 2, alpha: 0.8, blur: 2 },
+  });
   const powerUpText       = new Text({ text: '', style: powerUpStyle });
   const trappedTimerText  = new Text({ text: '', style: trappedTimerStyle });
   const shieldTimerText   = new Text({ text: '', style: shieldTimerStyle });
   const regenTimerText    = new Text({ text: '', style: regenTimerStyle });
   const skillTimerText    = new Text({ text: '', style: skillTimerStyle });
   const deflectTimerText  = new Text({ text: '', style: deflectTimerStyle });
-  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText].forEach(t => {
+  const wizardTimerText   = new Text({ text: '', style: wizardTimerStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText].forEach(t => {
     t.anchor.set(0, 1);
     t.x = 10;
     t.y = H - 38;
@@ -704,9 +731,10 @@ async function enter(core: Core): Promise<void> {
 
   if (isActiveSkill) redrawSkillBtn();
 
-  // ── Costume ability button (elegant costume only) ─────────────────────────
+  // ── Costume ability button (elegant & wizard costumes) ────────────────────
+  const hasActiveCostumeAbility = isElegantCostume || isWizardCostume;
   const costumeBtnContainer = new Container();
-  costumeBtnContainer.visible = isElegantCostume;
+  costumeBtnContainer.visible = hasActiveCostumeAbility;
   const costumeBtnBg = new Graphics();
   const costumeBtnCooldownArc = new Graphics();
   const costumeBtnLabelStyle = new TextStyle({
@@ -726,38 +754,64 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(costumeBtnContainer);
 
   function redrawCostumeBtn(): void {
-    const ready = deflectCooldownMs <= 0;
-    const borderColor = ready ? 0xff88cc : 0x555566;
-    const fillColor   = ready ? 0x1a0011 : 0x111122;
-
-    costumeBtnBg.clear();
-    costumeBtnBg.circle(0, 0, COSTUME_BTN_R)
-      .fill({ color: fillColor, alpha: 0.9 });
-    costumeBtnBg.circle(0, 0, COSTUME_BTN_R)
-      .stroke({ color: borderColor, width: ready ? 2 : 1 });
-
-    costumeBtnCooldownArc.clear();
-    if (!ready) {
-      const frac = deflectCooldownMs / DEFLECT_COOLDOWN_MS;
-      const startAngle = -Math.PI / 2;
-      const endAngle = startAngle + frac * Math.PI * 2;
-      costumeBtnCooldownArc
-        .moveTo(0, 0)
-        .arc(0, 0, COSTUME_BTN_R - 2, startAngle, endAngle)
-        .closePath()
-        .fill({ color: 0x000000, alpha: 0.55 });
-    }
-
-    if (ready) {
-      costumeBtnLabel.text = '彈反';
-      costumeBtnLabel.style.fill = 0xffffff;
-    } else {
-      costumeBtnLabel.text = `${Math.ceil(deflectCooldownMs / 1000)}s`;
-      costumeBtnLabel.style.fill = 0x888888;
+    if (isElegantCostume) {
+      const ready = deflectCooldownMs <= 0;
+      const borderColor = ready ? 0xff88cc : 0x555566;
+      const fillColor   = ready ? 0x1a0011 : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: ready ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (!ready) {
+        const frac = deflectCooldownMs / DEFLECT_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      costumeBtnLabel.text  = ready ? '彈反' : `${Math.ceil(deflectCooldownMs / 1000)}s`;
+      costumeBtnLabel.style.fill = ready ? 0xffffff : 0x888888;
+    } else if (isWizardCostume) {
+      const channeling = wizardChannelingMs > 0;
+      const onCooldown = wizardCooldownMs > 0;
+      const ready      = !channeling && !onCooldown;
+      const borderColor = channeling ? 0xffcc00 : ready ? 0xff8800 : 0x555566;
+      const fillColor   = channeling ? 0x1a1000 : ready ? 0x1a0800 : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: (ready || channeling) ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (channeling) {
+        // Show channel progress (fills as charge completes)
+        const frac = 1 - wizardChannelingMs / WIZARD_CHANNEL_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0xffcc00, alpha: 0.35 });
+      } else if (onCooldown) {
+        const frac = wizardCooldownMs / WIZARD_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      if (channeling) {
+        costumeBtnLabel.text = '蓄力中';
+        costumeBtnLabel.style.fill = 0xffcc00;
+      } else if (onCooldown) {
+        costumeBtnLabel.text = `${Math.ceil(wizardCooldownMs / 1000)}s`;
+        costumeBtnLabel.style.fill = 0x888888;
+      } else {
+        costumeBtnLabel.text = '火球';
+        costumeBtnLabel.style.fill = 0xffffff;
+      }
     }
   }
 
-  if (isElegantCostume) redrawCostumeBtn();
+  if (hasActiveCostumeAbility) redrawCostumeBtn();
 
   // eagle_eye skill: enemy bullet speed multiplier
   const eagleEyeSpeedMult = skillState.selected === 'eagle_eye' ? 0.80 : 1.0;
@@ -880,10 +934,12 @@ async function enter(core: Core): Promise<void> {
     if (activeSkillId === 'burst_fire' && skillActiveMs > 0) timerEntries.push([skillTimerText, `🔥 爆發射擊 ${Math.ceil(skillActiveMs / 1000)}s`]);
     // elegant costume: show deflect shield duration
     if (deflectActiveMs > 0) timerEntries.push([deflectTimerText, `🌸 彈幕反彈 ${Math.ceil(deflectActiveMs / 1000)}s`]);
+    // wizard costume: show channel countdown
+    if (wizardChannelingMs > 0) timerEntries.push([wizardTimerText, `✨ 蓄力中 ${Math.ceil(wizardChannelingMs / 1000)}s`]);
 
     const timerBaseY = H - 38;
     const timerLineH = 18;
-    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText].forEach(t => {
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText].forEach(t => {
       t.text = '';
       t.visible = false;
     });
@@ -948,7 +1004,7 @@ async function enter(core: Core): Promise<void> {
     if (id === 'periodic_shield' && periodicShieldTimer <= 0) {
       periodicShieldTimer = 12000;
     }
-    // Initialise regen timer if newly acquired
+    // Initialize regen timer if newly acquired
     if (id === 'regen' && regenIntervalMs > 0 && regenTimer <= 0) {
       regenTimer = regenIntervalMs;
     }
@@ -1431,12 +1487,37 @@ async function enter(core: Core): Promise<void> {
     return true;
   }
 
+  // ── Wizard costume: fireball activation helper ───────────────────────────
+  function tryActivateWizard(): boolean {
+    if (!isWizardCostume || gameEnded || wizardCooldownMs > 0 || wizardChannelingMs > 0) return false;
+    // Start charging
+    wizardChannelingMs = WIZARD_CHANNEL_MS;
+    redrawCostumeBtn();
+    // Visual flash to indicate charge start
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: playerEntity.position.x, y: playerEntity.position.y,
+        burst: true, burstCount: 14, speed: 80, speedVariance: 40,
+        spread: 180, lifetime: 450, startAlpha: 1, endAlpha: 0,
+        startScale: 1.1, endScale: 0,
+        startColor: 0xffaa00, endColor: 0xff6600, radius: 5,
+      },
+    });
+    return true;
+  }
+
   // ── Helpers: hit-test costume & skill buttons ─────────────────────────────
   function isOverCostumeBtn(canvasX: number, canvasY: number): boolean {
-    if (!isElegantCostume) return false;
+    if (!hasActiveCostumeAbility) return false;
     const dx = canvasX - COSTUME_BTN_X;
     const dy = canvasY - COSTUME_BTN_Y;
     return Math.sqrt(dx * dx + dy * dy) <= COSTUME_BTN_R + 10;
+  }
+
+  function tryActivateCostumeAbility(): boolean {
+    if (isElegantCostume) return tryActivateDeflect();
+    if (isWizardCostume)  return tryActivateWizard();
+    return false;
   }
 
   // ── Touch input ────────────────────────────────────────────────────────────
@@ -1453,7 +1534,7 @@ async function enter(core: Core): Promise<void> {
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
       if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateDeflect();
+        tryActivateCostumeAbility();
         return;
       }
       if (isOverSkillBtn(pos.x, pos.y)) {
@@ -1488,7 +1569,7 @@ async function enter(core: Core): Promise<void> {
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
       if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateDeflect();
+        tryActivateCostumeAbility();
         return;
       }
       if (isOverSkillBtn(pos.x, pos.y)) {
@@ -1670,6 +1751,63 @@ async function enter(core: Core): Promise<void> {
           gDisplay.y = gy;
           itemsContainer.addChild(gDisplay);
           items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
+        }
+      }
+
+      // ── Wizard costume: channel countdown & fireball launch ───────────────
+      if (isWizardCostume) {
+        if (wizardCooldownMs > 0) {
+          wizardCooldownMs = Math.max(0, wizardCooldownMs - dt);
+          redrawCostumeBtn();
+        }
+        if (wizardChannelingMs > 0) {
+          wizardChannelingMs = Math.max(0, wizardChannelingMs - dt);
+          redrawCostumeBtn();
+          // Channeling particles around player (growing intensity)
+          const chargePct = 1 - wizardChannelingMs / WIZARD_CHANNEL_MS;
+          if (Math.random() < 0.4 + chargePct * 0.5) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 20 + Math.random() * 14;
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x + Math.cos(angle) * r,
+                y: playerEntity.position.y + Math.sin(angle) * r,
+                burst: true, burstCount: 1, speed: 20, speedVariance: 10,
+                spread: 360, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                startScale: 0.8 + chargePct * 0.6, endScale: 0,
+                startColor: 0xffcc00, endColor: 0xff6600, radius: 4,
+              },
+            });
+          }
+          if (wizardChannelingMs <= 0) {
+            // Channel complete: fire the fireball
+            wizardCooldownMs = WIZARD_COOLDOWN_MS;
+            const ex = enemyEntity.position.x;
+            const ey = enemyEntity.position.y;
+            const px = playerEntity.position.x;
+            const py = playerEntity.position.y;
+            const dist = Math.sqrt((ex - px) * (ex - px) + (ey - py) * (ey - py)) || 1;
+            const fbVx = ((ex - px) / dist) * WIZARD_FIREBALL_SPEED;
+            const fbVy = ((ey - py) / dist) * WIZARD_FIREBALL_SPEED;
+            const fbDisplay = createFireball();
+            fbDisplay.x = px;
+            fbDisplay.y = py - 10;
+            playerBulletsContainer.addChild(fbDisplay);
+            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE });
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
+            flashOverlay.alpha = 0.20;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 250);
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: px, y: py,
+                burst: true, burstCount: 28, speed: 160, speedVariance: 80,
+                spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+                startScale: 1.5, endScale: 0,
+                startColor: 0xffcc00, endColor: 0xff4400, radius: 6,
+              },
+            });
+            redrawCostumeBtn();
+          }
         }
       }
 
@@ -1878,9 +2016,10 @@ async function enter(core: Core): Promise<void> {
         const dy = b.y - enemyEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
+          const dmg = b.damage ?? bulletDamage;
           removeBullet(playerBullets, i, playerBulletsContainer, true);
-          enemyHP = Math.max(0, enemyHP - bulletDamage);
-          score += SCORE_PER_HIT * bulletDamage;
+          enemyHP = Math.max(0, enemyHP - dmg);
+          score += SCORE_PER_HIT * dmg;
           hitFlashTimer = 80;
           sfxEnemyHit();
 
@@ -2439,7 +2578,27 @@ async function enter(core: Core): Promise<void> {
         const item = items[i];
         item.lifetime -= dt;
 
-        // Move vertically
+        // ── Fox costume: attract items within radius toward player ──────────
+        if (isFoxCostume) {
+          const adx = playerEntity.position.x - item.x;
+          const ady = playerEntity.position.y - item.y;
+          const aDist = Math.sqrt(adx * adx + ady * ady);
+          if (aDist < FOX_ATTRACT_RADIUS && aDist > 1) {
+            const pull = FOX_ATTRACT_ACCEL * (dt / 1000);
+            item.vx += (adx / aDist) * pull;
+            item.vy += (ady / aDist) * pull;
+            // Cap speed so items don't overshoot wildly
+            const spd = Math.sqrt(item.vx * item.vx + item.vy * item.vy);
+            const maxSpd = devConfig.itemFallSpeed * 3;
+            if (spd > maxSpd) {
+              item.vx = (item.vx / spd) * maxSpd;
+              item.vy = (item.vy / spd) * maxSpd;
+            }
+          }
+        }
+
+        // Move (apply velocity)
+        item.x += item.vx * (dt / 1000);
         item.y += item.vy * (dt / 1000);
 
         item.display.x = item.x;
@@ -2850,7 +3009,7 @@ async function enter(core: Core): Promise<void> {
     deflectRing.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, skillBtnContainer, costumeBtnContainer);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, skillBtnContainer, costumeBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -2864,6 +3023,7 @@ async function enter(core: Core): Promise<void> {
     regenTimerText.destroy();
     skillTimerText.destroy();
     deflectTimerText.destroy();
+    wizardTimerText.destroy();
     skillBtnContainer.destroy({ children: true });
     costumeBtnContainer.destroy({ children: true });
 
