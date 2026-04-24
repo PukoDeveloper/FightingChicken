@@ -300,7 +300,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 繼續旅程' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 返回章節選擇' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
@@ -313,7 +313,7 @@ async function enter(core: Core): Promise<void> {
 
   async function finish(): Promise<void> {
     gameResult.storyMode = false;
-    await core.events.emit('scene/load', { key: 'modeselect' });
+    await core.events.emit('scene/load', { key: 'story' });
   }
 
   async function advance(): Promise<void> {
