@@ -173,6 +173,7 @@ async function enter(core: Core): Promise<void> {
   let isDragging = false;
   let velocity = 0;
   let lastPointerY = 0;
+  let totalDragDist = 0;
 
   // Make the outer list interactive for pointer events
   const scrollHitArea = new Graphics();
@@ -193,19 +194,40 @@ async function enter(core: Core): Promise<void> {
     dragStartScrollY  = scrollY;
     lastPointerY = e.global.y;
     velocity = 0;
+    totalDragDist = 0;
   });
 
   scrollHitArea.on('pointermove', (e) => {
     if (!isDragging) return;
     const dy = dragStartPointerY - e.global.y;
+    totalDragDist += Math.abs(e.global.y - lastPointerY);
     velocity = lastPointerY - e.global.y;
     lastPointerY = e.global.y;
     applyScroll(dragStartScrollY + dy);
   });
 
-  const endDrag = (): void => { isDragging = false; };
+  const endDrag = (e: { global: { x: number; y: number } }): void => {
+    isDragging = false;
+    // Treat minimal movement as a tap and forward to the correct chapter item
+    if (totalDragDist < 8) {
+      const innerPos = innerList.getGlobalPosition();
+      const localY = e.global.y - innerPos.y;
+      const localX = e.global.x - innerPos.x;
+      const idx = Math.floor(localY / (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP));
+      if (idx >= 0 && idx < CHAPTERS.length) {
+        const remainder = localY - idx * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
+        if (remainder < CHAPTER_ITEM_H && localX >= 0 && localX < CHAPTER_ITEM_W) {
+          const isPlayable = idx === 1;
+          if (isPlayable) {
+            sfxMenuClick();
+            void core.events.emit('scene/load', { key: 'story_ch1' });
+          }
+        }
+      }
+    }
+  };
   scrollHitArea.on('pointerup', endDrag);
-  scrollHitArea.on('pointerupoutside', endDrag);
+  scrollHitArea.on('pointerupoutside', () => { isDragging = false; });
 
   // Momentum / inertia via tick
   const unsubTick = core.events.on('story', 'core/tick', () => {
