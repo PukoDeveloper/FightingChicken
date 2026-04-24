@@ -98,7 +98,7 @@ async function enter(core: Core): Promise<void> {
     btn.on('pointerdown', async () => {
       sfxMenuClick();
       gameResult.currentLevel = level;
-      await core.events.emit('scene/load', { key: 'costumeselect' });
+      await core.events.emit('scene/load', { key: 'skillselect' });
     });
 
     btn.on('pointerover', () => btn.scale.set(1.04));
@@ -133,7 +133,7 @@ async function enter(core: Core): Promise<void> {
 
   backBtn.on('pointerdown', async () => {
     sfxMenuClick();
-    await core.events.emit('scene/load', { key: 'title' });
+    await core.events.emit('scene/load', { key: 'modeselect' });
   });
 
   // ── Entry animations via TweenManager ────────────────────────────────────

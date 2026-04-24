@@ -4,7 +4,7 @@ import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { SKILLS } from '../game/skills';
 import type { SkillDef, SkillId } from '../game/skills';
-import { skillState } from '../game/store';
+import { skillState, endlessState } from '../game/store';
 import { sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
@@ -322,7 +322,8 @@ async function enter(core: Core): Promise<void> {
 
   backBtn.on('pointerdown', async () => {
     sfxMenuClick();
-    await core.events.emit('scene/load', { key: 'costumeselect' });
+    const dest = endlessState.active ? 'modeselect' : 'levelselect';
+    await core.events.emit('scene/load', { key: dest });
   });
   backBtn.on('pointerover', () => backBtn.scale.set(1.04));
   backBtn.on('pointerout', () => backBtn.scale.set(1.0));
