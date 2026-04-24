@@ -7,10 +7,6 @@ import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 // Renders a simple HTML panel on top of the canvas so we can use native
 // <input type="range"> controls without needing a custom PIXI UI library.
 
-// ─── DevMenu overlay (HTML) ──────────────────────────────────────────────────
-// Renders a simple HTML panel on top of the canvas so we can use native
-// <input type="range"> controls without needing a custom PIXI UI library.
-
 let _overlay: HTMLElement | null = null;
 
 async function enter(core: Core): Promise<void> {
