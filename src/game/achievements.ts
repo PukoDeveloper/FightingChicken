@@ -49,7 +49,10 @@ export function initAchievements(core: Core): void {
       name: '全關通關 🏅',
       description: '通關全部 5 關',
       triggerEvent: 'game/win',
-      triggerFilter: () => costumeState.clearedLevels.size >= 5,
+      triggerFilter: (payload: unknown) => {
+        const { isNewClear } = payload as { isNewClear: boolean };
+        return isNewClear && costumeState.clearedLevels.size >= 5;
+      },
     },
   });
 

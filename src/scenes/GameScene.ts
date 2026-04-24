@@ -2396,11 +2396,12 @@ async function enter(core: Core): Promise<void> {
       if (won) {
         gameResult.playedLevel = gameResult.currentLevel;
         // Track cleared level for costume unlock system
+        const isNewClear = !costumeState.clearedLevels.has(gameResult.currentLevel);
         costumeState.clearedLevels.add(gameResult.currentLevel);
         gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
 
         // Achievement events
-        core.events.emitSync('game/win', {});
+        core.events.emitSync('game/win', { isNewClear });
         if (!playerHitThisRun) {
           core.events.emitSync('game/no_damage_win', {});
         }
