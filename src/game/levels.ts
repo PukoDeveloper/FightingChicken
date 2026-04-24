@@ -790,8 +790,9 @@ const LEVEL_5: LevelConfig = {
           laserInterval: 4160, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
           curveInterval: 4420, curveWays: 2,  curveSpeed: 190, curveTurnRate: 1.55, curveColor: COL_BULLET_CURVE,
         }),
-        // Phase 3: when the boss's last HP segment starts, pet guardians are summoned.
-        // The boss pauses; pets fire at the player. Values are used after both pets are defeated.
+        // Phase 3: when the boss's last HP segment starts on the final wave (wave 5) of Level 5,
+        // pet guardians are summoned. The boss pauses; pets fire at the player until defeated.
+        // These values are used once both pets are defeated and the boss resumes.
         phase({
           spiralInterval: 86,  spiralWays: 19, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
           aimInterval: 459,    aimWays: 7,     aimSpread: 0.12,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,

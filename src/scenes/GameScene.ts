@@ -1573,7 +1573,6 @@ async function enter(core: Core): Promise<void> {
 
         // During pet phase: only pets can be hit; boss is invulnerable
         if (petPhaseActive) {
-          let hitPet = false;
           for (let pi = pets.length - 1; pi >= 0; pi--) {
             const pet = pets[pi];
             const pdx = b.x - pet.x;
@@ -1607,12 +1606,10 @@ async function enter(core: Core): Promise<void> {
                 const allDead = removePet(pi);
                 if (allDead) onAllPetsDefeated();
               }
-              hitPet = true;
               break;
             }
           }
-          // Whether or not we hit a pet, skip boss hit check during pet phase
-          if (hitPet) continue;
+          // Skip boss hit check during pet phase — boss is invulnerable while pets are alive
           continue;
         }
 
