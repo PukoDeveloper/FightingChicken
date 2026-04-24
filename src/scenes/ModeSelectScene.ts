@@ -183,31 +183,10 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'skillselect' });
   });
 
-  // 成就
-  const achBtn = makeModeBtn({
-    label: '🏆  成就',
-    fillColor: 0x222233,
-    strokeColor: 0x8888bb,
-    textColor: 0xccccee,
-    w: 200,
-    h: 50,
-  });
-  achBtn.x = W * 0.5;
-  achBtn.alpha = 0;
-  uiLayer.addChild(achBtn);
-  allBtns.push(achBtn);
-
-  achBtn.on('pointerdown', async () => {
-    if (_transitioning) return;
-    _transitioning = true;
-    sfxMenuClick();
-    await core.events.emit('scene/load', { key: 'achievements' });
-  });
-
   // ── Position all buttons vertically ──────────────────────────────────────
   // Spread them evenly between H*0.27 and H*0.82
   const topY = H * 0.27;
-  const spacing = storyEnabled ? 0.155 : 0.175;
+  const spacing = storyEnabled ? 0.20 : 0.23;
   allBtns.forEach((b, i) => {
     b.y = topY + i * spacing * H;
   });

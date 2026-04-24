@@ -240,6 +240,45 @@ async function enter(core: Core): Promise<void> {
   btn.alpha = 0;
   uiLayer.addChild(btn);
 
+  // ── Achievements button ───────────────────────────────────────────────────
+  const achBtnW = 180, achBtnH = 44;
+  const achBtn = new Container();
+  achBtn.eventMode = 'static';
+  achBtn.cursor = 'pointer';
+
+  const achBtnBg = new Graphics();
+  achBtnBg.roundRect(-achBtnW / 2, -achBtnH / 2, achBtnW, achBtnH, 10)
+    .fill({ color: 0x222233, alpha: 0.88 });
+  achBtnBg.roundRect(-achBtnW / 2, -achBtnH / 2, achBtnW, achBtnH, 10)
+    .stroke({ color: 0x8888bb, width: 1.5 });
+  achBtn.addChild(achBtnBg);
+
+  const achBtnText = new Text({
+    text: '🏆  成就',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 18,
+      fontWeight: 'bold',
+      fill: 0xccccee,
+    }),
+  });
+  achBtnText.anchor.set(0.5);
+  achBtn.addChild(achBtnText);
+
+  achBtn.x = W * 0.5;
+  achBtn.y = H * 0.855;
+  achBtn.alpha = 0;
+  uiLayer.addChild(achBtn);
+
+  achBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    await core.events.emit('scene/load', { key: 'achievements' });
+  });
+  achBtn.on('pointerover', () => achBtn.scale.set(1.04));
+  achBtn.on('pointerout',  () => achBtn.scale.set(1.0));
+
   // ── DEV button (bottom-right corner) ─────────────────────────────────────
   const devBtnW = 46, devBtnH = 22;
   const devBtn = new Container();
@@ -270,8 +309,8 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Scene fade-in via TweenManager ────────────────────────────────────────
-  const fadeTargets = [title, subtitle, costumeLabel, prevBtn, costumeNameText, nextBtn, btn] as unknown as Record<string, unknown>[];
-  const delays      = [0, 150, 300, 350, 350, 350, 450];
+  const fadeTargets = [title, subtitle, costumeLabel, prevBtn, costumeNameText, nextBtn, btn, achBtn] as unknown as Record<string, unknown>[];
+  const delays      = [0, 150, 300, 350, 350, 350, 450, 530];
   fadeTargets.forEach((t, i) => {
     core.events.emitSync('tween/to', {
       target: t,
@@ -315,7 +354,7 @@ async function enter(core: Core): Promise<void> {
     core.events.removeNamespace('title');
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     worldLayer.removeChild(stars, chickenContainer, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, devBtn);
+    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn);
     stars.destroy({ children: true });
     chickenContainer.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -327,6 +366,7 @@ async function enter(core: Core): Promise<void> {
     prevBtn.destroy({ children: true });
     nextBtn.destroy({ children: true });
     btn.destroy({ children: true });
+    achBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
     unsubTick();
   };
