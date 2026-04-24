@@ -278,7 +278,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 前往第二章' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 返回章節選擇' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ async function enter(core: Core): Promise<void> {
   }, 1800);
 
   async function finish(): Promise<void> {
-    await core.events.emit('scene/load', { key: 'story_ch2' });
+    await core.events.emit('scene/load', { key: 'story' });
   }
 
   async function advance(): Promise<void> {

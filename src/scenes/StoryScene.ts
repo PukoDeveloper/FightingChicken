@@ -16,11 +16,6 @@ const CHAPTERS: ChapterEntry[] = [
   { number: '第一章', title: '遇見勇氣',     subtitle: '命中注定的相遇' },
   { number: '第二章', title: '第一次對決',   subtitle: '初戰告捷，卻留下疑問' },
   { number: '第三章', title: '幽靈之謎',     subtitle: '神秘的幻影在暗中窺視' },
-  { number: '第四章', title: '混沌降臨',     subtitle: '秩序開始崩潰' },
-  { number: '第五章', title: '鋼鐵意志',     subtitle: '唯有堅持才能突破' },
-  { number: '第六章', title: '星空之戰',     subtitle: '在星際深處決一死戰' },
-  { number: '第七章', title: '最終決戰',     subtitle: '命運的終章即將揭曉' },
-  { number: '尾聲',   title: '新的旅程',     subtitle: '結束，是另一段旅程的開始' },
 ];
 
 const CHAPTER_ITEM_H = 88;
@@ -95,6 +90,7 @@ async function enter(core: Core): Promise<void> {
       0: 'story_prologue',
       1: 'story_ch1',
       2: 'story_ch2',
+      3: 'story_ch3',
     };
     return keys[idx] ?? null;
   }

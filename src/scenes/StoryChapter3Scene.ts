@@ -4,10 +4,12 @@ import type { Core } from '@inkshot/engine';
 import {
   createChickenDisplay,
   createCourageDisplay,
+  createPhantomDisplay,
+  createGrandpaTurkeyDisplay,
   createStarfield,
 } from '../game/sprites';
 import { sfxMenuClick } from '../game/audio';
-import { gameResult } from '../game/store';
+import { endlessState, gameResult } from '../game/store';
 
 // ─── Dialogue data ─────────────────────────────────────────────────────────────
 interface DialogueLine {
@@ -23,57 +25,64 @@ const DIALOGUE: DialogueLine[] = [
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '……我……居然還是輸了……你到底是什麼來歷？',
+    text: '小雞，等等！那片黑暗深處……我感覺到一股不祥的氣息。',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '我只是個普通的小雞，但有重要的事非做不可。',
+    text: '我知道。但祖父就在那個方向——我必須繼續前進。',
     side: 'left',
   },
   {
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '什麼事……讓你不惜一切也要前進？',
+    text: '那個幻影……它不是普通的敵人。它能竊取記憶、迷惑意志。小心。',
+    side: 'right',
+  },
+  {
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '……呵呵。小小的雞，居然走了這麼遠。',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '我在尋找我的祖父火雞……他失蹤在這片星空的深處。',
+    text: '是你！把我祖父帶走的就是你！他在哪裡？',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '……（若有所思）祖父火雞……那道幽靈般的影子……',
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '那位老者？他的記憶……太美味了。現在他已經是星空的一部分。',
     side: 'right',
+  },
+  {
+    speaker: '祖父的幻影',
+    portraitFactory: createGrandpaTurkeyDisplay,
+    accentColor: 0xc8a060,
+    text: '……孫兒……別……別被它欺騙……我還……',
+    side: 'left',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '什麼！？你知道他的下落？',
+    text: '祖父！！你還在——！幻影，我絕對不會饒了你！',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '我曾見過一道幻影，帶走了一位老者。再往深處走……小心那個幻影。',
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '憤怒？好極了。憤怒讓你的記憶更加鮮明——正是我所需要的！',
     side: 'right',
-  },
-  {
-    speaker: '小雞',
-    portraitFactory: createChickenDisplay,
-    accentColor: 0x66aaff,
-    text: '謝謝你，勇氣。不管前方有什麼，我一定會找到祖父的！',
-    side: 'left',
   },
 ];
 
@@ -104,7 +113,7 @@ async function enter(core: Core): Promise<void> {
   dimOverlay.eventMode = 'none';
   worldLayer.addChild(dimOverlay);
 
-  // ── Chapter title card ──────────────────────────────────────────────────────
+  // ── Chapter title card (fades out after 1.5 s) ──────────────────────────────
   const titleCard = new Container();
   const titleCardBg = new Graphics();
   titleCardBg
@@ -112,15 +121,15 @@ async function enter(core: Core): Promise<void> {
     .fill({ color: 0x0a0a22, alpha: 0.9 });
   titleCardBg
     .roundRect(-160, -36, 320, 72, 14)
-    .stroke({ color: 0xffaa44, width: 2 });
+    .stroke({ color: 0x88aaff, width: 2 });
   titleCard.addChild(titleCardBg);
 
   const titleCardChapter = new Text({
-    text: '第二章',
+    text: '第三章',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
-      fill: 0xffcc88,
+      fill: 0xaaccff,
     }),
   });
   titleCardChapter.anchor.set(0.5);
@@ -128,13 +137,13 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardChapter);
 
   const titleCardTitle = new Text({
-    text: '勝利之後',
+    text: '幽靈之謎',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 26,
       fontWeight: 'bold',
       fill: 0xffffff,
-      dropShadow: { color: 0xffaa44, distance: 2, alpha: 0.7, blur: 4 },
+      dropShadow: { color: 0x4466ff, distance: 2, alpha: 0.7, blur: 4 },
     }),
   });
   titleCardTitle.anchor.set(0.5);
@@ -171,7 +180,7 @@ async function enter(core: Core): Promise<void> {
     .fill({ color: 0x080818, alpha: 0.93 });
   panelBg
     .roundRect(PANEL_MARGIN, panelY, panelW, PANEL_H, 16)
-    .stroke({ color: 0x5555aa, width: 1.5 });
+    .stroke({ color: 0x3355aa, width: 1.5 });
   panelBg.alpha = 0;
   uiLayer.addChild(panelBg);
 
@@ -300,7 +309,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 返回章節選擇' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 開始挑戰！' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
@@ -311,11 +320,6 @@ async function enter(core: Core): Promise<void> {
     advanceLocked = false;
   }, 1800);
 
-  async function finish(): Promise<void> {
-    gameResult.storyMode = false;
-    await core.events.emit('scene/load', { key: 'story' });
-  }
-
   async function advance(): Promise<void> {
     if (advanceLocked) return;
     advanceLocked = true;
@@ -323,7 +327,10 @@ async function enter(core: Core): Promise<void> {
 
     lineIndex++;
     if (lineIndex >= DIALOGUE.length) {
-      await finish();
+      endlessState.active = false;
+      gameResult.currentLevel = 3;
+      gameResult.storyMode = true;
+      await core.events.emit('scene/load', { key: 'skillselect' });
       return;
     }
 
@@ -335,7 +342,10 @@ async function enter(core: Core): Promise<void> {
     if (advanceLocked) return;
     advanceLocked = true;
     sfxMenuClick();
-    await finish();
+    endlessState.active = false;
+    gameResult.currentLevel = 3;
+    gameResult.storyMode = true;
+    await core.events.emit('scene/load', { key: 'skillselect' });
   }
 
   const tapArea = new Graphics();
@@ -353,7 +363,7 @@ async function enter(core: Core): Promise<void> {
 
   showLine(0);
 
-  // ── Fade in the panel ───────────────────────────────────────────────────────
+  // ── Fade in the panel + UI after a short delay ──────────────────────────────
   const panelElements: Container[] = [
     panelBg, portraitFrame, portraitHolder, nameText, bodyText, tapHint, skipBtn,
   ];
@@ -368,7 +378,7 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Tick: blink tap hint ────────────────────────────────────────────────────
-  const unsubTick = core.events.on('story_ch2_end', 'core/tick', () => {
+  const unsubTick = core.events.on('story_ch3', 'core/tick', () => {
     if (!advanceLocked) {
       tapHint.alpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 600));
     }
@@ -377,7 +387,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   _cleanup = () => {
     clearTimeout(unlockTimer);
-    core.events.removeNamespace('story_ch2_end');
+    core.events.removeNamespace('story_ch3');
     unsubTick();
     worldLayer.removeChild(stars, dimOverlay);
     uiLayer.removeChild(
@@ -403,8 +413,8 @@ async function exit(_core: Core): Promise<void> {
   _cleanup = null;
 }
 
-export const StoryChapter2EndScene: SceneDescriptor = {
-  key: 'story_ch2_end',
+export const StoryChapter3Scene: SceneDescriptor = {
+  key: 'story_ch3',
   enter,
   exit,
 };

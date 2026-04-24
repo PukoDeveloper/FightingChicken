@@ -28,6 +28,8 @@ import { StoryChapter1Scene } from './scenes/StoryChapter1Scene';
 import { StoryChapter1EndScene } from './scenes/StoryChapter1EndScene';
 import { StoryChapter2Scene } from './scenes/StoryChapter2Scene';
 import { StoryChapter2EndScene } from './scenes/StoryChapter2EndScene';
+import { StoryChapter3Scene } from './scenes/StoryChapter3Scene';
+import { StoryChapter3EndScene } from './scenes/StoryChapter3EndScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { EncyclopediaScene } from './scenes/EncyclopediaScene';
 import { GAME_W, GAME_H } from './constants';
@@ -182,6 +184,8 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: StoryChapter1EndScene });
           c.events.emitSync('scene/register', { scene: StoryChapter2Scene });
           c.events.emitSync('scene/register', { scene: StoryChapter2EndScene });
+          c.events.emitSync('scene/register', { scene: StoryChapter3Scene });
+          c.events.emitSync('scene/register', { scene: StoryChapter3EndScene });
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
           c.events.emitSync('scene/register', { scene: EncyclopediaScene });
 

@@ -3,7 +3,8 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import {
   createChickenDisplay,
-  createCourageDisplay,
+  createPhantomDisplay,
+  createGrandpaTurkeyDisplay,
   createStarfield,
 } from '../game/sprites';
 import { sfxMenuClick } from '../game/audio';
@@ -20,59 +21,59 @@ interface DialogueLine {
 
 const DIALOGUE: DialogueLine[] = [
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '……我……居然還是輸了……你到底是什麼來歷？',
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '……不可能……被一隻小雞打敗？我的幻術……居然……',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '我只是個普通的小雞，但有重要的事非做不可。',
+    text: '現在告訴我！祖父在哪裡？你對他做了什麼？',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '什麼事……讓你不惜一切也要前進？',
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '……他的意志……比我想像的更強。我只是封住了他的身體——他的魂，我抓不住。',
     side: 'right',
   },
   {
-    speaker: '小雞',
-    portraitFactory: createChickenDisplay,
-    accentColor: 0x66aaff,
-    text: '我在尋找我的祖父火雞……他失蹤在這片星空的深處。',
+    speaker: '祖父的幻影',
+    portraitFactory: createGrandpaTurkeyDisplay,
+    accentColor: 0xc8a060,
+    text: '孫兒……你找到我了。我一直在等你……往星空深處的漩渦走——那才是真正的核心。',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '……（若有所思）祖父火雞……那道幽靈般的影子……',
-    side: 'right',
-  },
-  {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '什麼！？你知道他的下落？',
+    text: '祖父！你還好嗎？我一定會救你出來的！',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '我曾見過一道幻影，帶走了一位老者。再往深處走……小心那個幻影。',
+    speaker: '祖父的幻影',
+    portraitFactory: createGrandpaTurkeyDisplay,
+    accentColor: 0xc8a060,
+    text: '我等得起。但孩子，前方還有更強大的黑暗……記住，你的心才是最強的武器。',
+    side: 'left',
+  },
+  {
+    speaker: '幻影',
+    portraitFactory: createPhantomDisplay,
+    accentColor: 0x88aaff,
+    text: '……哼。你贏了這一局。但主人……主人會親自出手……那時，就算你心再強也沒用。',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '謝謝你，勇氣。不管前方有什麼，我一定會找到祖父的！',
+    text: '「主人」？星空裡還有更深的黑暗……不管如何，我絕不退縮！',
     side: 'left',
   },
 ];
@@ -112,15 +113,15 @@ async function enter(core: Core): Promise<void> {
     .fill({ color: 0x0a0a22, alpha: 0.9 });
   titleCardBg
     .roundRect(-160, -36, 320, 72, 14)
-    .stroke({ color: 0xffaa44, width: 2 });
+    .stroke({ color: 0x88aaff, width: 2 });
   titleCard.addChild(titleCardBg);
 
   const titleCardChapter = new Text({
-    text: '第二章',
+    text: '第三章',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
-      fill: 0xffcc88,
+      fill: 0xaaccff,
     }),
   });
   titleCardChapter.anchor.set(0.5);
@@ -128,13 +129,13 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardChapter);
 
   const titleCardTitle = new Text({
-    text: '勝利之後',
+    text: '幽靈的真相',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 26,
       fontWeight: 'bold',
       fill: 0xffffff,
-      dropShadow: { color: 0xffaa44, distance: 2, alpha: 0.7, blur: 4 },
+      dropShadow: { color: 0x4466ff, distance: 2, alpha: 0.7, blur: 4 },
     }),
   });
   titleCardTitle.anchor.set(0.5);
@@ -171,7 +172,7 @@ async function enter(core: Core): Promise<void> {
     .fill({ color: 0x080818, alpha: 0.93 });
   panelBg
     .roundRect(PANEL_MARGIN, panelY, panelW, PANEL_H, 16)
-    .stroke({ color: 0x5555aa, width: 1.5 });
+    .stroke({ color: 0x3355aa, width: 1.5 });
   panelBg.alpha = 0;
   uiLayer.addChild(panelBg);
 
@@ -368,7 +369,7 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Tick: blink tap hint ────────────────────────────────────────────────────
-  const unsubTick = core.events.on('story_ch2_end', 'core/tick', () => {
+  const unsubTick = core.events.on('story_ch3_end', 'core/tick', () => {
     if (!advanceLocked) {
       tapHint.alpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 600));
     }
@@ -377,7 +378,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   _cleanup = () => {
     clearTimeout(unlockTimer);
-    core.events.removeNamespace('story_ch2_end');
+    core.events.removeNamespace('story_ch3_end');
     unsubTick();
     worldLayer.removeChild(stars, dimOverlay);
     uiLayer.removeChild(
@@ -403,8 +404,8 @@ async function exit(_core: Core): Promise<void> {
   _cleanup = null;
 }
 
-export const StoryChapter2EndScene: SceneDescriptor = {
-  key: 'story_ch2_end',
+export const StoryChapter3EndScene: SceneDescriptor = {
+  key: 'story_ch3_end',
   enter,
   exit,
 };
