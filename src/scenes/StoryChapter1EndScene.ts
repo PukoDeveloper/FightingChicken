@@ -279,7 +279,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 返回主選單' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 模式選擇' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
