@@ -37,7 +37,7 @@ async function enter(core: Core): Promise<void> {
 
   // Unlock interaction after a short delay so the tap that opened this scene
   // cannot immediately trigger a chapter button.
-  const _inputLockTimer = window.setTimeout(() => { _inputReady = true; }, 400);
+  const inputLockTimer = window.setTimeout(() => { _inputReady = true; }, 400);
 
   // ── Audio ─────────────────────────────────────────────────────────────────
   startBgm();
@@ -308,7 +308,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   _cleanup = () => {
-    clearTimeout(_inputLockTimer);
+    clearTimeout(inputLockTimer);
     core.events.removeNamespace('story');
     unsubTick();
     worldLayer.removeChild(stars);
