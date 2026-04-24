@@ -143,7 +143,7 @@ export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
   };
 }
 
-// ─── Level 1 · 初級挑戰 (2 waves) ─────────────────────────────────────────────
+// ─── Level 1 · 初級挑戰 (1 wave) ──────────────────────────────────────────────
 
 const LEVEL_1: LevelConfig = {
   levelNumber: 1,
@@ -173,33 +173,10 @@ const LEVEL_1: LevelConfig = {
         }),
       ],
     },
-    {
-      waveNumber: 2,
-      enemyHp: 150,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 200, spiralWays: 6, spiralSpeed: BULLET_SPEED_SLOW, spiralColor: COL_BULLET_P1,
-          aimInterval: 1200,   aimWays: 3,   aimSpread: 0.30,                 aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P1,
-        }),
-        phase({
-          spiralInterval: 160, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 800,    aimWays: 3,     aimSpread: 0.30,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1400, spreadWays: 5, spreadAngle: 0.25, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 100, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 550,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 700, spreadWays: 8,  spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 2800,  ringCount: 28,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-        }),
-      ],
-    },
   ],
 };
 
-// ─── Level 2 · 中級考驗 (3 waves) ─────────────────────────────────────────────
+// ─── Level 2 · 中級考驗 (2 waves) ─────────────────────────────────────────────
 
 const LEVEL_2: LevelConfig = {
   levelNumber: 2,
@@ -256,35 +233,10 @@ const LEVEL_2: LevelConfig = {
         }),
       ],
     },
-    {
-      waveNumber: 3,
-      enemyHp: 160,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 160, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 900,    aimWays: 4,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1400, spreadWays: 6, spreadAngle: 0.25, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 140, spiralWays: 11, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
-          aimInterval: 650,    aimWays: 5,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 950, spreadWays: 7,  spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 3000,  ringCount: 28,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-        }),
-        phase({
-          spiralInterval: 80,  spiralWays: 18, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 400,    aimWays: 6,     aimSpread: 0.18,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 550, spreadWays: 10, spreadAngle: 0.16, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 1800,  ringCount: 40,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-        }),
-      ],
-    },
   ],
 };
 
-// ─── Level 3 · 終極試煉 (4 waves) ─────────────────────────────────────────────
+// ─── Level 3 · 終極試煉 (3 waves) ─────────────────────────────────────────────
 // Difficulty tuned down ~25 % vs original; new bomb / laser / curve attacks
 // are introduced from phase 2 onward to add variety without overwhelming density.
 
@@ -385,43 +337,10 @@ const LEVEL_3: LevelConfig = {
         }),
       ],
     },
-    {
-      waveNumber: 4,
-      enemyHp: 240,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 185, spiralWays: 10, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 1080,   aimWays: 4,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1620, spreadWays: 6, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 4300,   ringCount: 22, ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-          bombInterval: 8000,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 7000, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 150, spiralWays: 13, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 680,    aimWays: 5,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1050, spreadWays: 8, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2950,  ringCount: 32,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          bombInterval: 6000,  bombCount: 2, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 95,  spiralWays: 19, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 450,    aimWays: 6,     aimSpread: 0.16,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 620, spreadWays: 11, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 1900,  ringCount: 42,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          bombInterval: 4500,  bombCount: 2, bombFuseMs: 1800, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3500, laserCount: 7, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3000, curveWays: 3,  curveSpeed: 170, curveTurnRate: 1.5, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
   ],
 };
 
-// ─── Level 4 · 幽靈試煉 (4 waves, Phantom enemy) ──────────────────────────────
+// ─── Level 4 · 幽靈試煉 (3 waves, Phantom enemy) ──────────────────────────────
 // Difficulty reduced ~20 % vs original; bomb, laser and curve attacks added
 // from phase 1 onward; shockwave / bubble retained for phantom flavour.
 
@@ -544,51 +463,10 @@ const LEVEL_4: LevelConfig = {
         }),
       ],
     },
-    {
-      waveNumber: 4,
-      enemyHp: 270,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 162, spiralWays: 10, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 937,    aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1375, spreadWays: 6, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 3750,   ringCount: 24, ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 6250, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10,  bubbleColor: COL_BUBBLE,
-          bombInterval: 7000,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 6000, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.4, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 125, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 650,    aimWays: 5,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 900, spreadWays: 8,  spreadAngle: 0.17, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2500,  ringCount: 34,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3750, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 50,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4375, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 20,  bubbleColor: COL_BUBBLE,
-          bombInterval: 5500,  bombCount: 2, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4250, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4250, curveWays: 2,  curveSpeed: 170, curveTurnRate: 1.6, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 81,  spiralWays: 18, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 400,    aimWays: 6,     aimSpread: 0.14,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 550, spreadWays: 10, spreadAngle: 0.12, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 1750,  ringCount: 40,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 2750, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 70,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3000, bubbleCount: 4, bubbleSpeed: BUBBLE_SPEED + 25,  bubbleColor: COL_BUBBLE,
-          bombInterval: 4000,  bombCount: 2, bombFuseMs: 1700, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3000, laserCount: 8, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3000, curveWays: 3,  curveSpeed: 180, curveTurnRate: 1.8, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
   ],
 };
 
-// ─── Level 5 · 混沌深淵 (5 waves, Chaos enemy) ────────────────────────────────
+// ─── Level 5 · 混沌深淵 (4 waves, Chaos enemy) ────────────────────────────────
 // All patterns active from phase 1; difficulty scaled down ~15 % vs original.
 // New bomb / laser / curve attacks layered on top for maximum variety.
 
@@ -759,50 +637,6 @@ const LEVEL_5: LevelConfig = {
           bombInterval: 4550,  bombCount: 2, bombFuseMs: 1600, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
           laserInterval: 3510, laserCount: 7, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
           curveInterval: 3510, curveWays: 3,  curveSpeed: 195, curveTurnRate: 1.65, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 5,
-      enemyHp: 330,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 183, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 979,    aimWays: 5,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1529, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 3977,   ringCount: 24, ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5353, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 60,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 6118, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 20,  bubbleColor: COL_BUBBLE,
-          bombInterval: 7150,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5460, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 5850, curveWays: 2,  curveSpeed: 175, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 138, spiralWays: 13, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 703,    aimWays: 5,     aimSpread: 0.17,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1040, spreadWays: 8, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2447,  ringCount: 36,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3824, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 80,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4282, bubbleCount: 4, bubbleSpeed: BUBBLE_SPEED + 28,  bubbleColor: COL_BUBBLE,
-          bombInterval: 5460,  bombCount: 2, bombFuseMs: 1700, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4160, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4420, curveWays: 2,  curveSpeed: 190, curveTurnRate: 1.55, curveColor: COL_BULLET_CURVE,
-        }),
-        // Phase 3: when the boss's last HP segment starts on the final wave (wave 5) of Level 5,
-        // pet guardians are summoned. The boss pauses; pets fire at the player until defeated.
-        // These values are used once both pets are defeated and the boss resumes.
-        phase({
-          spiralInterval: 86,  spiralWays: 19, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 459,    aimWays: 7,     aimSpread: 0.12,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 612,  spreadWays: 11, spreadAngle: 0.10, spreadSpeed: BULLET_SPEED_FAST,  spreadColor: COL_BULLET_P3,
-          ringInterval: 1682,  ringCount: 44,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 2753, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 110, shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3059, bubbleCount: 5, bubbleSpeed: BUBBLE_SPEED + 35,  bubbleColor: COL_BUBBLE,
-          bombInterval: 4160,  bombCount: 2, bombFuseMs: 1500, bombRingCount: 14, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3120, laserCount: 8, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3250, curveWays: 3,  curveSpeed: 200, curveTurnRate: 1.8, curveColor: COL_BULLET_CURVE,
         }),
       ],
     },

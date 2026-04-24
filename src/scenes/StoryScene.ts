@@ -28,10 +28,16 @@ const CHAPTER_ITEM_GAP = 12;
 const CHAPTER_ITEM_W = 320;
 
 let _cleanup: (() => void) | null = null;
+let _inputReady = false;
 
 async function enter(core: Core): Promise<void> {
+  _inputReady = false;
   const W = core.app.screen.width;
   const H = core.app.screen.height;
+
+  // Unlock interaction after a short delay so the tap that opened this scene
+  // cannot immediately trigger a chapter button.
+  const inputLockTimer = window.setTimeout(() => { _inputReady = true; }, 400);
 
   // ── Audio ─────────────────────────────────────────────────────────────────
   startBgm();
@@ -167,6 +173,7 @@ async function enter(core: Core): Promise<void> {
       item.on('pointerover', () => item.scale.set(1.03));
       item.on('pointerout',  () => item.scale.set(1.0));
       item.on('pointerdown', async () => {
+        if (!_inputReady) return;
         sfxMenuClick();
         await core.events.emit('scene/load', { key: chapterSceneKey(i)! });
       });
@@ -219,7 +226,7 @@ async function enter(core: Core): Promise<void> {
   const endDrag = (e: { global: { x: number; y: number } }): void => {
     isDragging = false;
     // Treat minimal movement as a tap and forward to the correct chapter item
-    if (totalDragDist < 8) {
+    if (_inputReady && totalDragDist < 8) {
       const innerPos = innerList.getGlobalPosition();
       const localY = e.global.y - innerPos.y;
       const localX = e.global.x - innerPos.x;
@@ -276,6 +283,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(backBtn);
 
   backBtn.on('pointerdown', async () => {
+    if (!_inputReady) return;
     sfxMenuClick();
     await core.events.emit('scene/load', { key: 'modeselect' });
   });
@@ -300,6 +308,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   _cleanup = () => {
+    clearTimeout(inputLockTimer);
     core.events.removeNamespace('story');
     unsubTick();
     worldLayer.removeChild(stars);

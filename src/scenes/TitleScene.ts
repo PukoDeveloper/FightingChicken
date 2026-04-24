@@ -469,7 +469,7 @@ async function enter(core: Core): Promise<void> {
     const OV_GAP_X = 12, OV_GAP_Y = 10;
     const ovGridTotalW = 2 * OV_CARD_W + OV_GAP_X;
     const ovGridStartX = (W - ovGridTotalW) / 2 + OV_CARD_W / 2;
-    const ovCardsStartY = PANEL_Y + 272;
+    const ovCardsStartY = PANEL_Y + 295;
     const ovCards: Container[] = [];
 
     function buildOvCard(index: number): Container {
