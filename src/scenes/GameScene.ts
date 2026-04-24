@@ -3047,7 +3047,7 @@ async function enter(core: Core): Promise<void> {
 
     // Award 宇宙灰燼 every 10 waves completed
     const completedWave = endlessState.wave - 1;
-    if (completedWave % 10 === 0) {
+    if (completedWave > 0 && completedWave % 10 === 0) {
       currencyState.cosmicAsh += 1;
       waveBannerText.text = `✨ 獲得宇宙灰燼 ×1！`;
       waveBannerText.alpha = 1;

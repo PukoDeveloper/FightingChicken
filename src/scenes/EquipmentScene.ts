@@ -270,6 +270,8 @@ async function enter(core: Core): Promise<void> {
   }
 
   const UPGRADE_COST = 3;
+  const INSUFFICIENT_FUNDS_COLOR = 0xff4444;
+  const COST_LABEL_COLOR = 0xaaddff;
 
   function buildUpgradePanel(parent: Container): void {
     const cx = W * 0.5;
@@ -316,7 +318,7 @@ async function enter(core: Core): Promise<void> {
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
           fontSize: 13,
-          fill: 0xaaddff,
+          fill: COST_LABEL_COLOR,
         }),
       });
       costTxt.x = PANEL_X + 28;
@@ -356,8 +358,8 @@ async function enter(core: Core): Promise<void> {
       upgradeBtn.on('pointerdown', async () => {
         if (currencyState.cosmicAsh < opt.cost) {
           // Flash the label red briefly to indicate insufficient funds
-          costTxt.style.fill = 0xff4444;
-          setTimeout(() => { costTxt.style.fill = 0xaaddff; }, 800);
+          costTxt.style.fill = INSUFFICIENT_FUNDS_COLOR;
+          setTimeout(() => { costTxt.style.fill = COST_LABEL_COLOR; }, 800);
           return;
         }
         sfxMenuClick();
