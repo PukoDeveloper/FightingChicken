@@ -2,6 +2,9 @@ import type { Core } from '@inkshot/engine';
 import { gameResult, endlessState, costumeState } from './store';
 import type { CostumeId } from './costumes';
 
+/** The default costume used when resetting progress. */
+const DEFAULT_COSTUME: CostumeId = 'default';
+
 /** The engine's save-slot ID used for all game progress. */
 const SLOT_ID = 'progress';
 
@@ -99,5 +102,37 @@ export async function loadProgress(): Promise<void> {
     }
   } catch {
     // Silently ignore corrupt or unreadable save data.
+  }
+}
+
+/**
+ * Clear all persisted player progress and reset in-memory store state to
+ * its initial values.  Called from the developer menu to wipe records.
+ */
+export async function clearProgress(): Promise<void> {
+  if (!_core) return;
+  try {
+    // Reset in-memory state.
+    gameResult.levelHighScores = {};
+    endlessState.bestWave = 1;
+    endlessState.highScore = 0;
+    costumeState.clearedLevels = new Set();
+    costumeState.selected = DEFAULT_COSTUME;
+
+    // Overwrite the save slot with blank data so the cleared state is persisted.
+    _core.events.emitSync('save/slot:set', {
+      id: SLOT_ID,
+      patch: {
+        levelHighScores: {},
+        clearedLevels: [],
+        selectedCostume: DEFAULT_COSTUME,
+        endlessBestWave: 1,
+        endlessHighScore: 0,
+        _achievements: { data: {} },
+      },
+    });
+    await _core.events.emit('save/slot:save', { id: SLOT_ID });
+  } catch {
+    // Silently ignore write failures.
   }
 }

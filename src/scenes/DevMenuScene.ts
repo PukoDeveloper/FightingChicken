@@ -1,6 +1,7 @@
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { devConfig } from '../game/store';
+import { clearProgress } from '../game/persistence';
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 
 // ─── DevMenu overlay (HTML) ──────────────────────────────────────────────────
@@ -88,6 +89,27 @@ async function enter(core: Core): Promise<void> {
         關閉
       </button>
     </div>
+
+    <hr style="border:none;border-top:1px solid #444;margin:20px 0 16px;" />
+
+    <div style="text-align:center;">
+      <button id="dev-clear-data"
+        style="padding:8px 20px;background:#7a1010;color:#ffcccc;border:1px solid #cc3333;border-radius:6px;cursor:pointer;font-size:14px;">
+        🗑 刪除存檔資料
+      </button>
+      <p id="dev-clear-confirm" style="display:none;margin:10px 0 0;font-size:13px;color:#ffaaaa;">
+        確定要刪除所有存檔？此操作無法復原。
+        <br/>
+        <button id="dev-clear-yes"
+          style="margin-top:8px;padding:6px 14px;background:#cc0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;">
+          確認刪除
+        </button>
+        <button id="dev-clear-no"
+          style="margin-top:8px;margin-left:8px;padding:6px 14px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:13px;">
+          取消
+        </button>
+      </p>
+    </div>
   `;
 
   overlay.appendChild(panel);
@@ -101,6 +123,10 @@ async function enter(core: Core): Promise<void> {
   const storyToggle = panel.querySelector<HTMLInputElement>('#dev-story-toggle')!;
   const resetBtn    = panel.querySelector<HTMLButtonElement>('#dev-reset')!;
   const closeBtn    = panel.querySelector<HTMLButtonElement>('#dev-close')!;
+  const clearDataBtn    = panel.querySelector<HTMLButtonElement>('#dev-clear-data')!;
+  const clearConfirm    = panel.querySelector<HTMLElement>('#dev-clear-confirm')!;
+  const clearYesBtn     = panel.querySelector<HTMLButtonElement>('#dev-clear-yes')!;
+  const clearNoBtn      = panel.querySelector<HTMLButtonElement>('#dev-clear-no')!;
 
   speedSlider.addEventListener('input', () => {
     devConfig.playerMoveSpeed = Number(speedSlider.value);
@@ -129,6 +155,21 @@ async function enter(core: Core): Promise<void> {
 
   closeBtn.addEventListener('click', async () => {
     await core.events.emit('scene/load', { key: 'title' });
+  });
+
+  clearDataBtn.addEventListener('click', () => {
+    clearDataBtn.style.display = 'none';
+    clearConfirm.style.display = 'block';
+  });
+
+  clearNoBtn.addEventListener('click', () => {
+    clearConfirm.style.display = 'none';
+    clearDataBtn.style.display = 'inline-block';
+  });
+
+  clearYesBtn.addEventListener('click', async () => {
+    await clearProgress();
+    window.location.reload();
   });
 
   // Close on clicking the dark backdrop (outside the panel).
