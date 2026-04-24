@@ -525,6 +525,32 @@ export function createPowerItem(): Container {
   return c;
 }
 
+/** Gift box pickup (麋鹿小雞 passive): a wrapped present that awards a random buff. */
+export function createGiftBoxItem(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer glow (gold)
+  g.circle(0, 0, 20).fill({ color: 0xffdd00, alpha: 0.25 });
+  // Box body
+  g.rect(-11, -4, 22, 14).fill(0xcc3300);
+  // Box lid
+  g.rect(-11, -13, 22, 10).fill(0xee4411);
+  // Vertical ribbon
+  g.rect(-3, -13, 6, 24).fill(0xffee00);
+  // Horizontal ribbon
+  g.rect(-11, -3, 22, 6).fill(0xffee00);
+  // Bow left loop
+  g.ellipse(-7, -16, 6, 4).fill(0xffee00);
+  // Bow right loop
+  g.ellipse(7, -16, 6, 4).fill(0xffee00);
+  // Bow centre knot
+  g.circle(0, -16, 3).fill(0xffd700);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Screen flash overlay ────────────────────────────────────────────────────
 export function createFlashOverlay(w: number, h: number): Graphics {
   const g = new Graphics();
