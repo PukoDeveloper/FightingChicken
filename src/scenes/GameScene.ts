@@ -2300,6 +2300,9 @@ async function enter(core: Core): Promise<void> {
     waveConfig = levelConfig!.waves[waveIdx];
     waveMaxHp = waveConfig.enemyHp;
     enemyHP = waveMaxHp;
+
+    // Restore 2 HP to the player on wave clear (capped at effective max)
+    playerHP = Math.min(effectiveHpMax, playerHP + 2);
     phase = 1;
     spiralTimer = 0;
     aimTimer = 0;
