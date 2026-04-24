@@ -1962,11 +1962,11 @@ async function enter(core: Core): Promise<void> {
           costumeRing.circle(0, 0, 34 * heroPulse).fill({ color: 0xffee00, alpha: 0.10 });
           costumeRing.circle(0, 0, 34 * heroPulse).stroke({ color: 0xffee00, width: 3, alpha: 0.80 });
           if (heroActiveMs <= 0) {
-            // Ability ended: convert to charged damage and drop HP to 1
+            // Ability ended: convert to charged damage and drop HP to half
             costumeRing.visible = false;
             heroChargedDamage = heroAbsorbedDmg + heroStartHp;
             heroAbsorbedDmg   = 0;
-            playerHP          = 1;
+            playerHP          = Math.max(1, Math.floor(heroStartHp / 2));
             heroCooldownMs    = HERO_COOLDOWN_MS;
             updateHUD();
             redrawCostumeBtn();
