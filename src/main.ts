@@ -23,6 +23,7 @@ import { CostumeSelectScene } from './scenes/CostumeSelectScene';
 import { AchievementsScene } from './scenes/AchievementsScene';
 import { SkillSelectScene } from './scenes/SkillSelectScene';
 import { StoryScene } from './scenes/StoryScene';
+import { StoryChapter1Scene } from './scenes/StoryChapter1Scene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { GAME_W, GAME_H } from './constants';
 import { initPersistence, loadProgress } from './game/persistence';
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: AchievementsScene });
           c.events.emitSync('scene/register', { scene: SkillSelectScene });
           c.events.emitSync('scene/register', { scene: StoryScene });
+          c.events.emitSync('scene/register', { scene: StoryChapter1Scene });
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
 
           await c.events.emit('scene/load', { key: 'title' });

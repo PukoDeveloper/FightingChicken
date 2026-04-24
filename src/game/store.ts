@@ -22,7 +22,7 @@ export const devConfig = {
   /** Item fall speed in px/s. Initialised from ITEM_FALL_SPEED constant. */
   itemFallSpeed: ITEM_FALL_SPEED,
   /** Whether the Story Mode option is shown on the title screen. */
-  storyModeEnabled: false,
+  storyModeEnabled: true,
 };
 
 /** Endless mode state shared between GameScene and EndlessBuffScene. */

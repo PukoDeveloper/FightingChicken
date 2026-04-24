@@ -86,16 +86,22 @@ async function enter(core: Core): Promise<void> {
   for (let i = 0; i < CHAPTERS.length; i++) {
     const ch = CHAPTERS[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
+    // Chapter 1 (index 1) is playable; all others are coming soon
+    const isPlayable = i === 1;
 
     const item = new Container();
     item.y = itemY;
+    if (isPlayable) {
+      item.eventMode = 'static';
+      item.cursor = 'pointer';
+    }
 
     // Background card
     const cardBg = new Graphics();
     cardBg.roundRect(0, 0, CHAPTER_ITEM_W, CHAPTER_ITEM_H, 10)
-      .fill({ color: 0x1a1a3a, alpha: 0.9 });
+      .fill({ color: isPlayable ? 0x1a2a1a : 0x1a1a3a, alpha: 0.9 });
     cardBg.roundRect(0, 0, CHAPTER_ITEM_W, CHAPTER_ITEM_H, 10)
-      .stroke({ color: 0xffaa44, width: 1.5 });
+      .stroke({ color: isPlayable ? 0x44ff88 : 0xffaa44, width: isPlayable ? 2 : 1.5 });
     item.addChild(cardBg);
 
     // Chapter number label
@@ -114,7 +120,7 @@ async function enter(core: Core): Promise<void> {
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 22,
       fontWeight: 'bold',
-      fill: 0xffffff,
+      fill: isPlayable ? 0xeeffee : 0xffffff,
     });
     const namLabel = new Text({ text: ch.title, style: namStyle });
     namLabel.x = 16;
@@ -125,24 +131,36 @@ async function enter(core: Core): Promise<void> {
     const subStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
-      fill: 0xaaaaaa,
+      fill: isPlayable ? 0x88cc88 : 0xaaaaaa,
     });
     const subLabel = new Text({ text: ch.subtitle, style: subStyle });
     subLabel.x = 16;
     subLabel.y = 58;
     item.addChild(subLabel);
 
-    // "即將推出" badge on the right
+    // Right badge: "▶ 開始" for playable, "即將推出" for others
     const badgeStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 11,
-      fill: 0x888888,
+      fill: isPlayable ? 0x44ff88 : 0x888888,
     });
-    const badgeLabel = new Text({ text: '即將推出', style: badgeStyle });
+    const badgeLabel = new Text({
+      text: isPlayable ? '▶ 開始' : '即將推出',
+      style: badgeStyle,
+    });
     badgeLabel.anchor.set(1, 0.5);
     badgeLabel.x = CHAPTER_ITEM_W - 14;
     badgeLabel.y = CHAPTER_ITEM_H / 2;
     item.addChild(badgeLabel);
+
+    if (isPlayable) {
+      item.on('pointerover', () => item.scale.set(1.03));
+      item.on('pointerout',  () => item.scale.set(1.0));
+      item.on('pointerdown', async () => {
+        sfxMenuClick();
+        await core.events.emit('scene/load', { key: 'story_ch1' });
+      });
+    }
 
     innerList.addChild(item);
   }
