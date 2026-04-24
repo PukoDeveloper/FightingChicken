@@ -300,6 +300,111 @@ export function createChaosDisplay(): Container {
   return c;
 }
 
+// ─── Grandpa Turkey (祖父火雞) ──────────────────────────────────────────────────
+/**
+ * Wise elderly turkey character — the chicken's grandfather.
+ * Origin at centre of face.
+ */
+export function createGrandpaTurkeyDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // ── Fan tail (behind body, drawn first) ─────────────────────────────────
+  const fanCount = 11;
+  for (let i = 0; i < fanCount; i++) {
+    const angle = (i / (fanCount - 1)) * Math.PI - Math.PI * 0.15;
+    const r = 56;
+    // Alternate feather colours: warm brown / light tan
+    const featherColor = i % 2 === 0 ? 0x8b4513 : 0xc8a060;
+    g.moveTo(0, 4);
+    const ex = -Math.cos(angle) * r;
+    const ey = -Math.sin(angle) * r;
+    // Feather as a thin ellipse rotated along the fan ray
+    const mx = (-Math.cos(angle) * r * 0.5);
+    const my = (-Math.sin(angle) * r * 0.5);
+    g.ellipse(mx, my, 5, 26).fill({ color: featherColor, alpha: 0.85 });
+    // Feather tip highlight
+    g.ellipse(ex, ey, 4, 6).fill({ color: 0xffe0a0, alpha: 0.5 });
+  }
+  // Fan base arc
+  g.arc(0, 4, 22, Math.PI * 1.15, Math.PI * 1.85).fill({ color: 0x6b3a10, alpha: 0.9 });
+
+  // ── Body (round, grey-brown — old age) ───────────────────────────────────
+  g.circle(0, 8, 34).fill(0x8a7060);
+  g.circle(0, 8, 30).fill(0xb09070);
+  // White chest patch (age plumage)
+  g.ellipse(0, 16, 14, 12).fill({ color: 0xf0e8d8, alpha: 0.80 });
+
+  // ── Head ─────────────────────────────────────────────────────────────────
+  g.circle(0, -16, 22).fill(0xa07858);
+  g.circle(0, -16, 18).fill(0xc09870);
+
+  // ── Beak (hooked, dark) ──────────────────────────────────────────────────
+  g.moveTo(16, -18).lineTo(28, -13).lineTo(20, -8).closePath().fill(0x5a3a10);
+  // Beak lower jaw
+  g.moveTo(16, -14).lineTo(24, -10).lineTo(16, -8).closePath().fill(0x7a5a20);
+
+  // ── Wattle (red fleshy fold) ─────────────────────────────────────────────
+  g.ellipse(14, -8, 5, 9).fill({ color: 0xdd2200, alpha: 0.85 });
+  g.ellipse(10, -4, 4, 7).fill({ color: 0xff4422, alpha: 0.70 });
+
+  // ── Snood (red bump above beak) ─────────────────────────────────────────
+  g.ellipse(20, -22, 4, 8).fill({ color: 0xdd2200, alpha: 0.80 });
+
+  // ── Wise thick eyebrows (grey/white, bushy) ──────────────────────────────
+  g.moveTo(-22, -30).lineTo(-6, -34).lineTo(-5, -28).lineTo(-22, -25).closePath().fill(0xd8d0c0);
+  g.moveTo(6, -34).lineTo(20, -30).lineTo(20, -25).lineTo(6, -28).closePath().fill(0xd8d0c0);
+
+  // ── Eyes (warm amber — wise and gentle) ─────────────────────────────────
+  g.circle(-12, -22, 7).fill(0xfff0d0);
+  g.circle(-12, -22, 5).fill(0xc07800);
+  g.circle(-12, -22, 2.5).fill(0x110000);
+  g.circle(-10, -24, 1.2).fill(0xffffff);
+
+  g.circle(10, -22, 7).fill(0xfff0d0);
+  g.circle(10, -22, 5).fill(0xc07800);
+  g.circle(10, -22, 2.5).fill(0x110000);
+  g.circle(12, -24, 1.2).fill(0xffffff);
+
+  // ── Glasses (round wire-frame) ───────────────────────────────────────────
+  // Left lens
+  g.circle(-12, -22, 8.5).fill({ color: 0x000000, alpha: 0 })
+    .stroke({ color: 0xaaaaaa, width: 1.5 });
+  // Right lens
+  g.circle(10, -22, 8.5).fill({ color: 0x000000, alpha: 0 })
+    .stroke({ color: 0xaaaaaa, width: 1.5 });
+  // Bridge
+  g.moveTo(-3, -22).lineTo(1, -22).stroke({ color: 0xaaaaaa, width: 1.5 });
+  // Left arm
+  g.moveTo(-21, -22).lineTo(-30, -19).stroke({ color: 0xaaaaaa, width: 1.5 });
+  // Right arm
+  g.moveTo(19, -22).lineTo(28, -19).stroke({ color: 0xaaaaaa, width: 1.5 });
+
+  // ── Wrinkles (age lines) ─────────────────────────────────────────────────
+  g.moveTo(-18, -10).lineTo(-10, -12).stroke({ color: 0x7a5a38, width: 1, alpha: 0.5 });
+  g.moveTo(10, -12).lineTo(18, -10).stroke({ color: 0x7a5a38, width: 1, alpha: 0.5 });
+
+  // ── Wise smile ───────────────────────────────────────────────────────────
+  g.arc(0, -6, 10, 0.25, Math.PI - 0.25).stroke({ color: 0x5a3a10, width: 2 });
+
+  // ── Walking cane ─────────────────────────────────────────────────────────
+  // Shaft
+  g.rect(28, -4, 4, 42).fill(0x6b3a10);
+  // Handle (curved top — J shape)
+  g.arc(24, -4, 8, Math.PI * 1.5, Math.PI * 0.5).stroke({ color: 0x6b3a10, width: 4 });
+  // Cane tip metal
+  g.circle(30, 38, 4).fill(0x888888);
+
+  // ── Feet ─────────────────────────────────────────────────────────────────
+  g.rect(-10, 38, 4, 10).fill(0x8b4513);
+  g.rect(-16, 46, 14, 3).fill(0x8b4513);
+  g.rect(4, 38, 4, 10).fill(0x8b4513);
+  g.rect(1, 46, 14, 3).fill(0x8b4513);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Bullet factories ────────────────────────────────────────────────────────
 /** Player bullet: bright yellow circle with soft glow. */
 export function createPlayerBullet(): Graphics {

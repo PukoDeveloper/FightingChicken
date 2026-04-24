@@ -86,8 +86,8 @@ async function enter(core: Core): Promise<void> {
   for (let i = 0; i < CHAPTERS.length; i++) {
     const ch = CHAPTERS[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
-    // Chapter 1 (index 1) is playable; all others are coming soon
-    const isPlayable = i === 1;
+    // Chapter 0 (prologue) and Chapter 1 (index 1) are playable; all others are coming soon
+    const isPlayable = i === 0 || i === 1;
 
     const item = new Container();
     item.y = itemY;
@@ -158,7 +158,8 @@ async function enter(core: Core): Promise<void> {
       item.on('pointerout',  () => item.scale.set(1.0));
       item.on('pointerdown', async () => {
         sfxMenuClick();
-        await core.events.emit('scene/load', { key: 'story_ch1' });
+        const sceneKey = i === 0 ? 'story_prologue' : 'story_ch1';
+        await core.events.emit('scene/load', { key: sceneKey });
       });
     }
 
@@ -217,10 +218,11 @@ async function enter(core: Core): Promise<void> {
       if (idx >= 0 && idx < CHAPTERS.length) {
         const remainder = localY - idx * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
         if (remainder < CHAPTER_ITEM_H && localX >= 0 && localX < CHAPTER_ITEM_W) {
-          const isPlayable = idx === 1;
+        const isPlayable = idx === 0 || idx === 1;
           if (isPlayable) {
             sfxMenuClick();
-            void core.events.emit('scene/load', { key: 'story_ch1' });
+            const sceneKey = idx === 0 ? 'story_prologue' : 'story_ch1';
+            void core.events.emit('scene/load', { key: sceneKey });
           }
         }
       }

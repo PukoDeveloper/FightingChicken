@@ -23,6 +23,7 @@ import { CostumeSelectScene } from './scenes/CostumeSelectScene';
 import { AchievementsScene } from './scenes/AchievementsScene';
 import { SkillSelectScene } from './scenes/SkillSelectScene';
 import { StoryScene } from './scenes/StoryScene';
+import { StoryPrologueScene } from './scenes/StoryPrologueScene';
 import { StoryChapter1Scene } from './scenes/StoryChapter1Scene';
 import { StoryChapter1EndScene } from './scenes/StoryChapter1EndScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
@@ -173,6 +174,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: AchievementsScene });
           c.events.emitSync('scene/register', { scene: SkillSelectScene });
           c.events.emitSync('scene/register', { scene: StoryScene });
+          c.events.emitSync('scene/register', { scene: StoryPrologueScene });
           c.events.emitSync('scene/register', { scene: StoryChapter1Scene });
           c.events.emitSync('scene/register', { scene: StoryChapter1EndScene });
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
