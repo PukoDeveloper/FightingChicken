@@ -206,8 +206,10 @@ function itemSpawnMax(stacks: number): number {
  * Returns a dynamic description for a buff card that shows the player's
  * current value and the expected value after selecting this buff.
  * `currentBuffs` is the list of buffs already held (before this selection).
+ * `currentHp` is the player's actual HP entering this buff screen (optional;
+ * pass 0 or omit to fall back to the formula-only description).
  */
-export function buffDesc(id: BuffId, currentBuffs: BuffId[]): string {
+export function buffDesc(id: BuffId, currentBuffs: BuffId[], currentHp: number = 0): string {
   const count = (b: BuffId): number => currentBuffs.filter(x => x === b).length;
 
   switch (id) {
@@ -295,7 +297,9 @@ export function buffDesc(id: BuffId, currentBuffs: BuffId[]): string {
       const bp     = count('blood_price');
       const curMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
       const nxtMax = Math.min(curMax + 1, 10);
-      return `最大生命 +1，並恢復 1 HP\n生命上限：${curMax} → ${nxtMax}`;
+      const hpNow  = currentHp > 0 ? currentHp : curMax;
+      const hpAfter = Math.min(hpNow + 1, nxtMax);
+      return `生命上限：${curMax} → ${nxtMax}（+1）\nHP：${hpNow}/${curMax} → ${hpAfter}/${nxtMax}`;
     }
 
     case 'hp_restore': {
@@ -303,7 +307,12 @@ export function buffDesc(id: BuffId, currentBuffs: BuffId[]): string {
       const bp    = count('blood_price');
       const maxHp = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
       const heal  = Math.ceil(maxHp / 2);
-      return `立即恢復 ${heal} HP\n（最大生命 ${maxHp} 的一半，上取整）`;
+      const hpNow = currentHp > 0 ? currentHp : maxHp;
+      const hpAfter = Math.min(hpNow + heal, maxHp);
+      const gained = hpAfter - hpNow;
+      if (gained <= 0)
+        return `立即恢復 HP（上限 ${heal}）\nHP：${hpNow}/${maxHp}（已滿血，效果浪費）`;
+      return `立即恢復 ${gained} HP\nHP：${hpNow}/${maxHp} → ${hpAfter}/${maxHp}`;
     }
 
     default: {
