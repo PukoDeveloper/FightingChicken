@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
-import { endlessState } from '../game/store';
+import { endlessState, devConfig } from '../game/store';
 import { startBgm } from '../game/audio';
 
 // Clean up function stored between enter/exit
@@ -116,10 +116,48 @@ async function enter(core: Core): Promise<void> {
   btnText.anchor.set(0.5);
   btn.addChild(btnText);
 
+  // Shift all buttons up slightly when story mode adds an extra button
+  const storyEnabled = devConfig.storyModeEnabled;
+  const yStart    = storyEnabled ? H * 0.67 : H * 0.72;
+  const yStory    = H * 0.77;
+  const yEndless  = storyEnabled ? H * 0.86 : H * 0.82;
+  const yAch      = storyEnabled ? H * 0.94 : H * 0.91;
+
   btn.x = W * 0.5;
-  btn.y = H * 0.72;
+  btn.y = yStart;
   btn.alpha = 0;
   uiLayer.addChild(btn);
+
+  // ── Story Mode button (shown only when dev toggle is on) ─────────────────
+  let storyBtn: Container | null = null;
+  if (storyEnabled) {
+    const storyBtnW = 200, storyBtnH = 52;
+    storyBtn = new Container();
+    storyBtn.eventMode = 'static';
+    storyBtn.cursor = 'pointer';
+
+    const storyBtnBg = new Graphics();
+    storyBtnBg.roundRect(-storyBtnW / 2, -storyBtnH / 2, storyBtnW, storyBtnH, 12)
+      .fill({ color: 0x3d1a00, alpha: 0.9 });
+    storyBtnBg.roundRect(-storyBtnW / 2, -storyBtnH / 2, storyBtnW, storyBtnH, 12)
+      .stroke({ color: 0xffaa44, width: 2 });
+    storyBtn.addChild(storyBtnBg);
+
+    const storyBtnStyle = new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 22,
+      fontWeight: 'bold',
+      fill: 0xffcc88,
+    });
+    const storyBtnText = new Text({ text: '📖  故事模式', style: storyBtnStyle });
+    storyBtnText.anchor.set(0.5);
+    storyBtn.addChild(storyBtnText);
+
+    storyBtn.x = W * 0.5;
+    storyBtn.y = yStory;
+    storyBtn.alpha = 0;
+    uiLayer.addChild(storyBtn);
+  }
 
   // ── Endless Mode button ───────────────────────────────────────────────────
   const endlessBtnW = 200, endlessBtnH = 52;
@@ -159,7 +197,7 @@ async function enter(core: Core): Promise<void> {
   endlessBtn.addChild(bestWaveText);
 
   endlessBtn.x = W * 0.5;
-  endlessBtn.y = H * 0.82;
+  endlessBtn.y = yEndless;
   endlessBtn.alpha = 0;
   uiLayer.addChild(endlessBtn);
 
@@ -187,7 +225,7 @@ async function enter(core: Core): Promise<void> {
   achBtn.addChild(achBtnText);
 
   achBtn.x = W * 0.5;
-  achBtn.y = H * 0.91;
+  achBtn.y = yAch;
   achBtn.alpha = 0;
   uiLayer.addChild(achBtn);
 
@@ -221,8 +259,10 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Scene fade-in via TweenManager ────────────────────────────────────────
-  const fadeTargets = [title, subtitle, hint, btn, endlessBtn, achBtn] as unknown as Record<string, unknown>[];
-  const delays = [0, 150, 600, 350, 500, 650];
+  const fadeTargets = [title, subtitle, hint, btn, ...(storyBtn ? [storyBtn] : []), endlessBtn, achBtn] as unknown as Record<string, unknown>[];
+  const delays = storyBtn
+    ? [0, 150, 600, 350, 430, 510, 590]
+    : [0, 150, 600, 350, 500, 650];
   fadeTargets.forEach((t, i) => {
     core.events.emitSync('tween/to', {
       target: t,
@@ -290,12 +330,23 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'achievements' });
   });
 
+  if (storyBtn) {
+    storyBtn.on('pointerdown', async () => {
+      if (_transitioning) return;
+      _transitioning = true;
+      await core.events.emit('scene/load', { key: 'story' });
+    });
+    storyBtn.on('pointerover', () => storyBtn!.scale.set(1.04));
+    storyBtn.on('pointerout',  () => storyBtn!.scale.set(1.0));
+  }
+
   _cleanup = () => {
     core.events.removeNamespace('title');
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     core.events.emitSync('tween/kill', { target: endlessBtn.scale as unknown as Record<string, unknown> });
     worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
     uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, achBtn, devBtn);
+    if (storyBtn) uiLayer.removeChild(storyBtn);
     stars.destroy({ children: true });
     chickenPreview.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -304,6 +355,7 @@ async function enter(core: Core): Promise<void> {
     subtitle.destroy();
     hint.destroy();
     btn.destroy({ children: true });
+    storyBtn?.destroy({ children: true });
     endlessBtn.destroy({ children: true });
     achBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
