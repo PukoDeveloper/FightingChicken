@@ -13,6 +13,8 @@ export const gameResult = {
   currentLevel: 1,
   /** The level that was just played. Set by GameScene before it mutates currentLevel. */
   playedLevel: 1,
+  /** True when the current run was started from story mode (used by GameOverScene). */
+  storyMode: false,
 };
 
 /** Developer-only runtime config. Values here are editable via the dev menu. */

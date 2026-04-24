@@ -2,8 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createPlayerChicken, createCourageDisplay } from '../game/sprites';
-import { gameResult, costumeState } from '../game/store';
-import { endlessState } from '../game/store';
+import { gameResult, costumeState, endlessState } from '../game/store';
 import { createLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 
@@ -143,6 +142,8 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(msgLabel);
 
   // ── Replay button ─────────────────────────────────────────────────────────
+  const isStoryWin = gameResult.storyMode && won && !isEndlessGameOver;
+
   const btnW = 220, btnH = 58;
   const btn = new Container();
   btn.eventMode = 'static';
@@ -167,7 +168,7 @@ async function enter(core: Core): Promise<void> {
   btn.addChild(btnText);
 
   btn.x = W * 0.5;
-  btn.y = H * 0.84;
+  btn.y = isStoryWin ? H * 0.87 : H * 0.84;
   btn.alpha = 0;
   uiLayer.addChild(btn);
 
@@ -184,6 +185,46 @@ async function enter(core: Core): Promise<void> {
     }
     await core.events.emit('scene/load', { key: 'game' });
   });
+
+  // ── Story continuation button (only on story-mode win) ────────────────────
+  let storyBtn: Container | null = null;
+  if (isStoryWin) {
+    const sBtnW = 240, sBtnH = 58;
+    storyBtn = new Container();
+    storyBtn.eventMode = 'static';
+    storyBtn.cursor = 'pointer';
+
+    const sBtnBg = new Graphics();
+    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 12)
+      .fill({ color: 0x1a4466, alpha: 0.9 });
+    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 12)
+      .stroke({ color: 0x44aaff, width: 2 });
+    storyBtn.addChild(sBtnBg);
+
+    const sBtnText = new Text({
+      text: '繼續劇情 ▶',
+      style: new TextStyle({
+        fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+        fontSize: 24,
+        fontWeight: 'bold',
+        fill: 0xaaddff,
+      }),
+    });
+    sBtnText.anchor.set(0.5);
+    storyBtn.addChild(sBtnText);
+
+    storyBtn.x = W * 0.5;
+    storyBtn.y = H * 0.77;
+    storyBtn.alpha = 0;
+    uiLayer.addChild(storyBtn);
+
+    storyBtn.on('pointerdown', async () => {
+      sfxMenuClick();
+      await core.events.emit('scene/load', { key: 'story_ch1_end' });
+    });
+    storyBtn.on('pointerover', () => storyBtn!.scale.set(1.04));
+    storyBtn.on('pointerout',  () => storyBtn!.scale.set(1.0));
+  }
 
   // ── Title button ──────────────────────────────────────────────────────────
   const titleBtnW = 160, titleBtnH = 44;
@@ -208,7 +249,7 @@ async function enter(core: Core): Promise<void> {
   titleBtn.addChild(titleBtnText);
 
   titleBtn.x = W * 0.5;
-  titleBtn.y = H * 0.92;
+  titleBtn.y = isStoryWin ? H * 0.94 : H * 0.92;
   titleBtn.alpha = 0;
   uiLayer.addChild(titleBtn);
 
@@ -243,8 +284,14 @@ async function enter(core: Core): Promise<void> {
       delay: 500,
     });
   }
-  const fadeInItems = [msgLabel, scoreLabel, hiScoreLabel, levelLabel, btn, titleBtn] as unknown as Record<string, unknown>[];
-  const fadeDelays = [300, 450, 600, 700, 800, 900];
+  const fadeInItems = [
+    msgLabel, scoreLabel, hiScoreLabel, levelLabel,
+    ...(storyBtn ? [storyBtn] : []),
+    btn, titleBtn,
+  ] as unknown as Record<string, unknown>[];
+  const fadeDelays = storyBtn
+    ? [300, 450, 600, 700, 750, 850, 950]
+    : [300, 450, 600, 700, 800, 900];
   fadeInItems.forEach((t, i) => {
     core.events.emitSync('tween/to', {
       target: t,
@@ -255,9 +302,10 @@ async function enter(core: Core): Promise<void> {
     });
   });
 
-  // Replay button pulse
+  // Primary action button pulse
+  const pulseTarget = storyBtn ?? btn;
   core.events.emitSync('tween/to', {
-    target: btn.scale as unknown as Record<string, unknown>,
+    target: pulseTarget.scale as unknown as Record<string, unknown>,
     props: { x: 1.05, y: 1.05 },
     duration: 850,
     ease: 'easeInOutSine',
@@ -274,7 +322,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ────────────────────────────────────────────────────────────────
   _cleanup = () => {
     core.events.removeNamespace('gameover');
-    core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
+    core.events.emitSync('tween/kill', { target: pulseTarget.scale as unknown as Record<string, unknown> });
     unsubTick();
 
     worldLayer.removeChild(stars, character);
@@ -293,6 +341,10 @@ async function enter(core: Core): Promise<void> {
     levelLabel.destroy();
     btn.destroy({ children: true });
     titleBtn.destroy({ children: true });
+    if (storyBtn) {
+      uiLayer.removeChild(storyBtn);
+      storyBtn.destroy({ children: true });
+    }
   };
 }
 

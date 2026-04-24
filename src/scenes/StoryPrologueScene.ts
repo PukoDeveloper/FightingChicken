@@ -3,20 +3,17 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import {
   createChickenDisplay,
-  createCourageDisplay,
+  createGrandpaTurkeyDisplay,
   createStarfield,
 } from '../game/sprites';
 import { sfxMenuClick } from '../game/audio';
-import { endlessState, gameResult } from '../game/store';
 
 // ─── Dialogue data ─────────────────────────────────────────────────────────────
 interface DialogueLine {
   speaker: string;
   portraitFactory: () => Container;
-  /** Border / name colour used for this speaker's portrait frame. */
   accentColor: number;
   text: string;
-  /** Which side of the panel the portrait appears on. */
   side: 'left' | 'right';
 }
 
@@ -25,43 +22,43 @@ const DIALOGUE: DialogueLine[] = [
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '哇！這片星空好美……我感覺今天會有什麼特別的事情發生。',
+    text: '今天，是我離開家的第一天……這片星空，比我想像的還要廣闊。',
     side: 'left',
   },
   {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '嘿！你是誰？！這裡是我的領地，外人不得擅自闖入！',
+    speaker: '小雞',
+    portraitFactory: createChickenDisplay,
+    accentColor: 0x66aaff,
+    text: '祖父火雞……你究竟在宇宙的哪個角落等著我？',
+    side: 'left',
+  },
+  {
+    speaker: '祖父火雞',
+    portraitFactory: createGrandpaTurkeyDisplay,
+    accentColor: 0xffcc55,
+    text: '孩子……（記憶中的聲音）當你感到迷惘的時候——',
+    side: 'right',
+  },
+  {
+    speaker: '祖父火雞',
+    portraitFactory: createGrandpaTurkeyDisplay,
+    accentColor: 0xffcc55,
+    text: '記住，真正的勇氣不是無懼，而是即使害怕，也要繼續向前。',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '啊？我只是在散步而已……我沒有任何惡意的！',
+    text: '祖父的話……我永遠記得。不管前方有多少阻礙，我一定會找到你！',
     side: 'left',
-  },
-  {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '哼！不管你的理由是什麼，每個踏入此地的人都必須通過我的考驗！',
-    side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '考驗……？那好吧！我從來不會輕易退縮的！',
+    text: '出發！這段旅程，就從這片星空開始！',
     side: 'left',
-  },
-  {
-    speaker: '勇氣',
-    portraitFactory: createCourageDisplay,
-    accentColor: 0xff6644,
-    text: '好！準備好受苦了嗎，小雞？讓考驗開始！',
-    side: 'right',
   },
 ];
 
@@ -69,7 +66,7 @@ const DIALOGUE: DialogueLine[] = [
 const PORTRAIT_SIZE = 90;
 const PANEL_H       = 210;
 const PANEL_PAD     = 14;
-const PANEL_MARGIN  = 12;  // left/right margin of the panel from screen edges
+const PANEL_MARGIN  = 12;
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 let _cleanup: (() => void) | null = null;
@@ -87,7 +84,6 @@ async function enter(core: Core): Promise<void> {
   const stars = createStarfield(W, H);
   worldLayer.addChild(stars);
 
-  // Atmospheric dim overlay
   const dimOverlay = new Graphics();
   dimOverlay.rect(0, 0, W, H).fill({ color: 0x000000, alpha: 0.5 });
   dimOverlay.eventMode = 'none';
@@ -101,11 +97,11 @@ async function enter(core: Core): Promise<void> {
     .fill({ color: 0x0a0a22, alpha: 0.9 });
   titleCardBg
     .roundRect(-160, -36, 320, 72, 14)
-    .stroke({ color: 0xffaa44, width: 2 });
+    .stroke({ color: 0xffcc55, width: 2 });
   titleCard.addChild(titleCardBg);
 
   const titleCardChapter = new Text({
-    text: '第一章',
+    text: '序章',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
@@ -117,13 +113,13 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardChapter);
 
   const titleCardTitle = new Text({
-    text: '遇見勇氣',
+    text: '小雞的覺醒',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 26,
       fontWeight: 'bold',
       fill: 0xffffff,
-      dropShadow: { color: 0xffaa44, distance: 2, alpha: 0.7, blur: 4 },
+      dropShadow: { color: 0xffcc55, distance: 2, alpha: 0.7, blur: 4 },
     }),
   });
   titleCardTitle.anchor.set(0.5);
@@ -164,17 +160,14 @@ async function enter(core: Core): Promise<void> {
   panelBg.alpha = 0;
   uiLayer.addChild(panelBg);
 
-  // Portrait frame (redrawn per line)
   const portraitFrame = new Graphics();
   portraitFrame.alpha = 0;
   uiLayer.addChild(portraitFrame);
 
-  // Portrait sprite holder (children swapped per line)
   const portraitHolder = new Container();
   portraitHolder.alpha = 0;
   uiLayer.addChild(portraitHolder);
 
-  // Speaker name
   const nameText = new Text({
     text: '',
     style: new TextStyle({
@@ -187,7 +180,6 @@ async function enter(core: Core): Promise<void> {
   nameText.alpha = 0;
   uiLayer.addChild(nameText);
 
-  // Dialogue body
   const textAreaWidth = panelW - PORTRAIT_SIZE - PANEL_PAD * 3;
   const bodyText = new Text({
     text: '',
@@ -204,7 +196,6 @@ async function enter(core: Core): Promise<void> {
   bodyText.alpha = 0;
   uiLayer.addChild(bodyText);
 
-  // "Tap to continue" hint (blinks)
   const tapHint = new Text({
     text: '▶ 點擊繼續',
     style: new TextStyle({
@@ -219,7 +210,6 @@ async function enter(core: Core): Promise<void> {
   tapHint.alpha = 0;
   uiLayer.addChild(tapHint);
 
-  // Skip button (top-right)
   const skipBtn = new Container();
   skipBtn.eventMode = 'static';
   skipBtn.cursor = 'pointer';
@@ -250,11 +240,9 @@ async function enter(core: Core): Promise<void> {
   function showLine(idx: number): void {
     const line = DIALOGUE[idx];
 
-    // Clear previous portrait sprite
     const oldChildren = portraitHolder.removeChildren();
     for (const ch of oldChildren) ch.destroy({ children: true });
 
-    // Determine portrait & text positions
     const portraitFrameY = panelY + PANEL_PAD;
     let portraitX: number;
     let textX: number;
@@ -267,14 +255,12 @@ async function enter(core: Core): Promise<void> {
       textX = PANEL_MARGIN + PANEL_PAD;
     }
 
-    // Redraw portrait frame with accent colour
     portraitFrame.clear();
     portraitFrame
       .roundRect(portraitX, portraitFrameY, PORTRAIT_SIZE, PORTRAIT_SIZE, 10)
       .fill({ color: 0x0c0c22, alpha: 0.95 })
       .stroke({ color: line.accentColor, width: 2 });
 
-    // Build and scale portrait sprite
     const sprite = line.portraitFactory();
     const localBounds = sprite.getLocalBounds();
     const maxFit = PORTRAIT_SIZE - 16;
@@ -283,33 +269,29 @@ async function enter(core: Core): Promise<void> {
       maxFit / (localBounds.height || 1),
     );
     sprite.scale.set(scale);
-    // Centre the sprite inside the portrait box
     const scaledCx = (localBounds.x + localBounds.width  * 0.5) * scale;
     const scaledCy = (localBounds.y + localBounds.height * 0.5) * scale;
     sprite.x = portraitX + PORTRAIT_SIZE * 0.5 - scaledCx;
     sprite.y = portraitFrameY + PORTRAIT_SIZE * 0.5 - scaledCy;
     portraitHolder.addChild(sprite);
 
-    // Speaker name — coloured to match portrait accent
     nameText.style.fill = line.accentColor;
     nameText.text  = line.speaker;
     nameText.x = textX;
     nameText.y = panelY + PANEL_PAD;
 
-    // Body text — update width dynamically in case side changed
     bodyText.style.wordWrapWidth = textAreaWidth;
     bodyText.text = line.text;
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 開始挑戰！' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 前往第一章' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
-  let lineIndex    = 0;
-  let advanceLocked = true; // locked until title card fades
+  let lineIndex     = 0;
+  let advanceLocked = true;
 
-  // Unlock after the title card fade-out is mostly done
   const unlockTimer = window.setTimeout(() => {
     advanceLocked = false;
   }, 1800);
@@ -321,11 +303,7 @@ async function enter(core: Core): Promise<void> {
 
     lineIndex++;
     if (lineIndex >= DIALOGUE.length) {
-      // Launch chapter 1
-      endlessState.active = false;
-      gameResult.currentLevel = 1;
-      gameResult.storyMode = true;
-      await core.events.emit('scene/load', { key: 'skillselect' });
+      await core.events.emit('scene/load', { key: 'story_ch1' });
       return;
     }
 
@@ -337,13 +315,9 @@ async function enter(core: Core): Promise<void> {
     if (advanceLocked) return;
     advanceLocked = true;
     sfxMenuClick();
-    endlessState.active = false;
-    gameResult.currentLevel = 1;
-    gameResult.storyMode = true;
-    await core.events.emit('scene/load', { key: 'skillselect' });
+    await core.events.emit('scene/load', { key: 'story_ch1' });
   }
 
-  // Tap area covers the dialogue panel
   const tapArea = new Graphics();
   tapArea
     .rect(0, panelY - 30, W, PANEL_H + 46)
@@ -357,10 +331,9 @@ async function enter(core: Core): Promise<void> {
   skipBtn.on('pointerover', () => skipBtn.scale.set(1.05));
   skipBtn.on('pointerout',  () => skipBtn.scale.set(1.0));
 
-  // Show the first line straight away (visible once panel fades in)
   showLine(0);
 
-  // ── Fade in the panel + UI after a short delay ──────────────────────────────
+  // ── Fade in panel ───────────────────────────────────────────────────────────
   const panelElements: Container[] = [
     panelBg, portraitFrame, portraitHolder, nameText, bodyText, tapHint, skipBtn,
   ];
@@ -375,7 +348,7 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Tick: blink tap hint ────────────────────────────────────────────────────
-  const unsubTick = core.events.on('story_ch1', 'core/tick', () => {
+  const unsubTick = core.events.on('story_prologue', 'core/tick', () => {
     if (!advanceLocked) {
       tapHint.alpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 600));
     }
@@ -384,7 +357,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   _cleanup = () => {
     clearTimeout(unlockTimer);
-    core.events.removeNamespace('story_ch1');
+    core.events.removeNamespace('story_prologue');
     unsubTick();
     worldLayer.removeChild(stars, dimOverlay);
     uiLayer.removeChild(
@@ -410,8 +383,8 @@ async function exit(_core: Core): Promise<void> {
   _cleanup = null;
 }
 
-export const StoryChapter1Scene: SceneDescriptor = {
-  key: 'story_ch1',
+export const StoryPrologueScene: SceneDescriptor = {
+  key: 'story_prologue',
   enter,
   exit,
 };
