@@ -858,9 +858,65 @@ const STORY_CH1_LEVEL: LevelConfig = {
   ],
 };
 
+/** Story Chapter 2 battle – two-wave rematch vs 勇氣; moderate difficulty. */
+const STORY_CH2_LEVEL: LevelConfig = {
+  levelNumber: 2,
+  name: '第一次對決',
+  enemyType: 'courage',
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 160,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 260, spiralWays: 5, spiralSpeed: BULLET_SPEED_SLOW, spiralColor: COL_BULLET_P1,
+          aimInterval: 1500,   aimWays: 2,   aimSpread: 0.22,                 aimSpeed: BULLET_SPEED_SLOW, aimColor: COL_BULLET_P1,
+        }),
+        phase({
+          spiralInterval: 200, spiralWays: 7,  spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1200,   aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          spreadInterval: 1800, spreadWays: 4, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
+        }),
+        phase({
+          spiralInterval: 150, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
+          aimInterval: 800,    aimWays: 3,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P3,
+          spreadInterval: 1200, spreadWays: 5, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_SLOW,   spreadColor: COL_BULLET_P3,
+          ringInterval: 3800,  ringCount: 12,  ringSpeed: BULLET_SPEED_SLOW,     ringColor: COL_BULLET_RING,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 180,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 220, spiralWays: 6, spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1300,   aimWays: 3,   aimSpread: 0.25,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+        }),
+        phase({
+          spiralInterval: 170, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 1000,   aimWays: 3,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          spreadInterval: 1500, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
+        }),
+        phase({
+          spiralInterval: 120, spiralWays: 11, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
+          aimInterval: 700,    aimWays: 3,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 1000, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
+          ringInterval: 3000,  ringCount: 16,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
+        }),
+      ],
+    },
+  ],
+};
+
 /** Story-mode level map keyed by 1-based chapter number. */
 const STORY_LEVELS: Record<number, LevelConfig> = {
   1: STORY_CH1_LEVEL,
+  2: STORY_CH2_LEVEL,
 };
 
 /**

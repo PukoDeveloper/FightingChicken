@@ -7,6 +7,7 @@ import {
   createStarfield,
 } from '../game/sprites';
 import { sfxMenuClick } from '../game/audio';
+import { gameResult } from '../game/store';
 
 // ─── Dialogue data ─────────────────────────────────────────────────────────────
 interface DialogueLine {
@@ -22,36 +23,57 @@ const DIALOGUE: DialogueLine[] = [
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '你……真的打贏了……沒想到一隻小雞居然這麼厲害！',
+    text: '……我……居然還是輸了……你到底是什麼來歷？',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '我說過的，我不會輕易退縮！',
+    text: '我只是個普通的小雞，但有重要的事非做不可。',
     side: 'left',
   },
   {
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '哼……好吧，你通過了考驗。這片星空，歡迎你！',
+    text: '什麼事……讓你不惜一切也要前進？',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '謝謝！其實你的彈幕也很厲害，下次一定更精彩！',
+    text: '我在尋找我的祖父火雞……他失蹤在這片星空的深處。',
     side: 'left',
   },
   {
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '別得意！……下次我絕對不會輸的！',
+    text: '……（若有所思）祖父火雞……那道幽靈般的影子……',
     side: 'right',
+  },
+  {
+    speaker: '小雞',
+    portraitFactory: createChickenDisplay,
+    accentColor: 0x66aaff,
+    text: '什麼！？你知道他的下落？',
+    side: 'left',
+  },
+  {
+    speaker: '勇氣',
+    portraitFactory: createCourageDisplay,
+    accentColor: 0xff6644,
+    text: '我曾見過一道幻影，帶走了一位老者。再往深處走……小心那個幻影。',
+    side: 'right',
+  },
+  {
+    speaker: '小雞',
+    portraitFactory: createChickenDisplay,
+    accentColor: 0x66aaff,
+    text: '謝謝你，勇氣。不管前方有什麼，我一定會找到祖父的！',
+    side: 'left',
   },
 ];
 
@@ -94,7 +116,7 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardBg);
 
   const titleCardChapter = new Text({
-    text: '第一章',
+    text: '第二章',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
@@ -278,7 +300,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 前往第二章' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 繼續旅程' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
@@ -290,7 +312,8 @@ async function enter(core: Core): Promise<void> {
   }, 1800);
 
   async function finish(): Promise<void> {
-    await core.events.emit('scene/load', { key: 'story_ch2' });
+    gameResult.storyMode = false;
+    await core.events.emit('scene/load', { key: 'modeselect' });
   }
 
   async function advance(): Promise<void> {
@@ -345,7 +368,7 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Tick: blink tap hint ────────────────────────────────────────────────────
-  const unsubTick = core.events.on('story_ch1_end', 'core/tick', () => {
+  const unsubTick = core.events.on('story_ch2_end', 'core/tick', () => {
     if (!advanceLocked) {
       tapHint.alpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 600));
     }
@@ -354,7 +377,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   _cleanup = () => {
     clearTimeout(unlockTimer);
-    core.events.removeNamespace('story_ch1_end');
+    core.events.removeNamespace('story_ch2_end');
     unsubTick();
     worldLayer.removeChild(stars, dimOverlay);
     uiLayer.removeChild(
@@ -380,8 +403,8 @@ async function exit(_core: Core): Promise<void> {
   _cleanup = null;
 }
 
-export const StoryChapter1EndScene: SceneDescriptor = {
-  key: 'story_ch1_end',
+export const StoryChapter2EndScene: SceneDescriptor = {
+  key: 'story_ch2_end',
   enter,
   exit,
 };

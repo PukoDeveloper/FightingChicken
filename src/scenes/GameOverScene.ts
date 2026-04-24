@@ -221,7 +221,7 @@ async function enter(core: Core): Promise<void> {
 
     storyBtn.on('pointerdown', async () => {
       sfxMenuClick();
-      await core.events.emit('scene/load', { key: 'story_ch1_end' });
+      await core.events.emit('scene/load', { key: `story_ch${gameResult.playedLevel}_end` });
     });
     storyBtn.on('pointerover', () => storyBtn!.scale.set(1.04));
     storyBtn.on('pointerout',  () => storyBtn!.scale.set(1.0));
