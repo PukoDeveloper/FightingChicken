@@ -105,10 +105,23 @@ async function enter(core: Core): Promise<void> {
   descLabel.y = H * 0.39;
   uiLayer.addChild(descLabel);
 
+  const abilityStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 13,
+    fill: 0xffdd66,
+    align: 'center',
+  });
+  const abilityLabel = new Text({ text: '', style: abilityStyle });
+  abilityLabel.anchor.set(0.5);
+  abilityLabel.x = W * 0.5;
+  abilityLabel.y = H * 0.44;
+  uiLayer.addChild(abilityLabel);
+
   function refreshLabels(id: CostumeId): void {
     const cfg = COSTUMES.find(c => c.id === id)!;
     nameLabel.text = cfg.name;
     descLabel.text = cfg.description;
+    abilityLabel.text = cfg.ability ? `✨ ${cfg.ability}` : '';
   }
   refreshLabels(selectedId);
 
@@ -307,10 +320,11 @@ async function enter(core: Core): Promise<void> {
     currentPreview.destroy({ children: true });
     previewContainer.destroy({ children: true });
 
-    uiLayer.removeChild(titleLabel, nameLabel, descLabel, confirmBtn, backBtn);
+    uiLayer.removeChild(titleLabel, nameLabel, descLabel, abilityLabel, confirmBtn, backBtn);
     titleLabel.destroy();
     nameLabel.destroy();
     descLabel.destroy();
+    abilityLabel.destroy();
     confirmBtn.destroy({ children: true });
     backBtn.destroy({ children: true });
 

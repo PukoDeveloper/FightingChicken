@@ -47,6 +47,9 @@ import {
   COL_BUBBLE,
   COL_BULLET_BOMB,
   COL_BULLET_LASER,
+  ADVENTURE_PROXIMITY_MIN_DIST,
+  ADVENTURE_PROXIMITY_MAX_DIST,
+  ADVENTURE_PROXIMITY_MAX_MULT,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState } from '../game/store';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
@@ -527,6 +530,10 @@ async function enter(core: Core): Promise<void> {
   // Passive: all derived stats × 1.5 (HP max, fire rate, bullet damage, invincible duration, etc.)
   const isBossCostume = costumeState.selected === 'boss';
   const BOSS_STAT_MULT = 1.5;
+
+  // ── Adventure costume passive state ──────────────────────────────────────
+  // Passive: bullet damage scales with proximity to the enemy (1× at max distance, up to 3× when close).
+  const isAdventureCostume = costumeState.selected === 'adventure';
 
   // ── HUD ──────────────────────────────────────────────────────────────────
   // HP hearts
@@ -1997,19 +2004,33 @@ async function enter(core: Core): Promise<void> {
             ? Math.max(Math.round(baseInterval / 2), 60)
             : baseInterval;
         playerFireTimer = fireInterval;
-        // Hero costume: if charged damage is pending, apply to this fire cycle
-        const thisCycleDamage = heroChargedDamage > 0 ? heroChargedDamage : undefined;
+        // Determine per-cycle damage override (costume abilities are mutually exclusive):
+        // - Hero: charged damage accumulated during invincibility (one-shot, then cleared).
+        // - Adventure: proximity-scaled damage based on distance to the enemy.
+        // - Otherwise: undefined → bullets default to `bulletDamage`.
+        let spawnDamage: number | undefined;
         if (heroChargedDamage > 0) {
+          spawnDamage = heroChargedDamage;
           heroChargedDamage = 0;
           updateHUD();
+        } else if (isAdventureCostume) {
+          const adx = playerEntity.position.x - enemyEntity.position.x;
+          const ady = playerEntity.position.y - enemyEntity.position.y;
+          const adDist = Math.sqrt(adx * adx + ady * ady);
+          const adT = 1 - Math.min(1, Math.max(0,
+            (adDist - ADVENTURE_PROXIMITY_MIN_DIST) /
+            (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
+          ));
+          const adMult = 1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT;
+          spawnDamage = Math.max(1, Math.round(bulletDamage * adMult));
         }
-        spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, thisCycleDamage);
-        spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18, thisCycleDamage);
+        spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, spawnDamage);
+        spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18, spawnDamage);
         // Centre bullet(s) from power-up or triple_shot buffs
         const centreBullets = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
         for (let k = 0; k < centreBullets; k++) {
           const offset = (k - (centreBullets - 1) / 2) * 8;
-          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22, thisCycleDamage);
+          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22, spawnDamage);
         }
         sfxShoot();
       }
