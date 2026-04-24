@@ -368,11 +368,9 @@ export function createGrandpaTurkeyDisplay(): Container {
 
   // ── Glasses (round wire-frame) ───────────────────────────────────────────
   // Left lens
-  g.circle(-12, -22, 8.5).fill({ color: 0x000000, alpha: 0 })
-    .stroke({ color: 0xaaaaaa, width: 1.5 });
+  g.circle(-12, -22, 8.5).stroke({ color: 0xaaaaaa, width: 1.5 });
   // Right lens
-  g.circle(10, -22, 8.5).fill({ color: 0x000000, alpha: 0 })
-    .stroke({ color: 0xaaaaaa, width: 1.5 });
+  g.circle(10, -22, 8.5).stroke({ color: 0xaaaaaa, width: 1.5 });
   // Bridge
   g.moveTo(-3, -22).lineTo(1, -22).stroke({ color: 0xaaaaaa, width: 1.5 });
   // Left arm
