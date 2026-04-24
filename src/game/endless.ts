@@ -212,8 +212,11 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const uncapped = waveNum >= ENDLESS_UNCAP_WAVE;
   const capAt = (val: number, max: number) => uncapped ? val : Math.min(val, max);
 
-  // Enemy HP grows with difficulty (capped early on to keep it fun).
-  const hp = capAt(Math.round(150 * d), 1200);
+  // Enemy HP: exponential raw growth soft-capped so it asymptotically
+  // approaches ENDLESS_HP_SOFT_CAP and can never reach or exceed it.
+  const ENDLESS_HP_SOFT_CAP = 95000;
+  const rawHp = Math.round(150 * d);
+  const hp = Math.round(ENDLESS_HP_SOFT_CAP * rawHp / (ENDLESS_HP_SOFT_CAP + rawHp));
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
