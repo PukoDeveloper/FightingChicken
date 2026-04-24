@@ -227,7 +227,7 @@ async function enter(core: Core): Promise<void> {
 
   backBtn.on('pointerdown', async () => {
     sfxMenuClick();
-    await core.events.emit('scene/load', { key: 'title' });
+    await core.events.emit('scene/load', { key: 'modeselect' });
   });
 
   // ── Entry fade-in ─────────────────────────────────────────────────────────

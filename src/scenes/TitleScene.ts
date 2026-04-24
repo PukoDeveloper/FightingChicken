@@ -142,7 +142,7 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffffff,
   });
   const costumeNameText = new Text({
-    text: COSTUMES.find(c => c.id === unlockedCostumes[costumeIndex].id)?.name ?? '',
+    text: unlockedCostumes[costumeIndex].name,
     style: costumeNameStyle,
   });
   costumeNameText.anchor.set(0.5);
@@ -191,7 +191,7 @@ async function enter(core: Core): Promise<void> {
     currentCostumeDisplay.scale.set(1.6);
     chickenContainer.addChild(currentCostumeDisplay);
     // Update name label
-    costumeNameText.text = COSTUMES.find(c => c.id === unlockedCostumes[costumeIndex].id)?.name ?? '';
+    costumeNameText.text = unlockedCostumes[costumeIndex].name;
     // Persist selection
     costumeState.selected = unlockedCostumes[costumeIndex].id;
   }
