@@ -1,5 +1,13 @@
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
+import { Rectangle } from 'pixi.js';
+import type { Container } from 'pixi.js';
+import {
+  createCourageDisplay,
+  createPhantomDisplay,
+  createChaosDisplay,
+  createPetDisplay,
+} from '../game/sprites';
 
 // ─── Encyclopedia (圖鑑) overlay ─────────────────────────────────────────────
 // Rendered as an HTML panel (same technique as DevMenuScene) so that we can
@@ -7,12 +15,36 @@ import type { Core } from '@inkshot/engine';
 
 let _overlay: HTMLElement | null = null;
 
+// ─── Sprite-to-image helper ───────────────────────────────────────────────────
+
+/**
+ * Render a PIXI Container (created by `factory`) into an HTMLCanvasElement and
+ * return its PNG data URL.  A square frame centred on the container's local
+ * origin is extracted so that the sprite appears at full size.
+ */
+function spriteToDataUrl(
+  renderer: ReturnType<typeof import('pixi.js').autoDetectRenderer> extends Promise<infer R> ? R : never,
+  factory: () => Container,
+  frameSize: number,
+): string {
+  const container = factory();
+  const half = frameSize / 2;
+  const icanvas = renderer.extract.canvas({
+    target: container,
+    frame: new Rectangle(-half, -half, frameSize, frameSize),
+    clearColor: [0, 0, 0, 0],
+    antialias: true,
+  });
+  const dataUrl = (icanvas as HTMLCanvasElement).toDataURL('image/png');
+  container.destroy({ children: true });
+  return dataUrl;
+}
+
 // ─── Content data ─────────────────────────────────────────────────────────────
 
 interface BossEntry {
   name: string;
   subtitle: string;
-  icon: string;
   color: string;
   borderColor: string;
   levels: string;
@@ -31,7 +63,6 @@ interface AttackEntry {
 
 interface EntityEntry {
   name: string;
-  icon: string;
   color: string;
   borderColor: string;
   appearsIn: string;
@@ -43,7 +74,6 @@ const BOSSES: BossEntry[] = [
   {
     name: '勇氣',
     subtitle: 'Courage',
-    icon: '👿',
     color: '#2a0808',
     borderColor: '#cc2200',
     levels: '第 1 — 3 關',
@@ -56,7 +86,6 @@ const BOSSES: BossEntry[] = [
   {
     name: '幽靈',
     subtitle: 'Phantom',
-    icon: '👻',
     color: '#06061e',
     borderColor: '#3355dd',
     levels: '第 4 關',
@@ -69,7 +98,6 @@ const BOSSES: BossEntry[] = [
   {
     name: '混沌',
     subtitle: 'Chaos',
-    icon: '🌀',
     color: '#120012',
     borderColor: '#880088',
     levels: '第 5 關',
@@ -151,7 +179,6 @@ const ATTACKS: AttackEntry[] = [
 const ENTITIES: EntityEntry[] = [
   {
     name: '寵物護衛',
-    icon: '🟣',
     color: '#1a0028',
     borderColor: '#880088',
     appearsIn: '第 5 關（混沌）— 第三階段',
@@ -165,7 +192,7 @@ const ENTITIES: EntityEntry[] = [
 
 // ─── HTML generation ──────────────────────────────────────────────────────────
 
-function renderBossCard(b: BossEntry): string {
+function renderBossCard(b: BossEntry, spriteDataUrl: string): string {
   return `
     <div style="
       background:${b.color};
@@ -175,7 +202,7 @@ function renderBossCard(b: BossEntry): string {
       margin-bottom:14px;
     ">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-        <span style="font-size:36px;line-height:1;">${b.icon}</span>
+        <img src="${spriteDataUrl}" width="64" height="64" style="image-rendering:pixelated;flex-shrink:0;" alt="${b.name}">
         <div>
           <div style="font-size:20px;font-weight:bold;color:#ffffff;">${b.name}</div>
           <div style="font-size:12px;color:#aaaaaa;">${b.subtitle}</div>
@@ -219,7 +246,7 @@ function renderAttackCard(a: AttackEntry): string {
   `;
 }
 
-function renderEntityCard(e: EntityEntry): string {
+function renderEntityCard(e: EntityEntry, spriteDataUrl: string): string {
   return `
     <div style="
       background:${e.color};
@@ -229,7 +256,7 @@ function renderEntityCard(e: EntityEntry): string {
       margin-bottom:14px;
     ">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-        <span style="font-size:36px;line-height:1;">${e.icon}</span>
+        <img src="${spriteDataUrl}" width="64" height="64" style="image-rendering:pixelated;flex-shrink:0;" alt="${e.name}">
         <div>
           <div style="font-size:20px;font-weight:bold;color:#ffffff;">${e.name}</div>
           <div style="font-size:12px;color:#ccaacc;">${e.appearsIn}</div>
@@ -252,6 +279,19 @@ function renderEntityCard(e: EntityEntry): string {
 // ─── Scene lifecycle ──────────────────────────────────────────────────────────
 
 async function enter(core: Core): Promise<void> {
+  const renderer = core.app.renderer;
+
+  // Render each boss/entity sprite to a PNG data URL so the encyclopedia
+  // shows the actual in-game appearance instead of emoji placeholders.
+  const bossImgs = [
+    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createCourageDisplay, 130),
+    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createPhantomDisplay, 130),
+    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createChaosDisplay, 140),
+  ];
+  const entityImgs = [
+    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createPetDisplay, 72),
+  ];
+
   const overlay = document.createElement('div');
   _overlay = overlay;
 
@@ -346,9 +386,9 @@ async function enter(core: Core): Promise<void> {
     entity: document.createElement('div'),
   };
 
-  panes.boss.innerHTML   = BOSSES.map(renderBossCard).join('');
+  panes.boss.innerHTML   = BOSSES.map((b, i) => renderBossCard(b, bossImgs[i])).join('');
   panes.attack.innerHTML = ATTACKS.map(renderAttackCard).join('');
-  panes.entity.innerHTML = ENTITIES.map(renderEntityCard).join('');
+  panes.entity.innerHTML = ENTITIES.map((e, i) => renderEntityCard(e, entityImgs[i])).join('');
 
   Object.values(panes).forEach(p => {
     p.style.cssText = 'padding-top:4px;padding-bottom:8px;display:none;';
