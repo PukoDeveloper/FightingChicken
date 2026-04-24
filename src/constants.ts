@@ -98,3 +98,11 @@ export const COL_BUBBLE      = 0x44ddff; // trap bubble – cyan
 export const COL_BULLET_BOMB  = 0xff7700; // exploding bomb projectile – orange
 export const COL_BULLET_LASER = 0x00ffff; // top-screen laser column – bright cyan
 export const COL_BULLET_CURVE = 0xff44cc; // homing/curving bullet – pink
+
+// ─── Adventure Chicken ────────────────────────────────────────────────────────
+/** Distance (px) at or below which the adventure costume's max damage multiplier applies */
+export const ADVENTURE_PROXIMITY_MIN_DIST = 60;
+/** Distance (px) at or beyond which the adventure costume grants no extra damage (1×) */
+export const ADVENTURE_PROXIMITY_MAX_DIST = 350;
+/** Maximum damage multiplier when the player is at ADVENTURE_PROXIMITY_MIN_DIST or closer */
+export const ADVENTURE_PROXIMITY_MAX_MULT = 3;
