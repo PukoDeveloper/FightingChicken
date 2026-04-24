@@ -16,6 +16,8 @@ import {
   createFlashOverlay,
   createHealthItem,
   createPowerItem,
+  createGiftBoxItem,
+  createFireball,
 } from '../game/sprites';
 import {
   PLAYER_HP_MAX,
@@ -49,7 +51,8 @@ import {
 import { gameResult, devConfig, endlessState, costumeState, skillState } from '../game/store';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
-import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
+import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
+import type { BuffId } from '../game/endless';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
 import {
@@ -100,6 +103,10 @@ interface BulletData {
   y: number;
   vx: number; // px/s
   vy: number; // px/s
+  /** True when this enemy bullet has been deflected toward the enemy by the elegant costume ability. */
+  deflected?: boolean;
+  /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
+  damage?: number;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -109,7 +116,7 @@ interface ItemData {
   y: number;
   vx: number; // px/s (horizontal, currently 0)
   vy: number; // px/s (vertical fall speed)
-  type: 'health' | 'power';
+  type: 'health' | 'power' | 'gift';
   lifetime: number; // ms remaining
 }
 
@@ -292,47 +299,68 @@ async function enter(core: Core): Promise<void> {
   let powerUpTimer = 0;      // ms remaining on current damage power-up
 
   // ── Endless-mode buff state ───────────────────────────────────────────────
-  // Derive effective player stats from accumulated buffs.
-  const buffHpUpCount      = isEndless ? endlessState.buffs.filter(b => b === 'hp_up').length : 0;
-  const buffFireRateCount  = isEndless ? endlessState.buffs.filter(b => b === 'fire_rate_up').length : 0;
-  const buffTripleCount    = isEndless ? endlessState.buffs.filter(b => b === 'triple_shot').length : 0;
-  const buffBloodPriceCount = isEndless ? endlessState.buffs.filter(b => b === 'blood_price').length : 0;
-  const buffBulletPowerCount = isEndless ? endlessState.buffs.filter(b => b === 'bullet_power').length : 0;
-  const buffEvasionCount   = isEndless ? endlessState.buffs.filter(b => b === 'evasion').length : 0;
-  const buffRegenCount     = isEndless ? endlessState.buffs.filter(b => b === 'regen').length : 0;
-  const buffLongInvCount   = isEndless ? endlessState.buffs.filter(b => b === 'long_invincible').length : 0;
-  const buffItemDropCount  = isEndless ? endlessState.buffs.filter(b => b === 'item_drop_up').length : 0;
-  const hasBerserker       = isEndless && endlessState.buffs.includes('berserker');
-  const hasPeriodicShield  = isEndless && endlessState.buffs.includes('periodic_shield');
+  // Gift buffs: granted mid-game by the moose costume's gift-box passive.
+  const giftBuffs: BuffId[] = [];
+
+  /** Count total stacks of a buff across both endless-mode buffs and mid-game gift buffs. */
+  const countBuff = (id: BuffId): number =>
+    (isEndless ? endlessState.buffs.filter(b => b === id).length : 0) +
+    giftBuffs.filter(b => b === id).length;
+
+  // Derive effective player stats from accumulated buffs (mutable so gift buffs can update them).
+  let buffHpUpCount       = countBuff('hp_up');
+  let buffFireRateCount   = countBuff('fire_rate_up');
+  let buffTripleCount     = countBuff('triple_shot');
+  let buffBloodPriceCount = countBuff('blood_price');
+  let buffBulletPowerCount= countBuff('bullet_power');
+  let buffEvasionCount    = countBuff('evasion');
+  let buffRegenCount      = countBuff('regen');
+  let buffLongInvCount    = countBuff('long_invincible');
+  let buffItemDropCount   = countBuff('item_drop_up');
+  let hasBerserker        = (isEndless && endlessState.buffs.includes('berserker')) || giftBuffs.includes('berserker');
+  let hasPeriodicShield   = (isEndless && endlessState.buffs.includes('periodic_shield')) || giftBuffs.includes('periodic_shield');
 
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
   // iron_will skill: +1 max HP
   const skillIronWill = skillState.selected === 'iron_will';
-  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
+  let effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
   // Effective base fire interval (reduced by 10% per fire_rate_up stack, floored at 60 ms)
-  const effectiveFireInterval = Math.max(
+  let effectiveFireInterval = Math.max(
     Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)),
     60,
   );
   // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
-  const bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
+  let bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
   // Evasion chance: 10% per stack, capped at 30%
-  const evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
+  let evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
   // Effective invincibility duration: base + 600 ms per long_invincible stack
-  const effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
+  let effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
   // Level itemDropMult further scales the intervals (< 1 = more frequent drops for hard levels)
   const levelItemDropMult = levelConfig?.itemDropMult ?? 1.0;
-  const itemSpawnMinMs = buffItemDropCount > 0
+  let itemSpawnMinMs = buffItemDropCount > 0
     ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
     : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
-  const itemSpawnMaxMs = buffItemDropCount > 0
+  let itemSpawnMaxMs = buffItemDropCount > 0
     ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
     : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
-  // Regen: 12 s base interval per first stack, each additional stack subtracts 3 s more (min 6 s)
-  const regenIntervalMs = buffRegenCount > 0
+  // Regen: 15 s base interval on first stack, each additional stack subtracts 3 s more (min 6 s)
+  let regenIntervalMs = buffRegenCount > 0
     ? Math.max(15000 - buffRegenCount * 3000, 6000)
     : 0;
+
+  // ── Boss costume: apply +50% to all derived stats ─────────────────────────
+  // NOTE: isBossCostume is declared later after wizard state; we read costumeState.selected directly here.
+  if (costumeState.selected === 'boss') {
+    effectiveHpMax        = Math.min(Math.round(effectiveHpMax * 1.5), 10);
+    effectiveFireInterval = Math.max(Math.round(effectiveFireInterval / 1.5), 60);
+    bulletDamage          = Math.round(bulletDamage * 1.5);
+    effectiveInvincibleMs = Math.round(effectiveInvincibleMs * 1.5);
+    evasionChance         = Math.min(evasionChance * 1.5, 0.30);
+    itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / 1.5), 2000);
+    itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / 1.5), 4000);
+    regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / 1.5), 6000) : 0;
+  }
 
   // Periodic shield: counts down ms until next activation.
   // Carry over the remaining time from the previous wave (or start fresh at 12 s).
@@ -447,6 +475,58 @@ async function enter(core: Core): Promise<void> {
   const SKILL_BTN_X = W - 38;
   const SKILL_BTN_Y = H - 72;
   const SKILL_BTN_R = 26; // tap hitbox radius
+
+  // ── Elegant costume ability state ────────────────────────────────────────
+  // Active ability: 彈幕反彈 – deflects all enemy bullets back at the enemy for 4 s.
+  const isElegantCostume = costumeState.selected === 'elegant';
+  const DEFLECT_DURATION_MS = 4000;
+  const DEFLECT_COOLDOWN_MS = 18000;
+  let deflectActiveMs   = 0; // ms remaining while deflect shield is on
+  let deflectCooldownMs = 0; // ms until ability is ready again (0 = ready)
+  // Position for the costume ability button (above skill button on the right)
+  const COSTUME_BTN_X = W - 38;
+  const COSTUME_BTN_Y = H - 140;
+  const COSTUME_BTN_R = 26;
+
+  // ── Moose costume passive state ──────────────────────────────────────────
+  // Passive: every 18 s a gift box spawns at a random position; collecting it awards a random buff.
+  const isMooseCostume = costumeState.selected === 'moose';
+  const MOOSE_GIFT_INTERVAL_MS = 18000;
+  let mooseGiftTimer = isMooseCostume ? MOOSE_GIFT_INTERVAL_MS : 0;
+
+  // ── Fox costume passive state ─────────────────────────────────────────────
+  // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
+  const isFoxCostume = costumeState.selected === 'fox';
+  const FOX_ATTRACT_RADIUS = 150;
+  const FOX_ATTRACT_ACCEL  = 280; // extra px/s added toward player each second
+
+  // ── Wizard costume active state ───────────────────────────────────────────
+  // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
+  const isWizardCostume = costumeState.selected === 'wizard';
+  const WIZARD_CHANNEL_MS       = 2000;  // charge duration in ms
+  const WIZARD_COOLDOWN_MS      = 15000; // cooldown after firing in ms
+  const WIZARD_FIREBALL_DAMAGE  = 15;    // HP damage dealt to enemy on hit
+  const WIZARD_FIREBALL_SPEED   = 360;   // px/s
+  let wizardCooldownMs    = 0;
+  let wizardChannelingMs  = 0; // counts DOWN from WIZARD_CHANNEL_MS while charging (0 = not charging)
+
+  // ── Hero costume active state ─────────────────────────────────────────────
+  // Active ability: 英雄之力 – invincible for HERO_INVINCIBLE_MS; absorbs all incoming bullets;
+  // on expiry: heroChargedDamage = absorbed + starting HP (at activation); HP drops to 1.
+  // Next fire cycle deals heroChargedDamage instead of normal bulletDamage.
+  const isHeroCostume = costumeState.selected === 'hero';
+  const HERO_INVINCIBLE_MS = 5000;  // duration of the hero invincibility in ms
+  const HERO_COOLDOWN_MS   = 20000; // cooldown after ability ends in ms
+  let heroCooldownMs    = 0;
+  let heroActiveMs      = 0;  // counts DOWN from HERO_INVINCIBLE_MS while active (0 = not active)
+  let heroAbsorbedDmg   = 0;  // damage absorbed during active period
+  let heroStartHp       = 0;  // player HP at the moment ability was triggered
+  let heroChargedDamage = 0;  // > 0 = next fire cycle deals this damage
+
+  // ── Boss costume passive state ────────────────────────────────────────────
+  // Passive: all derived stats × 1.5 (HP max, fire rate, bullet damage, invincible duration, etc.)
+  const isBossCostume = costumeState.selected === 'boss';
+  const BOSS_STAT_MULT = 1.5;
 
   // ── HUD ──────────────────────────────────────────────────────────────────
   // HP hearts
@@ -586,18 +666,57 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0x884400, distance: 2, alpha: 0.8, blur: 2 },
   });
+  const deflectTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xff88cc,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x660044, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const wizardTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xffcc00,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x885500, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const heroTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xffdd44,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x886600, distance: 2, alpha: 0.8, blur: 2 },
+  });
+  const heroChargeStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xff8844,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x882200, distance: 2, alpha: 0.8, blur: 2 },
+  });
   const powerUpText       = new Text({ text: '', style: powerUpStyle });
   const trappedTimerText  = new Text({ text: '', style: trappedTimerStyle });
   const shieldTimerText   = new Text({ text: '', style: shieldTimerStyle });
   const regenTimerText    = new Text({ text: '', style: regenTimerStyle });
   const skillTimerText    = new Text({ text: '', style: skillTimerStyle });
-  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText].forEach(t => {
+  const deflectTimerText  = new Text({ text: '', style: deflectTimerStyle });
+  const wizardTimerText   = new Text({ text: '', style: wizardTimerStyle });
+  const heroTimerText     = new Text({ text: '', style: heroTimerStyle });
+  const heroChargeText    = new Text({ text: '', style: heroChargeStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText].forEach(t => {
     t.anchor.set(0, 1);
     t.x = 10;
     t.y = H - 38;
     t.visible = false;
     uiLayer.addChild(t);
   });
+
+  // ── Costume ability ring (shared visual: elegant=pink deflect ring, hero=golden invincible ring) ──
+  // Pulsing ring drawn around the player while an active costume ability is running.
+  const costumeRing = new Graphics();
+  costumeRing.visible = false;
+  let deflectAnimMs = 0;
+  worldLayer.addChild(costumeRing);
 
   // ── Active skill button (bottom-right) ────────────────────────────────────
   // Only rendered when an active skill is selected.
@@ -659,6 +778,124 @@ async function enter(core: Core): Promise<void> {
 
   if (isActiveSkill) redrawSkillBtn();
 
+  // ── Costume ability button (elegant & wizard costumes) ────────────────────
+  const hasActiveCostumeAbility = isElegantCostume || isWizardCostume || isHeroCostume;
+  const costumeBtnContainer = new Container();
+  costumeBtnContainer.visible = hasActiveCostumeAbility;
+  const costumeBtnBg = new Graphics();
+  const costumeBtnCooldownArc = new Graphics();
+  const costumeBtnLabelStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 10,
+    fill: 0xffffff,
+    align: 'center',
+    fontWeight: 'bold',
+    wordWrap: true,
+    wordWrapWidth: COSTUME_BTN_R * 2 - 4,
+  });
+  const costumeBtnLabel = new Text({ text: '', style: costumeBtnLabelStyle });
+  costumeBtnLabel.anchor.set(0.5);
+  costumeBtnContainer.addChild(costumeBtnBg, costumeBtnCooldownArc, costumeBtnLabel);
+  costumeBtnContainer.x = COSTUME_BTN_X;
+  costumeBtnContainer.y = COSTUME_BTN_Y;
+  uiLayer.addChild(costumeBtnContainer);
+
+  function redrawCostumeBtn(): void {
+    if (isElegantCostume) {
+      const ready = deflectCooldownMs <= 0;
+      const borderColor = ready ? 0xff88cc : 0x555566;
+      const fillColor   = ready ? 0x1a0011 : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: ready ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (!ready) {
+        const frac = deflectCooldownMs / DEFLECT_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      costumeBtnLabel.text  = ready ? '彈反' : `${Math.ceil(deflectCooldownMs / 1000)}s`;
+      costumeBtnLabel.style.fill = ready ? 0xffffff : 0x888888;
+    } else if (isWizardCostume) {
+      const channeling = wizardChannelingMs > 0;
+      const onCooldown = wizardCooldownMs > 0;
+      const ready      = !channeling && !onCooldown;
+      const borderColor = channeling ? 0xffcc00 : ready ? 0xff8800 : 0x555566;
+      const fillColor   = channeling ? 0x1a1000 : ready ? 0x1a0800 : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: (ready || channeling) ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (channeling) {
+        // Show channel progress (fills as charge completes)
+        const frac = 1 - wizardChannelingMs / WIZARD_CHANNEL_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0xffcc00, alpha: 0.35 });
+      } else if (onCooldown) {
+        const frac = wizardCooldownMs / WIZARD_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      if (channeling) {
+        costumeBtnLabel.text = '蓄力中';
+        costumeBtnLabel.style.fill = 0xffcc00;
+      } else if (onCooldown) {
+        costumeBtnLabel.text = `${Math.ceil(wizardCooldownMs / 1000)}s`;
+        costumeBtnLabel.style.fill = 0x888888;
+      } else {
+        costumeBtnLabel.text = '火球';
+        costumeBtnLabel.style.fill = 0xffffff;
+      }
+    } else if (isHeroCostume) {
+      const active     = heroActiveMs > 0;
+      const onCooldown = heroCooldownMs > 0;
+      const ready      = !active && !onCooldown;
+      const borderColor = active ? 0xffee00 : ready ? 0xffdd44 : 0x555566;
+      const fillColor   = active ? 0x1a1400 : ready ? 0x1a1200 : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: (ready || active) ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (active) {
+        // Show remaining invincibility (fills as time runs out)
+        const frac = 1 - heroActiveMs / HERO_INVINCIBLE_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0xffee00, alpha: 0.30 });
+      } else if (onCooldown) {
+        const frac = heroCooldownMs / HERO_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      if (active) {
+        costumeBtnLabel.text = '無敵中';
+        costumeBtnLabel.style.fill = 0xffee00;
+      } else if (onCooldown) {
+        costumeBtnLabel.text = `${Math.ceil(heroCooldownMs / 1000)}s`;
+        costumeBtnLabel.style.fill = 0x888888;
+      } else {
+        costumeBtnLabel.text = '英雄';
+        costumeBtnLabel.style.fill = 0xffffff;
+      }
+    }
+  }
+
+  if (hasActiveCostumeAbility) redrawCostumeBtn();
+
   // eagle_eye skill: enemy bullet speed multiplier
   const eagleEyeSpeedMult = skillState.selected === 'eagle_eye' ? 0.80 : 1.0;
 
@@ -676,17 +913,25 @@ async function enter(core: Core): Promise<void> {
     display.y = y;
     display.visible = true;
     enemyBulletsContainer.addChild(display);
-    enemyBullets.push({ display, x, y, vx: vx * eagleEyeSpeedMult, vy: vy * eagleEyeSpeedMult });
+    // If the deflect shield is active, immediately reverse the bullet toward the enemy.
+    const deflected = deflectActiveMs > 0;
+    enemyBullets.push({
+      display,
+      x, y,
+      vx: vx * eagleEyeSpeedMult * (deflected ? -1 : 1),
+      vy: vy * eagleEyeSpeedMult * (deflected ? -1 : 1),
+      deflected,
+    });
   }
 
   // ── Helper: spawn player bullet ───────────────────────────────────────────
-  function spawnPlayerBullet(x: number, y: number): void {
+  function spawnPlayerBullet(x: number, y: number, damageOverride?: number): void {
     const display = playerBulletPool.acquire();
     display.x = x;
     display.y = y;
     display.visible = true;
     playerBulletsContainer.addChild(display);
-    playerBullets.push({ display, x, y, vx: 0, vy: -PLAYER_BULLET_SPEED });
+    playerBullets.push({ display, x, y, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: damageOverride });
   }
 
   // ── Helper: remove bullet (returns display to its pool) ──────────────────
@@ -770,10 +1015,18 @@ async function enter(core: Core): Promise<void> {
     if (regenIntervalMs > 0 && regenTimer > 0) timerEntries.push([regenTimerText, `💚 再生 ${Math.ceil(regenTimer / 1000)}s`]);
     // burst_fire skill: show active duration
     if (activeSkillId === 'burst_fire' && skillActiveMs > 0) timerEntries.push([skillTimerText, `🔥 爆發射擊 ${Math.ceil(skillActiveMs / 1000)}s`]);
+    // elegant costume: show deflect shield duration
+    if (deflectActiveMs > 0) timerEntries.push([deflectTimerText, `🌸 彈幕反彈 ${Math.ceil(deflectActiveMs / 1000)}s`]);
+    // wizard costume: show channel countdown
+    if (wizardChannelingMs > 0) timerEntries.push([wizardTimerText, `✨ 蓄力中 ${Math.ceil(wizardChannelingMs / 1000)}s`]);
+    // hero costume: show active invincibility countdown
+    if (heroActiveMs > 0) timerEntries.push([heroTimerText, `🛡 英雄無敵 ${Math.ceil(heroActiveMs / 1000)}s`]);
+    // hero costume: show charged damage ready to fire
+    if (heroChargedDamage > 0) timerEntries.push([heroChargeText, `⚔ 充能攻擊 ${heroChargedDamage}`]);
 
     const timerBaseY = H - 38;
     const timerLineH = 18;
-    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText].forEach(t => {
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText].forEach(t => {
       t.text = '';
       t.visible = false;
     });
@@ -784,7 +1037,81 @@ async function enter(core: Core): Promise<void> {
     });
   }
 
-  // ── Helper: check phase ───────────────────────────────────────────────────
+  // ── Helper: recompute all buff-derived stats (called after a gift buff is granted) ──
+  function recomputeBuffStats(): void {
+    buffHpUpCount        = countBuff('hp_up');
+    buffFireRateCount    = countBuff('fire_rate_up');
+    buffTripleCount      = countBuff('triple_shot');
+    buffBloodPriceCount  = countBuff('blood_price');
+    buffBulletPowerCount = countBuff('bullet_power');
+    buffEvasionCount     = countBuff('evasion');
+    buffRegenCount       = countBuff('regen');
+    buffLongInvCount     = countBuff('long_invincible');
+    buffItemDropCount    = countBuff('item_drop_up');
+    hasBerserker      = (isEndless && endlessState.buffs.includes('berserker'))       || giftBuffs.includes('berserker');
+    hasPeriodicShield = (isEndless && endlessState.buffs.includes('periodic_shield')) || giftBuffs.includes('periodic_shield');
+
+    effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
+    effectiveFireInterval = Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)), 60);
+    bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
+    evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
+    effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
+    itemSpawnMinMs = buffItemDropCount > 0
+      ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
+      : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
+    itemSpawnMaxMs = buffItemDropCount > 0
+      ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
+      : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
+    regenIntervalMs = buffRegenCount > 0 ? Math.max(15000 - buffRegenCount * 3000, 6000) : 0;
+
+    // Boss costume: re-apply +50% multiplier after buff recomputation
+    if (isBossCostume) {
+      effectiveHpMax        = Math.min(Math.round(effectiveHpMax * BOSS_STAT_MULT), 10);
+      effectiveFireInterval = Math.max(Math.round(effectiveFireInterval / BOSS_STAT_MULT), 60);
+      bulletDamage          = Math.round(bulletDamage * BOSS_STAT_MULT);
+      effectiveInvincibleMs = Math.round(effectiveInvincibleMs * BOSS_STAT_MULT);
+      evasionChance         = Math.min(evasionChance * BOSS_STAT_MULT, 0.30);
+      itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / BOSS_STAT_MULT), 2000);
+      itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / BOSS_STAT_MULT), 4000);
+      regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / BOSS_STAT_MULT), 6000) : 0;
+    }
+  }
+
+  // ── Helper: apply a gift buff received from the moose costume's gift box ────
+  function applyGiftBuff(id: BuffId): void {
+    giftBuffs.push(id);
+    recomputeBuffStats();
+
+    // Grow the hearts display if max HP increased due to hp_up
+    while (hearts.length < effectiveHpMax) {
+      const h = createHeart(true);
+      h.scale.set(1.1);
+      h.x = 18 + hearts.length * 26;
+      h.y = 0;
+      heartsContainer.addChild(h);
+      hearts.push(h);
+    }
+
+    // Immediate HP effects
+    if (id === 'hp_up') {
+      playerHP = Math.min(effectiveHpMax, playerHP + 1);
+    } else if (id === 'hp_restore') {
+      playerHP = Math.min(effectiveHpMax, playerHP + Math.ceil(effectiveHpMax / 2));
+    }
+
+    // Start periodic shield timer if just unlocked via gift
+    if (id === 'periodic_shield' && periodicShieldTimer <= 0) {
+      periodicShieldTimer = 12000;
+    }
+    // Initialize regen timer if newly acquired
+    if (id === 'regen' && regenIntervalMs > 0 && regenTimer <= 0) {
+      regenTimer = regenIntervalMs;
+    }
+
+    updateHUD();
+  }
+
+
   function checkPhase(): void {
     const frac = enemyHP / waveMaxHp;
     const newPhase: 1 | 2 | 3 = frac > waveConfig.phase2Frac ? 1 : frac > waveConfig.phase3Frac ? 2 : 3;
@@ -1226,6 +1553,98 @@ async function enter(core: Core): Promise<void> {
     return true;
   }
 
+  // ── Elegant costume: deflect activation helper ────────────────────────────
+  function tryActivateDeflect(): boolean {
+    if (!isElegantCostume || gameEnded || deflectCooldownMs > 0) return false;
+    deflectCooldownMs = DEFLECT_COOLDOWN_MS;
+    deflectActiveMs   = DEFLECT_DURATION_MS;
+    deflectAnimMs     = 0;
+
+    // Flip all existing enemy bullets toward the enemy
+    for (const b of enemyBullets) {
+      if (!b.deflected) {
+        b.vx = -b.vx;
+        b.vy = -b.vy;
+        b.deflected = true;
+      }
+    }
+
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff88cc, alpha: 1 });
+    flashOverlay.alpha = 0.22;
+    phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+    core.events.emitSync('camera/shake', { intensity: 5, duration: 200 });
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: playerEntity.position.x, y: playerEntity.position.y,
+        burst: true, burstCount: 22, speed: 130, speedVariance: 60,
+        spread: 180, lifetime: 550, startAlpha: 1, endAlpha: 0,
+        startScale: 1.3, endScale: 0,
+        startColor: 0xff88cc, endColor: 0xffffff, radius: 5,
+      },
+    });
+    redrawCostumeBtn();
+    return true;
+  }
+
+  // ── Wizard costume: fireball activation helper ───────────────────────────
+  function tryActivateWizard(): boolean {
+    if (!isWizardCostume || gameEnded || wizardCooldownMs > 0 || wizardChannelingMs > 0) return false;
+    // Start charging
+    wizardChannelingMs = WIZARD_CHANNEL_MS;
+    redrawCostumeBtn();
+    // Visual flash to indicate charge start
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: playerEntity.position.x, y: playerEntity.position.y,
+        burst: true, burstCount: 14, speed: 80, speedVariance: 40,
+        spread: 180, lifetime: 450, startAlpha: 1, endAlpha: 0,
+        startScale: 1.1, endScale: 0,
+        startColor: 0xffaa00, endColor: 0xff6600, radius: 5,
+      },
+    });
+    return true;
+  }
+
+  // ── Hero costume: ability activation helper ──────────────────────────────
+  function tryActivateHero(): boolean {
+    if (!isHeroCostume || gameEnded || heroCooldownMs > 0 || heroActiveMs > 0) return false;
+    heroStartHp      = playerHP;
+    heroAbsorbedDmg  = 0;
+    heroActiveMs     = HERO_INVINCIBLE_MS;
+    // Use invincibleMs so the existing blink/invincibility system covers the ability
+    invincibleMs = Math.max(invincibleMs, HERO_INVINCIBLE_MS);
+    redrawCostumeBtn();
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xffee00, alpha: 1 });
+    flashOverlay.alpha = 0.25;
+    phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+    core.events.emitSync('camera/shake', { intensity: 6, duration: 250 });
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: playerEntity.position.x, y: playerEntity.position.y,
+        burst: true, burstCount: 26, speed: 150, speedVariance: 70,
+        spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+        startScale: 1.4, endScale: 0,
+        startColor: 0xffee00, endColor: 0xffaa00, radius: 6,
+      },
+    });
+    return true;
+  }
+
+  // ── Helpers: hit-test costume & skill buttons ─────────────────────────────
+  function isOverCostumeBtn(canvasX: number, canvasY: number): boolean {
+    if (!hasActiveCostumeAbility) return false;
+    const dx = canvasX - COSTUME_BTN_X;
+    const dy = canvasY - COSTUME_BTN_Y;
+    return Math.sqrt(dx * dx + dy * dy) <= COSTUME_BTN_R + 10;
+  }
+
+  function tryActivateCostumeAbility(): boolean {
+    if (isElegantCostume) return tryActivateDeflect();
+    if (isWizardCostume)  return tryActivateWizard();
+    if (isHeroCostume)    return tryActivateHero();
+    return false;
+  }
+
   // ── Touch input ────────────────────────────────────────────────────────────
   function isOverSkillBtn(canvasX: number, canvasY: number): boolean {
     if (!isActiveSkill) return false;
@@ -1239,6 +1658,10 @@ async function enter(core: Core): Promise<void> {
     'input/touch:start',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
+      if (isOverCostumeBtn(pos.x, pos.y)) {
+        tryActivateCostumeAbility();
+        return;
+      }
       if (isOverSkillBtn(pos.x, pos.y)) {
         tryActivateSkill();
         return;
@@ -1270,6 +1693,10 @@ async function enter(core: Core): Promise<void> {
     'input/pointer:down',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
+      if (isOverCostumeBtn(pos.x, pos.y)) {
+        tryActivateCostumeAbility();
+        return;
+      }
       if (isOverSkillBtn(pos.x, pos.y)) {
         tryActivateSkill();
         return;
@@ -1416,6 +1843,144 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Elegant costume: deflect shield countdown & ring visual ───────────
+      if (isElegantCostume) {
+        if (deflectCooldownMs > 0) {
+          deflectCooldownMs = Math.max(0, deflectCooldownMs - dt);
+          redrawCostumeBtn();
+        }
+        if (deflectActiveMs > 0) {
+          deflectActiveMs = Math.max(0, deflectActiveMs - dt);
+          deflectAnimMs += dt;
+          costumeRing.visible = true;
+          costumeRing.x = playerEntity.position.x;
+          costumeRing.y = playerEntity.position.y;
+          const pulse = 1 + 0.10 * Math.sin(deflectAnimMs / 160);
+          costumeRing.clear();
+          costumeRing.circle(0, 0, 32 * pulse).fill({ color: 0xff88cc, alpha: 0.10 });
+          costumeRing.circle(0, 0, 32 * pulse).stroke({ color: 0xff88cc, width: 3, alpha: 0.75 });
+          if (deflectActiveMs <= 0) { costumeRing.visible = false; deflectAnimMs = 0; }
+        }
+      }
+
+      // ── Moose costume: gift box passive timer ──────────────────────────────
+      if (isMooseCostume && !waveTransitioning) {
+        mooseGiftTimer -= dt;
+        if (mooseGiftTimer <= 0) {
+          mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS;
+          // Spawn a gift box at a random horizontal position near the top of the play area
+          const gx = 30 + Math.random() * (W - 60);
+          const gy = -20; // start just above the screen so it falls in
+          const gDisplay = createGiftBoxItem();
+          gDisplay.x = gx;
+          gDisplay.y = gy;
+          itemsContainer.addChild(gDisplay);
+          items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
+        }
+      }
+
+      // ── Wizard costume: channel countdown & fireball launch ───────────────
+      if (isWizardCostume) {
+        if (wizardCooldownMs > 0) {
+          wizardCooldownMs = Math.max(0, wizardCooldownMs - dt);
+          redrawCostumeBtn();
+        }
+        if (wizardChannelingMs > 0) {
+          wizardChannelingMs = Math.max(0, wizardChannelingMs - dt);
+          redrawCostumeBtn();
+          // Channeling particles around player (growing intensity)
+          const chargePct = 1 - wizardChannelingMs / WIZARD_CHANNEL_MS;
+          if (Math.random() < 0.4 + chargePct * 0.5) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 20 + Math.random() * 14;
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x + Math.cos(angle) * r,
+                y: playerEntity.position.y + Math.sin(angle) * r,
+                burst: true, burstCount: 1, speed: 20, speedVariance: 10,
+                spread: 360, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                startScale: 0.8 + chargePct * 0.6, endScale: 0,
+                startColor: 0xffcc00, endColor: 0xff6600, radius: 4,
+              },
+            });
+          }
+          if (wizardChannelingMs <= 0) {
+            // Channel complete: fire the fireball
+            wizardCooldownMs = WIZARD_COOLDOWN_MS;
+            const ex = enemyEntity.position.x;
+            const ey = enemyEntity.position.y;
+            const px = playerEntity.position.x;
+            const py = playerEntity.position.y;
+            const dist = Math.sqrt((ex - px) * (ex - px) + (ey - py) * (ey - py)) || 1;
+            const fbVx = ((ex - px) / dist) * WIZARD_FIREBALL_SPEED;
+            const fbVy = ((ey - py) / dist) * WIZARD_FIREBALL_SPEED;
+            const fbDisplay = createFireball();
+            fbDisplay.x = px;
+            fbDisplay.y = py - 10;
+            playerBulletsContainer.addChild(fbDisplay);
+            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE });
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
+            flashOverlay.alpha = 0.20;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 250);
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: px, y: py,
+                burst: true, burstCount: 28, speed: 160, speedVariance: 80,
+                spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
+                startScale: 1.5, endScale: 0,
+                startColor: 0xffcc00, endColor: 0xff4400, radius: 6,
+              },
+            });
+            redrawCostumeBtn();
+          }
+        }
+      }
+
+      // ── Hero costume: active ability countdown & expiry ───────────────────
+      if (isHeroCostume) {
+        if (heroCooldownMs > 0) {
+          heroCooldownMs = Math.max(0, heroCooldownMs - dt);
+          redrawCostumeBtn();
+        }
+        if (heroActiveMs > 0) {
+          heroActiveMs = Math.max(0, heroActiveMs - dt);
+          redrawCostumeBtn();
+          // Pulsing golden ring around the player while active
+          costumeRing.visible = true;
+          costumeRing.x = playerEntity.position.x;
+          costumeRing.y = playerEntity.position.y;
+          const heroAnimMs = HERO_INVINCIBLE_MS - heroActiveMs;
+          const heroPulse = 1 + 0.12 * Math.sin(heroAnimMs / 150);
+          costumeRing.clear();
+          costumeRing.circle(0, 0, 34 * heroPulse).fill({ color: 0xffee00, alpha: 0.10 });
+          costumeRing.circle(0, 0, 34 * heroPulse).stroke({ color: 0xffee00, width: 3, alpha: 0.80 });
+          if (heroActiveMs <= 0) {
+            // Ability ended: convert to charged damage and drop HP to 1
+            costumeRing.visible = false;
+            heroChargedDamage = heroAbsorbedDmg + heroStartHp;
+            heroAbsorbedDmg   = 0;
+            playerHP          = 1;
+            heroCooldownMs    = HERO_COOLDOWN_MS;
+            updateHUD();
+            redrawCostumeBtn();
+            // Visual signal of the transformation
+            flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
+            flashOverlay.alpha = 0.30;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 350);
+            core.events.emitSync('camera/shake', { intensity: 8, duration: 300 });
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: playerEntity.position.x, y: playerEntity.position.y,
+                burst: true, burstCount: 30, speed: 170, speedVariance: 80,
+                spread: 180, lifetime: 650, startAlpha: 1, endAlpha: 0,
+                startScale: 1.6, endScale: 0,
+                startColor: 0xffee00, endColor: 0xff6600, radius: 7,
+              },
+            });
+          }
+        }
+      }
+
       // ── Player auto-fire ──────────────────────────────────────────────────
       playerFireTimer -= dt;
       if (playerFireTimer <= 0) {
@@ -1432,13 +1997,19 @@ async function enter(core: Core): Promise<void> {
             ? Math.max(Math.round(baseInterval / 2), 60)
             : baseInterval;
         playerFireTimer = fireInterval;
-        spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18);
-        spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18);
+        // Hero costume: if charged damage is pending, apply to this fire cycle
+        const thisCycleDamage = heroChargedDamage > 0 ? heroChargedDamage : undefined;
+        if (heroChargedDamage > 0) {
+          heroChargedDamage = 0;
+          updateHUD();
+        }
+        spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, thisCycleDamage);
+        spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18, thisCycleDamage);
         // Centre bullet(s) from power-up or triple_shot buffs
         const centreBullets = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
         for (let k = 0; k < centreBullets; k++) {
           const offset = (k - (centreBullets - 1) / 2) * 8;
-          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22);
+          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22, thisCycleDamage);
         }
         sfxShoot();
       }
@@ -1621,9 +2192,10 @@ async function enter(core: Core): Promise<void> {
         const dy = b.y - enemyEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
+          const dmg = b.damage ?? bulletDamage;
           removeBullet(playerBullets, i, playerBulletsContainer, true);
-          enemyHP = Math.max(0, enemyHP - bulletDamage);
-          score += SCORE_PER_HIT * bulletDamage;
+          enemyHP = Math.max(0, enemyHP - dmg);
+          score += SCORE_PER_HIT * dmg;
           hitFlashTimer = 80;
           sfxEnemyHit();
 
@@ -1692,8 +2264,70 @@ async function enter(core: Core): Promise<void> {
           continue;
         }
 
+        // Deflected bullets fly toward the enemy instead of the player.
+        if (b.deflected) {
+          if (!waveTransitioning && !petPhaseActive) {
+            const edx = b.x - enemyEntity.position.x;
+            const edy = b.y - enemyEntity.position.y;
+            if (Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
+              removeBullet(enemyBullets, i, enemyBulletsContainer, false);
+              enemyHP = Math.max(0, enemyHP - 1);
+              hitFlashTimer = 80;
+              score += SCORE_PER_HIT;
+              sfxEnemyHit();
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
+                  y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
+                  burst: true, burstCount: 8, speed: 90, speedVariance: 40,
+                  spread: 180, lifetime: 350, startAlpha: 1, endAlpha: 0,
+                  startScale: 1, endScale: 0,
+                  startColor: 0xff88cc, endColor: 0xff4488, radius: 4,
+                },
+              });
+              checkPhase();
+              if (enemyHP <= 0) {
+                score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
+                if (isEndless) {
+                  advanceEndlessWave();
+                } else {
+                  const nextWaveIdx = waveIdx + 1;
+                  if (nextWaveIdx < levelConfig!.waves.length) {
+                    advanceWave(nextWaveIdx);
+                  } else {
+                    endGame(true);
+                  }
+                }
+                return;
+              }
+            }
+          }
+          continue; // deflected bullets never harm the player
+        }
+
         // Skip collision if invincible
-        if (invincibleMs > 0) continue;
+        if (invincibleMs > 0) {
+          // Hero costume: absorb bullets that would have hit during active period
+          if (heroActiveMs > 0) {
+            const hdx = b.x - playerEntity.position.x;
+            const hdy = b.y - playerEntity.position.y;
+            if (Math.sqrt(hdx * hdx + hdy * hdy) < ENEMY_BULLET_R + PLAYER_HITBOX_R) {
+              removeBullet(enemyBullets, i, enemyBulletsContainer, false);
+              heroAbsorbedDmg += 1;
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: playerEntity.position.x + (Math.random() - 0.5) * 20,
+                  y: playerEntity.position.y + (Math.random() - 0.5) * 20,
+                  burst: true, burstCount: 5, speed: 70, speedVariance: 30,
+                  spread: 180, lifetime: 280, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0xffee00, endColor: 0xffaa00, radius: 4,
+                },
+              });
+            }
+          }
+          continue;
+        }
 
         // Hit player
         const dx = b.x - playerEntity.position.x;
@@ -2141,7 +2775,27 @@ async function enter(core: Core): Promise<void> {
         const item = items[i];
         item.lifetime -= dt;
 
-        // Move vertically
+        // ── Fox costume: attract items within radius toward player ──────────
+        if (isFoxCostume) {
+          const adx = playerEntity.position.x - item.x;
+          const ady = playerEntity.position.y - item.y;
+          const aDist = Math.sqrt(adx * adx + ady * ady);
+          if (aDist < FOX_ATTRACT_RADIUS && aDist > 1) {
+            const pull = FOX_ATTRACT_ACCEL * (dt / 1000);
+            item.vx += (adx / aDist) * pull;
+            item.vy += (ady / aDist) * pull;
+            // Cap speed so items don't overshoot wildly
+            const spd = Math.sqrt(item.vx * item.vx + item.vy * item.vy);
+            const maxSpd = devConfig.itemFallSpeed * 3;
+            if (spd > maxSpd) {
+              item.vx = (item.vx / spd) * maxSpd;
+              item.vy = (item.vy / spd) * maxSpd;
+            }
+          }
+        }
+
+        // Move (apply velocity)
+        item.x += item.vx * (dt / 1000);
         item.y += item.vy * (dt / 1000);
 
         item.display.x = item.x;
@@ -2163,6 +2817,12 @@ async function enter(core: Core): Promise<void> {
           if (item.type === 'health') {
             playerHP = Math.min(effectiveHpMax, playerHP + 1);
             invincibleMs = Math.max(invincibleMs, HEALTH_ITEM_INVINCIBLE_MS);
+          } else if (item.type === 'gift') {
+            // Moose costume gift box: apply a random buff
+            const picked = pickRandomBuffs(1, [...(isEndless ? endlessState.buffs : []), ...giftBuffs]);
+            if (picked.length > 0) {
+              applyGiftBuff(picked[0].id);
+            }
           } else {
             powerUpTimer = POWER_UP_DURATION_MS;
           }
@@ -2182,6 +2842,8 @@ async function enter(core: Core): Promise<void> {
           sfxPickup();
           core.events.emitSync('game/item:collected', {});
           // Sparkle burst on collect
+          const sparkleStart = item.type === 'gift' ? 0xffdd00 : item.type === 'health' ? 0x00ff88 : 0xffee44;
+          const sparkleEnd   = item.type === 'gift' ? 0xff8800 : item.type === 'health' ? 0x00cc55 : 0xff8800;
           core.events.emitSync('particle/emit', {
             config: {
               x: item.x,
@@ -2197,8 +2859,8 @@ async function enter(core: Core): Promise<void> {
               endAlpha: 0,
               startScale: 1,
               endScale: 0,
-              startColor: item.type === 'health' ? 0x00ff88 : 0xffee44,
-              endColor: item.type === 'health' ? 0x00cc55 : 0xff8800,
+              startColor: sparkleStart,
+              endColor: sparkleEnd,
               radius: 5,
             },
           });
@@ -2529,7 +3191,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -2541,9 +3203,10 @@ async function enter(core: Core): Promise<void> {
     lasersContainer.destroy({ children: true });
     petsContainer.destroy({ children: true });
     trapRing.destroy();
+    costumeRing.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, skillBtnContainer);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, skillBtnContainer, costumeBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -2556,7 +3219,12 @@ async function enter(core: Core): Promise<void> {
     shieldTimerText.destroy();
     regenTimerText.destroy();
     skillTimerText.destroy();
+    deflectTimerText.destroy();
+    wizardTimerText.destroy();
+    heroTimerText.destroy();
+    heroChargeText.destroy();
     skillBtnContainer.destroy({ children: true });
+    costumeBtnContainer.destroy({ children: true });
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
