@@ -29,6 +29,7 @@ import { StoryChapter1EndScene } from './scenes/StoryChapter1EndScene';
 import { StoryChapter2Scene } from './scenes/StoryChapter2Scene';
 import { StoryChapter2EndScene } from './scenes/StoryChapter2EndScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
+import { EncyclopediaScene } from './scenes/EncyclopediaScene';
 import { GAME_W, GAME_H } from './constants';
 import { initPersistence, loadProgress } from './game/persistence';
 import { initAchievements } from './game/achievements';
@@ -182,6 +183,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: StoryChapter2Scene });
           c.events.emitSync('scene/register', { scene: StoryChapter2EndScene });
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
+          c.events.emitSync('scene/register', { scene: EncyclopediaScene });
 
           await c.events.emit('scene/load', { key: 'title' });
         },
