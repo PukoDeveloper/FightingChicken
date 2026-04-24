@@ -15,6 +15,7 @@ const CHAPTERS: ChapterEntry[] = [
   { number: '序章',   title: '小雞的覺醒',   subtitle: '一切從這裡開始……' },
   { number: '第一章', title: '遇見勇氣',     subtitle: '命中注定的相遇' },
   { number: '第二章', title: '第一次對決',   subtitle: '初戰告捷，卻留下疑問' },
+  { number: '第三章', title: '幽靈之謎',     subtitle: '神秘的幻影在暗中窺視' },
 ];
 
 const CHAPTER_ITEM_H = 88;
@@ -89,6 +90,7 @@ async function enter(core: Core): Promise<void> {
       0: 'story_prologue',
       1: 'story_ch1',
       2: 'story_ch2',
+      3: 'story_ch3',
     };
     return keys[idx] ?? null;
   }

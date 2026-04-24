@@ -747,10 +747,73 @@ const STORY_CH2_LEVEL: LevelConfig = {
   ],
 };
 
+/** Story Chapter 3 battle – two-wave fight vs 幻影 (Phantom); harder than ch2, introduces shockwaves and bubbles. */
+const STORY_CH3_LEVEL: LevelConfig = {
+  levelNumber: 3,
+  name: '幽靈之謎',
+  enemyType: 'phantom',
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 180,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 230, spiralWays: 6, spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P1,
+          aimInterval: 1400,   aimWays: 3,   aimSpread: 0.22,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P1,
+        }),
+        phase({
+          spiralInterval: 180, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 1100,   aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
+          shockwaveInterval: 5000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED,       shockwaveColor: COL_SHOCKWAVE,
+        }),
+        phase({
+          spiralInterval: 140, spiralWays: 10, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
+          aimInterval: 850,    aimWays: 4,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 1200, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
+          ringInterval: 3200,  ringCount: 14,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
+          shockwaveInterval: 4200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20, shockwaveColor: COL_SHOCKWAVE,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 210,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 200, spiralWays: 7, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 1200,   aimWays: 3,   aimSpread: 0.25,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          bubbleInterval: 4500, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,      bubbleColor: COL_BUBBLE,
+        }),
+        phase({
+          spiralInterval: 155, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 900,    aimWays: 4,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
+          spreadInterval: 1400, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
+          shockwaveInterval: 4000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 15, shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 3800, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10, bubbleColor: COL_BUBBLE,
+        }),
+        phase({
+          spiralInterval: 110, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 680,    aimWays: 4,     aimSpread: 0.18,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 980,  spreadWays: 7, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
+          ringInterval: 2600,  ringCount: 18,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
+          shockwaveInterval: 3200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 30, shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 3000, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 20, bubbleColor: COL_BUBBLE,
+        }),
+      ],
+    },
+  ],
+};
+
 /** Story-mode level map keyed by 1-based chapter number. */
 const STORY_LEVELS: Record<number, LevelConfig> = {
   1: STORY_CH1_LEVEL,
   2: STORY_CH2_LEVEL,
+  3: STORY_CH3_LEVEL,
 };
 
 /**
