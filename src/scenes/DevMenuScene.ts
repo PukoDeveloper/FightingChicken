@@ -68,6 +68,16 @@ async function enter(core: Core): Promise<void> {
       style="width:100%;margin-bottom:16px;accent-color:#ff6644;"
     />
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <input id="dev-story-toggle" type="checkbox"
+        ${devConfig.storyModeEnabled ? 'checked' : ''}
+        style="width:18px;height:18px;accent-color:#ff6644;cursor:pointer;flex-shrink:0;"
+      />
+      <label for="dev-story-toggle" style="font-size:14px;color:#ffccaa;cursor:pointer;">
+        啟用故事模式（主畫面顯示故事模式按鈕）
+      </label>
+    </div>
+
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button id="dev-reset"
         style="padding:8px 16px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:14px;">
@@ -88,6 +98,7 @@ async function enter(core: Core): Promise<void> {
   const speedVal    = panel.querySelector<HTMLElement>('#dev-speed-val')!;
   const fallSlider  = panel.querySelector<HTMLInputElement>('#dev-fall')!;
   const fallVal     = panel.querySelector<HTMLElement>('#dev-fall-val')!;
+  const storyToggle = panel.querySelector<HTMLInputElement>('#dev-story-toggle')!;
   const resetBtn    = panel.querySelector<HTMLButtonElement>('#dev-reset')!;
   const closeBtn    = panel.querySelector<HTMLButtonElement>('#dev-close')!;
 
@@ -101,6 +112,10 @@ async function enter(core: Core): Promise<void> {
     fallVal.textContent = `${devConfig.itemFallSpeed} px/s`;
   });
 
+  storyToggle.addEventListener('change', () => {
+    devConfig.storyModeEnabled = storyToggle.checked;
+  });
+
   resetBtn.addEventListener('click', () => {
     devConfig.playerMoveSpeed = PLAYER_MOVE_SPEED;
     speedSlider.value = String(PLAYER_MOVE_SPEED);
@@ -108,6 +123,8 @@ async function enter(core: Core): Promise<void> {
     devConfig.itemFallSpeed = ITEM_FALL_SPEED;
     fallSlider.value = String(ITEM_FALL_SPEED);
     fallVal.textContent = `${ITEM_FALL_SPEED} px/s`;
+    devConfig.storyModeEnabled = false;
+    storyToggle.checked = false;
   });
 
   closeBtn.addEventListener('click', async () => {

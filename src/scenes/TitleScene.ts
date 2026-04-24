@@ -1,13 +1,40 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
-import { createChickenDisplay, createCourageDisplay, createStarfield } from '../game/sprites';
-import { endlessState } from '../game/store';
-import { startBgm } from '../game/audio';
+import {
+  createChickenDisplay,
+  createElegantChickenDisplay,
+  createMooseChickenDisplay,
+  createFoxChickenDisplay,
+  createWizardChickenDisplay,
+  createAdventureChickenDisplay,
+  createHeroChickenDisplay,
+  createBossChickenDisplay,
+  createCourageDisplay,
+  createStarfield,
+} from '../game/sprites';
+import { costumeState, endlessState } from '../game/store';
+import { COSTUMES, isCostumeUnlocked } from '../game/costumes';
+import type { CostumeId } from '../game/costumes';
+import { startBgm, sfxMenuClick } from '../game/audio';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
 let _transitioning = false;
+
+/** Build the preview Container for the given costume. */
+function buildCostumePreview(id: CostumeId): Container {
+  switch (id) {
+    case 'elegant':   return createElegantChickenDisplay();
+    case 'moose':     return createMooseChickenDisplay();
+    case 'fox':       return createFoxChickenDisplay();
+    case 'wizard':    return createWizardChickenDisplay();
+    case 'adventure': return createAdventureChickenDisplay();
+    case 'hero':      return createHeroChickenDisplay();
+    case 'boss':      return createBossChickenDisplay();
+    default:          return createChickenDisplay();
+  }
+}
 
 async function enter(core: Core): Promise<void> {
   _transitioning = false;
@@ -24,20 +51,32 @@ async function enter(core: Core): Promise<void> {
   const stars = createStarfield(W, H);
   worldLayer.addChild(stars);
 
-  // ── Characters preview ───────────────────────────────────────────────────
-  const chickenPreview = createChickenDisplay();
-  chickenPreview.scale.set(1.6);
-  chickenPreview.x = W * 0.32;
-  chickenPreview.y = H * 0.5;
-  worldLayer.addChild(chickenPreview);
+  // ── Costume state for cycling ─────────────────────────────────────────────
+  const unlockedCostumes = COSTUMES.filter(c =>
+    isCostumeUnlocked(c.id, costumeState.clearedLevels, endlessState.bestWave),
+  );
+  let costumeIndex = unlockedCostumes.findIndex(c => c.id === costumeState.selected);
+  if (costumeIndex < 0) costumeIndex = 0;
 
+  // ── Characters preview ───────────────────────────────────────────────────
+  // Left side: selected costume preview (changes when player cycles)
+  const chickenContainer = new Container();
+  chickenContainer.x = W * 0.30;
+  chickenContainer.y = H * 0.43;
+  worldLayer.addChild(chickenContainer);
+
+  let currentCostumeDisplay = buildCostumePreview(unlockedCostumes[costumeIndex].id);
+  currentCostumeDisplay.scale.set(1.6);
+  chickenContainer.addChild(currentCostumeDisplay);
+
+  // Right side: enemy preview (static)
   const couragePreview = createCourageDisplay();
   couragePreview.scale.set(1.2);
-  couragePreview.x = W * 0.68;
-  couragePreview.y = H * 0.5;
+  couragePreview.x = W * 0.70;
+  couragePreview.y = H * 0.43;
   worldLayer.addChild(couragePreview);
 
-  // VS text between them
+  // VS text
   const vsStyle = new TextStyle({
     fontFamily: 'Arial Black, Arial, sans-serif',
     fontSize: 48,
@@ -48,7 +87,7 @@ async function enter(core: Core): Promise<void> {
   const vsText = new Text({ text: 'VS', style: vsStyle });
   vsText.anchor.set(0.5);
   vsText.x = W * 0.5;
-  vsText.y = H * 0.5;
+  vsText.y = H * 0.43;
   worldLayer.addChild(vsText);
 
   // ── Title ─────────────────────────────────────────────────────────────────
@@ -63,7 +102,7 @@ async function enter(core: Core): Promise<void> {
   const title = new Text({ text: '小雞大戰勇氣！', style: titleStyle });
   title.anchor.set(0.5);
   title.x = W * 0.5;
-  title.y = H * 0.22;
+  title.y = H * 0.16;
   title.alpha = 0;
   uiLayer.addChild(title);
 
@@ -75,23 +114,103 @@ async function enter(core: Core): Promise<void> {
   const subtitle = new Text({ text: '彈幕射擊遊戲', style: subtitleStyle });
   subtitle.anchor.set(0.5);
   subtitle.x = W * 0.5;
-  subtitle.y = H * 0.29;
+  subtitle.y = H * 0.24;
   subtitle.alpha = 0;
   uiLayer.addChild(subtitle);
 
-  // ── Controls hint ─────────────────────────────────────────────────────────
-  const hintStyle = new TextStyle({
-    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-    fontSize: 15,
-    fill: 0xaaaaaa,
-    align: 'center',
+  // ── Costume picker ────────────────────────────────────────────────────────
+  // Label above picker
+  const costumeLabel = new Text({
+    text: '造型',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 13,
+      fill: 0xaaaaaa,
+    }),
   });
-  const hint = new Text({ text: '拖曳移動小雞  •  自動射擊\n躲開勇氣的彈幕，擊敗他！', style: hintStyle });
-  hint.anchor.set(0.5);
-  hint.x = W * 0.5;
-  hint.y = H * 0.60;
-  hint.alpha = 0;
-  uiLayer.addChild(hint);
+  costumeLabel.anchor.set(0.5);
+  costumeLabel.x = W * 0.5;
+  costumeLabel.y = H * 0.57;
+  costumeLabel.alpha = 0;
+  uiLayer.addChild(costumeLabel);
+
+  // Costume name
+  const costumeNameStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 20,
+    fontWeight: 'bold',
+    fill: 0xffffff,
+  });
+  const costumeNameText = new Text({
+    text: unlockedCostumes[costumeIndex].name,
+    style: costumeNameStyle,
+  });
+  costumeNameText.anchor.set(0.5);
+  costumeNameText.x = W * 0.5;
+  costumeNameText.y = H * 0.625;
+  costumeNameText.alpha = 0;
+  uiLayer.addChild(costumeNameText);
+
+  // Prev / Next arrow buttons
+  function makeArrowBtn(label: string): Container {
+    const arrowW = 44, arrowH = 44;
+    const c = new Container();
+    c.eventMode = 'static';
+    c.cursor = 'pointer';
+    const bg = new Graphics();
+    bg.roundRect(-arrowW / 2, -arrowH / 2, arrowW, arrowH, 10)
+      .fill({ color: 0x333355, alpha: 0.85 })
+      .stroke({ color: 0x8888cc, width: 1.5 });
+    c.addChild(bg);
+    const txt = new Text({
+      text: label,
+      style: new TextStyle({ fontFamily: 'Arial, sans-serif', fontSize: 22, fill: 0xddddff, fontWeight: 'bold' }),
+    });
+    txt.anchor.set(0.5);
+    c.addChild(txt);
+    return c;
+  }
+
+  const prevBtn = makeArrowBtn('<');
+  prevBtn.x = W * 0.5 - 90;
+  prevBtn.y = H * 0.625;
+  prevBtn.alpha = 0;
+  uiLayer.addChild(prevBtn);
+
+  const nextBtn = makeArrowBtn('>');
+  nextBtn.x = W * 0.5 + 90;
+  nextBtn.y = H * 0.625;
+  nextBtn.alpha = 0;
+  uiLayer.addChild(nextBtn);
+
+  function refreshCostume(): void {
+    // Update costume display
+    chickenContainer.removeChild(currentCostumeDisplay);
+    currentCostumeDisplay.destroy({ children: true });
+    currentCostumeDisplay = buildCostumePreview(unlockedCostumes[costumeIndex].id);
+    currentCostumeDisplay.scale.set(1.6);
+    chickenContainer.addChild(currentCostumeDisplay);
+    // Update name label
+    costumeNameText.text = unlockedCostumes[costumeIndex].name;
+    // Persist selection
+    costumeState.selected = unlockedCostumes[costumeIndex].id;
+  }
+
+  prevBtn.on('pointerdown', () => {
+    sfxMenuClick();
+    costumeIndex = (costumeIndex - 1 + unlockedCostumes.length) % unlockedCostumes.length;
+    refreshCostume();
+  });
+  prevBtn.on('pointerover', () => prevBtn.scale.set(1.08));
+  prevBtn.on('pointerout',  () => prevBtn.scale.set(1.0));
+
+  nextBtn.on('pointerdown', () => {
+    sfxMenuClick();
+    costumeIndex = (costumeIndex + 1) % unlockedCostumes.length;
+    refreshCostume();
+  });
+  nextBtn.on('pointerover', () => nextBtn.scale.set(1.08));
+  nextBtn.on('pointerout',  () => nextBtn.scale.set(1.0));
 
   // ── Start button ──────────────────────────────────────────────────────────
   const btnW = 200, btnH = 56;
@@ -117,51 +236,9 @@ async function enter(core: Core): Promise<void> {
   btn.addChild(btnText);
 
   btn.x = W * 0.5;
-  btn.y = H * 0.72;
+  btn.y = H * 0.74;
   btn.alpha = 0;
   uiLayer.addChild(btn);
-
-  // ── Endless Mode button ───────────────────────────────────────────────────
-  const endlessBtnW = 200, endlessBtnH = 52;
-  const endlessBtn = new Container();
-  endlessBtn.eventMode = 'static';
-  endlessBtn.cursor = 'pointer';
-
-  const endlessBtnBg = new Graphics();
-  endlessBtnBg.roundRect(-endlessBtnW / 2, -endlessBtnH / 2, endlessBtnW, endlessBtnH, 12)
-    .fill({ color: 0x004488, alpha: 0.9 });
-  endlessBtnBg.roundRect(-endlessBtnW / 2, -endlessBtnH / 2, endlessBtnW, endlessBtnH, 12)
-    .stroke({ color: 0x44aaff, width: 2 });
-  endlessBtn.addChild(endlessBtnBg);
-
-  const endlessBtnStyle = new TextStyle({
-    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-    fontSize: 22,
-    fontWeight: 'bold',
-    fill: 0xaaddff,
-  });
-  const endlessBtnText = new Text({ text: '∞  無盡模式', style: endlessBtnStyle });
-  endlessBtnText.anchor.set(0.5);
-  endlessBtn.addChild(endlessBtnText);
-
-  // Best wave sub-label
-  const bestWaveStyle = new TextStyle({
-    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-    fontSize: 12,
-    fill: 0x88bbdd,
-  });
-  const bestWaveText = new Text({
-    text: endlessState.bestWave > 1 ? `最高波數：第 ${endlessState.bestWave} 波` : '挑戰無限關卡！',
-    style: bestWaveStyle,
-  });
-  bestWaveText.anchor.set(0.5);
-  bestWaveText.y = endlessBtnH / 2 + 10;
-  endlessBtn.addChild(bestWaveText);
-
-  endlessBtn.x = W * 0.5;
-  endlessBtn.y = H * 0.82;
-  endlessBtn.alpha = 0;
-  uiLayer.addChild(endlessBtn);
 
   // ── Achievements button ───────────────────────────────────────────────────
   const achBtnW = 180, achBtnH = 44;
@@ -176,20 +253,31 @@ async function enter(core: Core): Promise<void> {
     .stroke({ color: 0x8888bb, width: 1.5 });
   achBtn.addChild(achBtnBg);
 
-  const achBtnStyle = new TextStyle({
-    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-    fontSize: 18,
-    fontWeight: 'bold',
-    fill: 0xccccee,
+  const achBtnText = new Text({
+    text: '🏆  成就',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 18,
+      fontWeight: 'bold',
+      fill: 0xccccee,
+    }),
   });
-  const achBtnText = new Text({ text: '🏆  成就', style: achBtnStyle });
   achBtnText.anchor.set(0.5);
   achBtn.addChild(achBtnText);
 
   achBtn.x = W * 0.5;
-  achBtn.y = H * 0.91;
+  achBtn.y = H * 0.855;
   achBtn.alpha = 0;
   uiLayer.addChild(achBtn);
+
+  achBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    await core.events.emit('scene/load', { key: 'achievements' });
+  });
+  achBtn.on('pointerover', () => achBtn.scale.set(1.04));
+  achBtn.on('pointerout',  () => achBtn.scale.set(1.0));
 
   // ── DEV button (bottom-right corner) ─────────────────────────────────────
   const devBtnW = 46, devBtnH = 22;
@@ -221,8 +309,8 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Scene fade-in via TweenManager ────────────────────────────────────────
-  const fadeTargets = [title, subtitle, hint, btn, endlessBtn, achBtn] as unknown as Record<string, unknown>[];
-  const delays = [0, 150, 600, 350, 500, 650];
+  const fadeTargets = [title, subtitle, costumeLabel, prevBtn, costumeNameText, nextBtn, btn, achBtn] as unknown as Record<string, unknown>[];
+  const delays      = [0, 150, 300, 350, 350, 350, 450, 530];
   fadeTargets.forEach((t, i) => {
     core.events.emitSync('tween/to', {
       target: t,
@@ -233,7 +321,7 @@ async function enter(core: Core): Promise<void> {
     });
   });
 
-  // ── Button pulse animations via TweenManager ──────────────────────────────
+  // ── Button pulse animation ────────────────────────────────────────────────
   core.events.emitSync('tween/to', {
     target: btn.scale as unknown as Record<string, unknown>,
     props: { x: 1.05, y: 1.05 },
@@ -243,15 +331,6 @@ async function enter(core: Core): Promise<void> {
     yoyo: true,
     delay: 700,
   });
-  core.events.emitSync('tween/to', {
-    target: endlessBtn.scale as unknown as Record<string, unknown>,
-    props: { x: 1.04, y: 1.04 },
-    duration: 900,
-    ease: 'easeInOutSine',
-    loop: true,
-    yoyo: true,
-    delay: 900,
-  });
 
   // ── Background music ──────────────────────────────────────────────────────
   startBgm();
@@ -260,51 +339,33 @@ async function enter(core: Core): Promise<void> {
   const unsubTick = core.events.on('title', 'core/tick', ({ delta }: { delta: number }) => {
     const dt = delta;
     vsText.rotation += 0.002 * dt;
-    chickenPreview.y = H * 0.5 + Math.sin(Date.now() / 600) * 10;
-    couragePreview.y = H * 0.5 + Math.sin(Date.now() / 600 + Math.PI) * 10;
+    chickenContainer.y = H * 0.43 + Math.sin(Date.now() / 600) * 10;
+    couragePreview.y   = H * 0.43 + Math.sin(Date.now() / 600 + Math.PI) * 10;
   });
 
-  // Click / touch start
+  // ── Button handlers ───────────────────────────────────────────────────────
   btn.on('pointerdown', async () => {
     if (_transitioning) return;
     _transitioning = true;
-    endlessState.active = false;
-    await core.events.emit('scene/load', { key: 'levelselect' });
-  });
-
-  endlessBtn.on('pointerdown', async () => {
-    if (_transitioning) return;
-    _transitioning = true;
-    endlessState.active = true;
-    endlessState.wave = 1;
-    endlessState.buffs = [];
-    endlessState.score = 0;
-    endlessState.periodicShieldTimer = 0;
-    endlessState.regenTimer = 0;
-    await core.events.emit('scene/load', { key: 'costumeselect' });
-  });
-
-  achBtn.on('pointerdown', async () => {
-    if (_transitioning) return;
-    _transitioning = true;
-    await core.events.emit('scene/load', { key: 'achievements' });
+    await core.events.emit('scene/load', { key: 'modeselect' });
   });
 
   _cleanup = () => {
     core.events.removeNamespace('title');
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
-    core.events.emitSync('tween/kill', { target: endlessBtn.scale as unknown as Record<string, unknown> });
-    worldLayer.removeChild(stars, chickenPreview, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, hint, btn, endlessBtn, achBtn, devBtn);
+    worldLayer.removeChild(stars, chickenContainer, couragePreview, vsText);
+    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn);
     stars.destroy({ children: true });
-    chickenPreview.destroy({ children: true });
+    chickenContainer.destroy({ children: true });
     couragePreview.destroy({ children: true });
     vsText.destroy();
     title.destroy();
     subtitle.destroy();
-    hint.destroy();
+    costumeLabel.destroy();
+    costumeNameText.destroy();
+    prevBtn.destroy({ children: true });
+    nextBtn.destroy({ children: true });
     btn.destroy({ children: true });
-    endlessBtn.destroy({ children: true });
     achBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
     unsubTick();
