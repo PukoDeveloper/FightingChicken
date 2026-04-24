@@ -66,3 +66,9 @@ export const skillState = {
   selected: null as SkillId | null,
 };
 
+/** Persistent currency state. */
+export const currencyState = {
+  /** Amount of 宇宙灰燼 (Cosmic Ash) the player has collected. */
+  cosmicAsh: 0,
+};
+

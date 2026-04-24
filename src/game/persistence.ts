@@ -1,5 +1,5 @@
 import type { Core } from '@inkshot/engine';
-import { gameResult, endlessState, costumeState } from './store';
+import { gameResult, endlessState, costumeState, currencyState } from './store';
 import type { CostumeId } from './costumes';
 
 /** The default costume used when resetting progress. */
@@ -49,6 +49,7 @@ export async function saveProgress(): Promise<void> {
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
+        cosmicAsh: currencyState.cosmicAsh,
         _achievements: achievementsSnapshot,
       },
     });
@@ -100,6 +101,10 @@ export async function loadProgress(): Promise<void> {
     if (typeof data.endlessHighScore === 'number' && Number.isFinite(data.endlessHighScore)) {
       endlessState.highScore = data.endlessHighScore;
     }
+
+    if (typeof data.cosmicAsh === 'number' && Number.isFinite(data.cosmicAsh)) {
+      currencyState.cosmicAsh = Math.max(0, Math.floor(data.cosmicAsh));
+    }
   } catch {
     // Silently ignore corrupt or unreadable save data.
   }
@@ -118,6 +123,7 @@ export async function clearProgress(): Promise<void> {
     endlessState.highScore = 0;
     costumeState.clearedLevels = new Set();
     costumeState.selected = DEFAULT_COSTUME;
+    currencyState.cosmicAsh = 0;
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {
@@ -128,6 +134,7 @@ export async function clearProgress(): Promise<void> {
         selectedCostume: DEFAULT_COSTUME,
         endlessBestWave: 1,
         endlessHighScore: 0,
+        cosmicAsh: 0,
         _achievements: { data: {} },
       },
     });
