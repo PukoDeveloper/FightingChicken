@@ -51,7 +51,7 @@ export const COSTUMES: CostumeConfig[] = [
     id: 'moose',
     name: '麋鹿小雞',
     description: '頭頂鹿角、憨厚可愛的特殊小雞',
-    ability: '被動：每 18 秒自動產生一個禮物盒',
+    ability: '被動：每 10 秒自動產生一個禮物盒',
     unlockHint: '預設解鎖',
     stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
   },

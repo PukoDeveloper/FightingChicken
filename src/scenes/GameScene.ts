@@ -494,7 +494,7 @@ async function enter(core: Core): Promise<void> {
   // ── Moose costume passive state ──────────────────────────────────────────
   // Passive: every 18 s a gift box spawns at a random position; collecting it awards a random buff.
   const isMooseCostume = costumeState.selected === 'moose';
-  const MOOSE_GIFT_INTERVAL_MS = 18000;
+  const MOOSE_GIFT_INTERVAL_MS = 10000;
   let mooseGiftTimer = isMooseCostume ? MOOSE_GIFT_INTERVAL_MS : 0;
 
   // ── Fox costume passive state ─────────────────────────────────────────────
@@ -2273,6 +2273,10 @@ async function enter(core: Core): Promise<void> {
 
       // ── Move enemy bullets ────────────────────────────────────────────────
       for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        // Guard: checkPhase() (called from the deflected-bullet hit path below)
+        // clears enemyBullets while this loop is still running. Break early when
+        // the index goes out of bounds to avoid a TypeError on undefined access.
+        if (i >= enemyBullets.length) break;
         const b = enemyBullets[i];
         b.x += b.vx * (dt / 1000);
         b.y += b.vy * (dt / 1000);
