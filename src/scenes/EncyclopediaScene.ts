@@ -1,7 +1,7 @@
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { Rectangle } from 'pixi.js';
-import type { Container } from 'pixi.js';
+import type { Container, Renderer } from 'pixi.js';
 import {
   createCourageDisplay,
   createPhantomDisplay,
@@ -23,7 +23,7 @@ let _overlay: HTMLElement | null = null;
  * origin is extracted so that the sprite appears at full size.
  */
 function spriteToDataUrl(
-  renderer: ReturnType<typeof import('pixi.js').autoDetectRenderer> extends Promise<infer R> ? R : never,
+  renderer: Renderer,
   factory: () => Container,
   frameSize: number,
 ): string {
@@ -284,12 +284,12 @@ async function enter(core: Core): Promise<void> {
   // Render each boss/entity sprite to a PNG data URL so the encyclopedia
   // shows the actual in-game appearance instead of emoji placeholders.
   const bossImgs = [
-    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createCourageDisplay, 130),
-    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createPhantomDisplay, 130),
-    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createChaosDisplay, 140),
+    spriteToDataUrl(renderer as Renderer, createCourageDisplay, 130),
+    spriteToDataUrl(renderer as Renderer, createPhantomDisplay, 130),
+    spriteToDataUrl(renderer as Renderer, createChaosDisplay, 140),
   ];
   const entityImgs = [
-    spriteToDataUrl(renderer as Parameters<typeof spriteToDataUrl>[0], createPetDisplay, 72),
+    spriteToDataUrl(renderer as Renderer, createPetDisplay, 72),
   ];
 
   const overlay = document.createElement('div');

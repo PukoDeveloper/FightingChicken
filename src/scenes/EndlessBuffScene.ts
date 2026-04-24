@@ -113,7 +113,7 @@ async function enter(core: Core): Promise<void> {
       fill: 0xdddddd,
       lineHeight: 22,
     });
-    const descText = new Text({ text: buffDesc(buff.id, endlessState.buffs), style: descStyle });
+    const descText = new Text({ text: buffDesc(buff.id, endlessState.buffs, endlessState.currentHp), style: descStyle });
     descText.x = 18;
     descText.y = 48;
     card.addChild(descText);
