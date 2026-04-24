@@ -3,7 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { endlessState } from '../game/store';
-import { pickRandomBuffs, ALL_BUFFS } from '../game/endless';
+import { pickRandomBuffs, ALL_BUFFS, buffDesc } from '../game/endless';
 import type { BuffDef } from '../game/endless';
 import { sfxWaveClear, sfxMenuClick } from '../game/audio';
 
@@ -113,7 +113,7 @@ async function enter(core: Core): Promise<void> {
       fill: 0xdddddd,
       lineHeight: 22,
     });
-    const descText = new Text({ text: buff.desc, style: descStyle });
+    const descText = new Text({ text: buffDesc(buff.id, endlessState.buffs), style: descStyle });
     descText.x = 18;
     descText.y = 48;
     card.addChild(descText);

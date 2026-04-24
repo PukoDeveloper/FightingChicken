@@ -336,6 +336,43 @@ async function enter(core: Core): Promise<void> {
   cpBtn.y = H - cpBtnH - 10;
   uiLayer.addChild(cpBtn);
 
+  // ── Encyclopedia button (next to costume button) ──────────────────────────
+  const encBtnW = 72, encBtnH = 34;
+  const encBtn = new Container();
+  encBtn.eventMode = 'static';
+  encBtn.cursor = 'pointer';
+  const encBtnBg = new Graphics();
+  encBtnBg
+    .roundRect(0, 0, encBtnW, encBtnH, 8)
+    .fill({ color: 0x1a1a2e, alpha: 0.92 })
+    .stroke({ color: 0x5544aa, width: 1.5 });
+  encBtn.addChild(encBtnBg);
+  const encBtnText = new Text({
+    text: '📖 圖鑑',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 14,
+      fontWeight: 'bold',
+      fill: 0xbbaaff,
+    }),
+  });
+  encBtnText.anchor.set(0.5);
+  encBtnText.x = encBtnW / 2;
+  encBtnText.y = encBtnH / 2;
+  encBtn.addChild(encBtnText);
+  encBtn.x = 10 + cpBtnW + 8;
+  encBtn.y = H - encBtnH - 10;
+  uiLayer.addChild(encBtn);
+
+  encBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    await core.events.emit('scene/load', { key: 'encyclopedia' });
+  });
+  encBtn.on('pointerover', () => encBtn.scale.set(1.06));
+  encBtn.on('pointerout',  () => encBtn.scale.set(1.0));
+
   // ── Inline costume overlay ────────────────────────────────────────────────
   let overlayContainer: Container | null = null;
 
@@ -653,7 +690,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     closeOverlay();
     worldLayer.removeChild(stars, chickenContainer, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn);
+    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn, encBtn);
     stars.destroy({ children: true });
     chickenContainer.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -668,6 +705,7 @@ async function enter(core: Core): Promise<void> {
     achBtn.destroy({ children: true });
     devBtn.destroy({ children: true });
     cpBtn.destroy({ children: true });
+    encBtn.destroy({ children: true });
     unsubTick();
   };
 }

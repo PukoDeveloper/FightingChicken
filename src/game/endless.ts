@@ -11,6 +11,9 @@ import {
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
   PLAYER_HP_MAX,
+  PLAYER_FIRE_INTERVAL,
+  INVINCIBLE_MS,
+  ITEM_SPAWN_MAX_MS,
 } from '../constants';
 import type { EnemyType } from '../constants';
 import type { WaveConfig } from './levels';
@@ -180,6 +183,136 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
   return result;
 }
 
+// ─── Dynamic Buff Descriptions ────────────────────────────────────────────────
+
+/** Helper: format milliseconds as a clean seconds string (1 decimal, no trailing zero). */
+function toSec(ms: number): string {
+  return `${parseFloat((ms / 1000).toFixed(1))}s`;
+}
+
+/** Effective fire interval after `stacks` fire_rate_up buffs (floored at 60 ms). */
+function fireInterval(stacks: number): number {
+  return Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, stacks)), 60);
+}
+
+/** Effective item max-spawn interval after `stacks` item_drop_up buffs (floored at 4 000 ms). */
+function itemSpawnMax(stacks: number): number {
+  return stacks > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, stacks)), 4000)
+    : ITEM_SPAWN_MAX_MS;
+}
+
+/**
+ * Returns a dynamic description for a buff card that shows the player's
+ * current value and the expected value after selecting this buff.
+ * `currentBuffs` is the list of buffs already held (before this selection).
+ */
+export function buffDesc(id: BuffId, currentBuffs: BuffId[]): string {
+  const count = (b: BuffId): number => currentBuffs.filter(x => x === b).length;
+
+  switch (id) {
+    case 'fire_rate_up': {
+      const n   = count('fire_rate_up');
+      const cur = fireInterval(n);
+      const nxt = fireInterval(n + 1);
+      if (cur === nxt)
+        return `射擊間隔：${cur}ms（已達最短間隔）\n（已疊加 ${n} 次）`;
+      if (n === 0)
+        return `射擊間隔：${cur}ms → ${nxt}ms\n（每次提升 10%，可多次疊加）`;
+      const totalPct = Math.round((1 - nxt / PLAYER_FIRE_INTERVAL) * 100);
+      return `射擊間隔：${cur}ms → ${nxt}ms\n（已疊加 ${n} 次，累計提升 ${totalPct}%）`;
+    }
+
+    case 'triple_shot': {
+      const n   = count('triple_shot');
+      const cur = 1 + n;
+      const nxt = cur + 1;
+      if (n === 0)
+        return `每次射擊子彈數：${cur} → ${nxt} 顆\n（每次疊加 +1 顆）`;
+      return `每次射擊子彈數：${cur} → ${nxt} 顆\n（已疊加 ${n} 次）`;
+    }
+
+    case 'blood_price': {
+      const hpUp   = count('hp_up');
+      const bp     = count('blood_price');
+      const bpow   = count('bullet_power');
+      const curDmg = 1 + bp * 2 + bpow;
+      const curMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
+      const nxtMax = Math.max(curMax - 1, 1);
+      return `傷害：${curDmg} → ${curDmg + 2}（+2）\n生命上限：${curMax} → ${nxtMax}（-1）`;
+    }
+
+    case 'bullet_power': {
+      const n      = count('bullet_power');
+      const bp     = count('blood_price');
+      const curDmg = 1 + bp * 2 + n;
+      if (n === 0)
+        return `子彈傷害：${curDmg} → ${curDmg + 1}（+1）\n（可多次疊加）`;
+      return `子彈傷害：${curDmg} → ${curDmg + 1}（+1）\n（已疊加 ${n} 次）`;
+    }
+
+    case 'evasion': {
+      const n      = count('evasion');
+      const curPct = Math.min(n * 10, 30);
+      const nxtPct = Math.min((n + 1) * 10, 30);
+      if (n === 0)
+        return `閃避機率：0% → ${nxtPct}%\n（每次 +10%，上限 30%）`;
+      return `閃避機率：${curPct}% → ${nxtPct}%\n（已疊加 ${n} 次，上限 30%）`;
+    }
+
+    case 'regen': {
+      const n      = count('regen');
+      const nxtMs  = Math.max(15000 - (n + 1) * 3000, 6000);
+      if (n === 0)
+        return `每 ${toSec(nxtMs)} 自動回復 1 HP\n（可疊加 3 次，最快每 6s）`;
+      const curMs = Math.max(15000 - n * 3000, 6000);
+      if (curMs === nxtMs)
+        return `每 ${toSec(curMs)} 自動回復 1 HP\n（已達最短間隔，疊加 ${n} 次）`;
+      return `回復間隔：${toSec(curMs)} → ${toSec(nxtMs)}\n（已疊加 ${n} 次）`;
+    }
+
+    case 'long_invincible': {
+      const n     = count('long_invincible');
+      const curMs = INVINCIBLE_MS + n * 600;
+      const nxtMs = INVINCIBLE_MS + (n + 1) * 600;
+      if (n === 0)
+        return `受傷無敵：${toSec(curMs)} → ${toSec(nxtMs)}\n（每次疊加 +0.6s）`;
+      return `受傷無敵：${toSec(curMs)} → ${toSec(nxtMs)}\n（已疊加 ${n} 次）`;
+    }
+
+    case 'item_drop_up': {
+      const n      = count('item_drop_up');
+      const curMax = itemSpawnMax(n);
+      const nxtMax = itemSpawnMax(n + 1);
+      if (n === 0)
+        return `道具最長間隔：${toSec(curMax)} → ${toSec(nxtMax)}\n（每次縮短 25%，最多疊加 4 次）`;
+      const nxtReductionPct = Math.round((1 - Math.pow(0.75, n + 1)) * 100);
+      return `道具最長間隔：${toSec(curMax)} → ${toSec(nxtMax)}\n（已疊加 ${n} 次，累計縮短 ${nxtReductionPct}%）`;
+    }
+
+    case 'hp_up': {
+      const hpUp   = count('hp_up');
+      const bp     = count('blood_price');
+      const curMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
+      const nxtMax = Math.min(curMax + 1, 10);
+      return `最大生命 +1，並恢復 1 HP\n生命上限：${curMax} → ${nxtMax}`;
+    }
+
+    case 'hp_restore': {
+      const hpUp  = count('hp_up');
+      const bp    = count('blood_price');
+      const maxHp = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
+      const heal  = Math.ceil(maxHp / 2);
+      return `立即恢復 ${heal} HP\n（最大生命 ${maxHp} 的一半，上取整）`;
+    }
+
+    default: {
+      // Non-stackable buffs (berserker, periodic_shield): return their static description.
+      return ALL_BUFFS.find(b => b.id === id)?.desc ?? '';
+    }
+  }
+}
+
 // ─── Endless Wave Generator ───────────────────────────────────────────────────
 
 /**
@@ -212,8 +345,11 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const uncapped = waveNum >= ENDLESS_UNCAP_WAVE;
   const capAt = (val: number, max: number) => uncapped ? val : Math.min(val, max);
 
-  // Enemy HP grows with difficulty (capped early on to keep it fun).
-  const hp = capAt(Math.round(150 * d), 1200);
+  // Enemy HP: exponential raw growth soft-capped so it asymptotically
+  // approaches ENDLESS_HP_SOFT_CAP and can never reach or exceed it.
+  const ENDLESS_HP_SOFT_CAP = 95000;
+  const rawHp = Math.round(150 * d);
+  const hp = Math.round(ENDLESS_HP_SOFT_CAP * rawHp / (ENDLESS_HP_SOFT_CAP + rawHp));
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
