@@ -3,7 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createPlayerChicken, createCourageDisplay } from '../game/sprites';
 import { gameResult, costumeState, endlessState } from '../game/store';
-import { createLevel } from '../game/levels';
+import { createLevel, getStoryLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
@@ -110,7 +110,8 @@ async function enter(core: Core): Promise<void> {
     const best = endlessState.bestWave;
     levelLabelText = `無盡模式 · 第 ${waveReached} 波  最高：第 ${best} 波`;
   } else {
-    const clearedLevelConfig = createLevel(clearedLevel);
+    const storyLevelCfg = gameResult.storyMode ? getStoryLevel(clearedLevel) : null;
+    const clearedLevelConfig = storyLevelCfg ?? createLevel(clearedLevel);
     levelLabelText = won
       ? `通關第 ${clearedLevel} 關「${clearedLevelConfig.name}」！`
       : `挑戰第 ${clearedLevel} 關「${clearedLevelConfig.name}」`;
@@ -189,15 +190,15 @@ async function enter(core: Core): Promise<void> {
   // ── Story continuation button (only on story-mode win) ────────────────────
   let storyBtn: Container | null = null;
   if (isStoryWin) {
-    const sBtnW = 240, sBtnH = 58;
+    const sBtnW = 190, sBtnH = 42;
     storyBtn = new Container();
     storyBtn.eventMode = 'static';
     storyBtn.cursor = 'pointer';
 
     const sBtnBg = new Graphics();
-    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 12)
+    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 10)
       .fill({ color: 0x1a4466, alpha: 0.9 });
-    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 12)
+    sBtnBg.roundRect(-sBtnW / 2, -sBtnH / 2, sBtnW, sBtnH, 10)
       .stroke({ color: 0x44aaff, width: 2 });
     storyBtn.addChild(sBtnBg);
 
@@ -205,7 +206,7 @@ async function enter(core: Core): Promise<void> {
       text: '繼續劇情 ▶',
       style: new TextStyle({
         fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-        fontSize: 24,
+        fontSize: 18,
         fontWeight: 'bold',
         fill: 0xaaddff,
       }),
@@ -220,7 +221,7 @@ async function enter(core: Core): Promise<void> {
 
     storyBtn.on('pointerdown', async () => {
       sfxMenuClick();
-      await core.events.emit('scene/load', { key: 'story_ch1_end' });
+      await core.events.emit('scene/load', { key: `story_ch${gameResult.playedLevel}_end` });
     });
     storyBtn.on('pointerover', () => storyBtn!.scale.set(1.04));
     storyBtn.on('pointerout',  () => storyBtn!.scale.set(1.0));

@@ -83,11 +83,21 @@ async function enter(core: Core): Promise<void> {
   // Build chapter items
   const totalContentH = CHAPTERS.length * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP) - CHAPTER_ITEM_GAP;
 
+  /** Maps a 0-based chapter index to its scene key, or null if not yet implemented. */
+  function chapterSceneKey(idx: number): string | null {
+    const keys: Record<number, string> = {
+      0: 'story_prologue',
+      1: 'story_ch1',
+      2: 'story_ch2',
+    };
+    return keys[idx] ?? null;
+  }
+
   for (let i = 0; i < CHAPTERS.length; i++) {
     const ch = CHAPTERS[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
-    // Chapter 0 (prologue) and Chapter 1 (index 1) are playable; all others are coming soon
-    const isPlayable = i === 0 || i === 1;
+    // Chapter 0 (prologue), Chapter 1 (index 1), and Chapter 2 (index 2) are playable; all others are coming soon
+    const isPlayable = chapterSceneKey(i) !== null;
 
     const item = new Container();
     item.y = itemY;
@@ -158,8 +168,7 @@ async function enter(core: Core): Promise<void> {
       item.on('pointerout',  () => item.scale.set(1.0));
       item.on('pointerdown', async () => {
         sfxMenuClick();
-        const sceneKey = i === 0 ? 'story_prologue' : 'story_ch1';
-        await core.events.emit('scene/load', { key: sceneKey });
+        await core.events.emit('scene/load', { key: chapterSceneKey(i)! });
       });
     }
 
@@ -218,11 +227,10 @@ async function enter(core: Core): Promise<void> {
       if (idx >= 0 && idx < CHAPTERS.length) {
         const remainder = localY - idx * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
         if (remainder < CHAPTER_ITEM_H && localX >= 0 && localX < CHAPTER_ITEM_W) {
-        const isPlayable = idx === 0 || idx === 1;
-          if (isPlayable) {
+          const key = chapterSceneKey(idx);
+          if (key !== null) {
             sfxMenuClick();
-            const sceneKey = idx === 0 ? 'story_prologue' : 'story_ch1';
-            void core.events.emit('scene/load', { key: sceneKey });
+            void core.events.emit('scene/load', { key });
           }
         }
       }

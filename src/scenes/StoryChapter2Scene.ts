@@ -7,6 +7,7 @@ import {
   createStarfield,
 } from '../game/sprites';
 import { sfxMenuClick } from '../game/audio';
+import { endlessState, gameResult } from '../game/store';
 
 // ─── Dialogue data ─────────────────────────────────────────────────────────────
 interface DialogueLine {
@@ -22,35 +23,35 @@ const DIALOGUE: DialogueLine[] = [
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '你……真的打贏了……沒想到一隻小雞居然這麼厲害！',
+    text: '……等等！這場戰鬥還沒結束！',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '我說過的，我不會輕易退縮！',
+    text: '你……！你又出現了？我還以為我們和解了！',
     side: 'left',
   },
   {
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '哼……好吧，你通過了考驗。這片星空，歡迎你！',
+    text: '哼！剛才那只是個熱身而已。現在，才是真正的決鬥！',
     side: 'right',
   },
   {
     speaker: '小雞',
     portraitFactory: createChickenDisplay,
     accentColor: 0x66aaff,
-    text: '謝謝！其實你的彈幕也很厲害，下次一定更精彩！',
+    text: '好吧！如果你非要再戰，我也不會退縮！',
     side: 'left',
   },
   {
     speaker: '勇氣',
     portraitFactory: createCourageDisplay,
     accentColor: 0xff6644,
-    text: '別得意！……下次我絕對不會輸的！',
+    text: '小雞，這次迎接我全力的彈幕吧！',
     side: 'right',
   },
 ];
@@ -82,7 +83,7 @@ async function enter(core: Core): Promise<void> {
   dimOverlay.eventMode = 'none';
   worldLayer.addChild(dimOverlay);
 
-  // ── Chapter title card ──────────────────────────────────────────────────────
+  // ── Chapter title card (fades out after 1.5 s) ──────────────────────────────
   const titleCard = new Container();
   const titleCardBg = new Graphics();
   titleCardBg
@@ -94,7 +95,7 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardBg);
 
   const titleCardChapter = new Text({
-    text: '第一章',
+    text: '第二章',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
@@ -106,7 +107,7 @@ async function enter(core: Core): Promise<void> {
   titleCard.addChild(titleCardChapter);
 
   const titleCardTitle = new Text({
-    text: '勝利之後',
+    text: '第一次對決',
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 26,
@@ -278,7 +279,7 @@ async function enter(core: Core): Promise<void> {
     bodyText.x = textX;
     bodyText.y = panelY + PANEL_PAD + 26;
 
-    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 前往第二章' : '▶ 點擊繼續';
+    tapHint.text = idx === DIALOGUE.length - 1 ? '▶ 開始挑戰！' : '▶ 點擊繼續';
   }
 
   // ── Advance dialogue ────────────────────────────────────────────────────────
@@ -289,10 +290,6 @@ async function enter(core: Core): Promise<void> {
     advanceLocked = false;
   }, 1800);
 
-  async function finish(): Promise<void> {
-    await core.events.emit('scene/load', { key: 'story_ch2' });
-  }
-
   async function advance(): Promise<void> {
     if (advanceLocked) return;
     advanceLocked = true;
@@ -300,7 +297,10 @@ async function enter(core: Core): Promise<void> {
 
     lineIndex++;
     if (lineIndex >= DIALOGUE.length) {
-      await finish();
+      endlessState.active = false;
+      gameResult.currentLevel = 2;
+      gameResult.storyMode = true;
+      await core.events.emit('scene/load', { key: 'skillselect' });
       return;
     }
 
@@ -312,7 +312,10 @@ async function enter(core: Core): Promise<void> {
     if (advanceLocked) return;
     advanceLocked = true;
     sfxMenuClick();
-    await finish();
+    endlessState.active = false;
+    gameResult.currentLevel = 2;
+    gameResult.storyMode = true;
+    await core.events.emit('scene/load', { key: 'skillselect' });
   }
 
   const tapArea = new Graphics();
@@ -330,7 +333,7 @@ async function enter(core: Core): Promise<void> {
 
   showLine(0);
 
-  // ── Fade in the panel ───────────────────────────────────────────────────────
+  // ── Fade in the panel + UI after a short delay ──────────────────────────────
   const panelElements: Container[] = [
     panelBg, portraitFrame, portraitHolder, nameText, bodyText, tapHint, skipBtn,
   ];
@@ -345,7 +348,7 @@ async function enter(core: Core): Promise<void> {
   });
 
   // ── Tick: blink tap hint ────────────────────────────────────────────────────
-  const unsubTick = core.events.on('story_ch1_end', 'core/tick', () => {
+  const unsubTick = core.events.on('story_ch2', 'core/tick', () => {
     if (!advanceLocked) {
       tapHint.alpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 600));
     }
@@ -354,7 +357,7 @@ async function enter(core: Core): Promise<void> {
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   _cleanup = () => {
     clearTimeout(unlockTimer);
-    core.events.removeNamespace('story_ch1_end');
+    core.events.removeNamespace('story_ch2');
     unsubTick();
     worldLayer.removeChild(stars, dimOverlay);
     uiLayer.removeChild(
@@ -380,8 +383,8 @@ async function exit(_core: Core): Promise<void> {
   _cleanup = null;
 }
 
-export const StoryChapter1EndScene: SceneDescriptor = {
-  key: 'story_ch1_end',
+export const StoryChapter2Scene: SceneDescriptor = {
+  key: 'story_ch2',
   enter,
   exit,
 };

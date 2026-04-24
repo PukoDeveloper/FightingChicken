@@ -47,7 +47,7 @@ import {
   COL_BULLET_LASER,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState } from '../game/store';
-import { createLevel, TOTAL_LEVELS } from '../game/levels';
+import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType } from '../game/endless';
 import { SKILLS } from '../game/skills';
@@ -203,9 +203,12 @@ async function enter(core: Core): Promise<void> {
 
   // For endless mode we compute a single-wave "level" from endlessState.wave;
   // for normal mode we load the full level and set up multi-wave progression.
+  // For story mode we use the story-exclusive level config when available.
   const levelConfig = isEndless
     ? null
-    : createLevel(gameResult.currentLevel);
+    : (gameResult.storyMode
+        ? (getStoryLevel(gameResult.currentLevel) ?? createLevel(gameResult.currentLevel))
+        : createLevel(gameResult.currentLevel));
 
   let waveIdx = 0;
   let waveConfig: WaveConfig = isEndless
