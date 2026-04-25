@@ -173,6 +173,7 @@ export function createEnemyDisplay(type: EnemyType): Container {
     case 'phantom':   return createPhantomDisplay();
     case 'chaos':     return createChaosDisplay();
     case 'blackhole': return createBlackHoleDisplay();
+    case 'mech':      return createMechDisplay();
     default:          return createCourageDisplay();
   }
 }
@@ -296,6 +297,84 @@ export function createChaosDisplay(): Container {
     mawPts.push(jx, jy);
   }
   g.poly([-24, 38, ...mawPts, 24, 38]).fill(0x110000);
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Mech Boss (機甲) ─────────────────────────────────────────────────────────
+/**
+ * Build a Container for the Mech boss.
+ * A robotic armoured chicken with glowing red eyes, steel plating, and
+ * a sensor antenna. Origin at centre of the head/body.
+ */
+export function createMechDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer energy field (electric blue glow)
+  g.circle(0, 0, 58).fill({ color: 0x0044aa, alpha: 0.07 });
+  g.circle(0, 0, 50).fill({ color: 0x0088ff, alpha: 0.04 });
+
+  // 8-point armour shell
+  const spikes = 8;
+  const spikeOuter = 46;
+  const spikeInner = 38;
+  const pts: number[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? spikeOuter : spikeInner;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    pts.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.poly(pts).fill(0x1a2a3a);
+
+  // Main body plates
+  g.circle(0, 0, 38).fill(0x182028);
+  g.circle(0, 0, 34).fill(0x253545);
+
+  // Subtle circuit line highlights
+  g.rect(-28, -2, 56, 1.5).fill({ color: 0x44aaff, alpha: 0.18 });
+  g.rect(-1, -28, 1.5, 56).fill({ color: 0x44aaff, alpha: 0.18 });
+
+  // Shoulder armour plates
+  g.roundRect(-48, -12, 14, 20, 3).fill(0x2a3a4a);
+  g.roundRect(-48, -12, 14, 20, 3).stroke({ color: 0x44aaff, width: 1 });
+  g.roundRect(34, -12, 14, 20, 3).fill(0x2a3a4a);
+  g.roundRect(34, -12, 14, 20, 3).stroke({ color: 0x44aaff, width: 1 });
+
+  // Left eye socket
+  g.poly([-24, -16, -8, -20, -8, -8, -24, -4]).fill(0x000000);
+  // Left eye glow
+  g.poly([-22, -14, -10, -17, -10, -9, -22, -6]).fill(0xcc1100);
+  g.circle(-16, -11, 4).fill({ color: 0xff3311, alpha: 0.65 });
+  g.circle(-16, -11, 1.5).fill(0xffffff);
+
+  // Right eye socket
+  g.poly([8, -20, 24, -16, 24, -4, 8, -8]).fill(0x000000);
+  // Right eye glow
+  g.poly([10, -17, 22, -14, 22, -6, 10, -9]).fill(0xcc1100);
+  g.circle(16, -11, 4).fill({ color: 0xff3311, alpha: 0.65 });
+  g.circle(16, -11, 1.5).fill(0xffffff);
+
+  // Mechanical mouth / ventilation grille
+  g.roundRect(-18, 8, 36, 9, 2).fill(0x111a22);
+  for (let vi = 0; vi < 4; vi++) {
+    g.rect(-15 + vi * 9, 10, 6, 5).fill({ color: 0x44aaff, alpha: 0.55 });
+  }
+
+  // Corner rivets / bolts
+  const boltPos: Array<[number, number]> = [[-28, -28], [28, -28], [-28, 28], [28, 28]];
+  for (const [bx, by] of boltPos) {
+    g.circle(bx, by, 3).fill(0x3a5a7a);
+    g.circle(bx, by, 1.2).fill(0x88bbcc);
+  }
+
+  // Antenna shaft
+  g.rect(-1.5, -54, 3, 18).fill(0x3a5a7a);
+  // Antenna tip with glowing sensor
+  g.circle(0, -55, 5).fill(0x223344);
+  g.circle(0, -55, 3).fill(0x44ffcc);
+  g.circle(0, -55, 1.2).fill(0xffffff);
 
   c.addChild(g);
   return c;
