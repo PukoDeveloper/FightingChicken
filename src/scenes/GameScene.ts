@@ -111,6 +111,8 @@ interface BulletData {
   deflected?: boolean;
   /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
   damage?: number;
+  /** When false, the display was NOT acquired from a pool (e.g. wizard fireball) and must be destroyed rather than released. Defaults to true for pool-acquired bullets. */
+  pooled?: boolean;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -979,7 +981,11 @@ async function enter(core: Core): Promise<void> {
     const b = arr[idx];
     container.removeChild(b.display);
     if (isPlayer) {
-      playerBulletPool.release(b.display);
+      if (b.pooled !== false) {
+        playerBulletPool.release(b.display);
+      } else {
+        b.display.destroy();
+      }
     } else {
       enemyBulletPool.release(b.display);
     }
@@ -1714,19 +1720,34 @@ async function enter(core: Core): Promise<void> {
     return Math.sqrt(dx * dx + dy * dy) <= SKILL_BTN_R + 10;
   }
 
+  // When both buttons are in hit-test range (their expanded zones overlap), activate
+  // the one whose centre is closest to the tap so neither button steals the other's tap.
+  function handleBtnTap(canvasX: number, canvasY: number): boolean {
+    const inCostume = isOverCostumeBtn(canvasX, canvasY);
+    const inSkill   = isOverSkillBtn(canvasX, canvasY);
+    if (!inCostume && !inSkill) return false;
+    if (inCostume && inSkill) {
+      const dc = Math.hypot(canvasX - COSTUME_BTN_X, canvasY - COSTUME_BTN_Y);
+      const ds = Math.hypot(canvasX - SKILL_BTN_X,   canvasY - SKILL_BTN_Y);
+      if (dc <= ds) {
+        tryActivateCostumeAbility();
+      } else {
+        tryActivateSkill();
+      }
+    } else if (inCostume) {
+      tryActivateCostumeAbility();
+    } else {
+      tryActivateSkill();
+    }
+    return true;
+  }
+
   const unsubTouchStart = core.events.on(
     'game',
     'input/touch:start',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
-      if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateCostumeAbility();
-        return;
-      }
-      if (isOverSkillBtn(pos.x, pos.y)) {
-        tryActivateSkill();
-        return;
-      }
+      if (handleBtnTap(pos.x, pos.y)) return;
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
@@ -1754,14 +1775,7 @@ async function enter(core: Core): Promise<void> {
     'input/pointer:down',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
-      if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateCostumeAbility();
-        return;
-      }
-      if (isOverSkillBtn(pos.x, pos.y)) {
-        tryActivateSkill();
-        return;
-      }
+      if (handleBtnTap(pos.x, pos.y)) return;
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
@@ -1963,7 +1977,7 @@ async function enter(core: Core): Promise<void> {
             fbDisplay.x = px;
             fbDisplay.y = py - 10;
             playerBulletsContainer.addChild(fbDisplay);
-            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE });
+            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE, pooled: false });
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
             flashOverlay.alpha = 0.20;
             phaseFlashTimer = Math.max(phaseFlashTimer, 250);
@@ -3215,7 +3229,11 @@ async function enter(core: Core): Promise<void> {
     // Destroy all bullets (return to pools)
     for (const b of playerBullets) {
       playerBulletsContainer.removeChild(b.display);
-      playerBulletPool.release(b.display);
+      if (b.pooled !== false) {
+        playerBulletPool.release(b.display);
+      } else {
+        b.display.destroy();
+      }
     }
     for (const b of enemyBullets) {
       enemyBulletsContainer.removeChild(b.display);
