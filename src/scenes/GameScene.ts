@@ -558,12 +558,19 @@ async function enter(core: Core): Promise<void> {
   // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
   // Damage scales with wizardFireballUseCount (accumulates across waves within the same level).
   const isWizardCostume = costumeState.selected === 'wizard';
-  const WIZARD_CHANNEL_MS           = 2000;  // charge duration in ms
-  const WIZARD_COOLDOWN_MS          = 15000; // cooldown after firing in ms
-  const WIZARD_FIREBALL_DAMAGE      = 15;    // base HP damage dealt to enemy on first use
-  const WIZARD_FIREBALL_DAMAGE_BONUS = 8;    // extra damage added for each prior use this level
-  const WIZARD_FIREBALL_SPEED       = 360;   // px/s
-  const WIZARD_FIREBALL_HITBOX_R    = 20;    // collision radius for the large fireball sprite
+  const WIZARD_CHANNEL_MS              = 2000;  // charge duration in ms
+  const WIZARD_COOLDOWN_MS             = 15000; // cooldown after firing in ms
+  const WIZARD_FIREBALL_DAMAGE         = 15;    // base HP damage dealt to enemy on first use
+  const WIZARD_FIREBALL_DAMAGE_BONUS   = 8;     // extra damage added for each prior use this level
+  const WIZARD_FIREBALL_SPEED          = 360;   // px/s
+  const WIZARD_FIREBALL_HITBOX_R       = 20;    // collision radius for the large fireball sprite
+  const WIZARD_CIRCLE_ROTATION_SPEED   = 0.0018;  // outer ring rotation speed (radians/ms)
+  const WIZARD_RUNE_ROTATION_MULT      = 1.5;     // rune arc counter-rotation multiplier vs outer ring
+  const WIZARD_CIRCLE_BASE_RADIUS      = 50;      // starting radius of the magic circle (px)
+  const WIZARD_CIRCLE_CHARGE_EXPANSION = 30;      // extra radius gained as charge completes (px)
+  const WIZARD_CIRCLE_TIER_BONUS       = 8;       // extra radius per prior fireball use this level (px)
+  const WIZARD_CIRCLE_MIN_ALPHA        = 0.30;    // magic circle alpha at start of channeling
+  const WIZARD_CIRCLE_ALPHA_EXPANSION  = 0.55;    // alpha increase from start to end of channeling
   let wizardCooldownMs       = 0;
   let wizardChannelingMs     = 0; // counts DOWN from WIZARD_CHANNEL_MS while charging (0 = not charging)
   let wizardFireballUseCount = 0; // increments each time fireball is fired; never resets within a level
@@ -2023,10 +2030,10 @@ async function enter(core: Core): Promise<void> {
           }
 
           // ── Magic circle animation ──────────────────────────────────────
-          wizardCircleAngle += dt * 0.0018; // radians per ms (slow outer rotation)
-          const tierBonus  = wizardFireballUseCount * 8; // grows with each use
-          const baseR      = 50 + chargePct * 30 + tierBonus; // expands while charging
-          const circAlpha  = 0.30 + chargePct * 0.55;
+          wizardCircleAngle += dt * WIZARD_CIRCLE_ROTATION_SPEED;
+          const tierBonus  = wizardFireballUseCount * WIZARD_CIRCLE_TIER_BONUS;
+          const baseR      = WIZARD_CIRCLE_BASE_RADIUS + chargePct * WIZARD_CIRCLE_CHARGE_EXPANSION + tierBonus;
+          const circAlpha  = WIZARD_CIRCLE_MIN_ALPHA + chargePct * WIZARD_CIRCLE_ALPHA_EXPANSION;
           wizardMagicCircle.visible = true;
           wizardMagicCircle.x = playerEntity.position.x;
           wizardMagicCircle.y = playerEntity.position.y;
@@ -2055,7 +2062,7 @@ async function enter(core: Core): Promise<void> {
           // Counter-rotating arc rune segments
           const runeCount = 6;
           for (let ri = 0; ri < runeCount; ri++) {
-            const ra = -wizardCircleAngle * 1.5 + (ri / runeCount) * Math.PI * 2;
+            const ra = -wizardCircleAngle * WIZARD_RUNE_ROTATION_MULT + (ri / runeCount) * Math.PI * 2;
             wizardMagicCircle
               .arc(0, 0, baseR - 8, ra, ra + 0.30)
               .stroke({ color: 0xffffff, width: 2.5, alpha: circAlpha * 0.85 });
