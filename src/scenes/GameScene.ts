@@ -451,6 +451,7 @@ async function enter(core: Core): Promise<void> {
   let petPhaseActive = false;
   let petPhaseTriggered = false;
   let petBannerTimer = 0;
+  let bossRegenTimer = 0;
 
   // Pet constants
   const PET_HP = 55;
@@ -461,6 +462,8 @@ async function enter(core: Core): Promise<void> {
   const PET_BULLET_SPEED = 200; // BULLET_SPEED_MEDIUM
   const PET_BULLET_COLOR = 0xaa44ff;
   const PET_BAR_W = 54;
+  const BOSS_REGEN_INTERVAL = 2000; // ms between boss HP regen ticks during pet phase
+  const BOSS_REGEN_AMOUNT = 3;      // HP restored per tick
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -1397,6 +1400,7 @@ async function enter(core: Core): Promise<void> {
   /** Spawn the two pet guardians flanking the boss. */
   function spawnPets(): void {
     petPhaseActive = true;
+    bossRegenTimer = BOSS_REGEN_INTERVAL;
     // Clear all existing boss bullets for a dramatic pause
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
       enemyBulletsContainer.removeChild(enemyBullets[i].display);
@@ -2177,6 +2181,15 @@ async function enter(core: Core): Promise<void> {
           petBannerTimer = Math.max(0, petBannerTimer - dt);
           waveBannerText.alpha = petBannerTimer < 400 ? petBannerTimer / 400 : 1;
           if (petBannerTimer <= 0) waveBannerText.alpha = 0;
+        }
+
+        // Boss HP regeneration during pet phase
+        bossRegenTimer -= dt;
+        if (bossRegenTimer <= 0) {
+          bossRegenTimer = BOSS_REGEN_INTERVAL;
+          if (enemyHP < waveMaxHp) {
+            enemyHP = Math.min(waveMaxHp, enemyHP + BOSS_REGEN_AMOUNT);
+          }
         }
       } else if (petBannerTimer > 0) {
         // Handle banner fade-out even when pet phase just ended
