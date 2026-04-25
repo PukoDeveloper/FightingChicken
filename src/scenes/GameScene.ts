@@ -39,7 +39,7 @@ import {
   POWER_FIRE_INTERVAL,
   HEALTH_ITEM_PROB,
   HEALTH_ITEM_INVINCIBLE_MS,
-  MOOSE_GIFT_PROB,
+  MOOSE_GIFT_INTERVAL_MS,
   SHOCKWAVE_MAX_RADIUS,
   SHOCKWAVE_THICKNESS,
   BUBBLE_HITBOX_R,
@@ -311,6 +311,7 @@ async function enter(core: Core): Promise<void> {
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
   let itemSpawnTimer = 5000; // first item spawns after 5 s
+  let mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS; // first gift box spawns after one full interval
   let powerUpTimer = 0;      // ms remaining on current damage power-up
 
   // ── Endless-mode buff state ───────────────────────────────────────────────
@@ -1029,16 +1030,17 @@ async function enter(core: Core): Promise<void> {
       lifetime: ITEM_LIFETIME_MS,
     });
 
-    // Moose costume passive: each item spawn has a random chance to also drop a gift box.
-    if (isMooseCostume && Math.random() < MOOSE_GIFT_PROB) {
-      const gx = 30 + Math.random() * (W - 60);
-      const gy = -20;
-      const gDisplay = createGiftBoxItem();
-      gDisplay.x = gx;
-      gDisplay.y = gy;
-      itemsContainer.addChild(gDisplay);
-      items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
-    }
+  }
+
+  // ── Helper: spawn a moose costume gift box ────────────────────────────────
+  function spawnMooseGift(): void {
+    const gx = 30 + Math.random() * (W - 60);
+    const gy = -20;
+    const gDisplay = createGiftBoxItem();
+    gDisplay.x = gx;
+    gDisplay.y = gy;
+    itemsContainer.addChild(gDisplay);
+    items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
   }
 
   // ── Helper: remove pickup item ────────────────────────────────────────────
@@ -2538,6 +2540,15 @@ async function enter(core: Core): Promise<void> {
         if (itemSpawnTimer <= 0) {
           itemSpawnTimer = itemSpawnMinMs + Math.random() * (itemSpawnMaxMs - itemSpawnMinMs);
           spawnItem();
+        }
+      }
+
+      // ── Moose gift timer (independent of normal item spawn) ───────────────
+      if (isMooseCostume && !waveTransitioning) {
+        mooseGiftTimer -= dt;
+        if (mooseGiftTimer <= 0) {
+          mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS;
+          spawnMooseGift();
         }
       }
 

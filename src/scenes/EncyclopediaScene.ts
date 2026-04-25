@@ -7,6 +7,7 @@ import {
   createPhantomDisplay,
   createChaosDisplay,
   createPetDisplay,
+  createBlackHoleDisplay,
 } from '../game/sprites';
 
 // ─── Encyclopedia (圖鑑) overlay ─────────────────────────────────────────────
@@ -188,6 +189,17 @@ const ENTITIES: EntityEntry[] = [
       '獨立射擊子彈，與 BOSS 的攻擊疊加，大幅提高全螢幕子彈密度。',
     tip: '優先集中火力擊滅寵物護衛以恢復喘息空間；HP 較低，數發即可擊殺。',
   },
+  {
+    name: '黑洞',
+    color: '#08000f',
+    borderColor: '#6600cc',
+    appearsIn: '虛空之境模式',
+    description:
+      '虛空之境中心的永恆存在，無法被擊敗。' +
+      '持續發射螺旋彈、瞄準彈、衝擊波與陷阱泡泡，在 60 秒計時結束前不斷施壓。' +
+      '目標是在限時內對黑洞造成盡可能多的傷害，以刷新最高傷害紀錄。',
+    tip: '黑洞無法擊倒——專注閃避並持續輸出。善用技能在安全窗口中衝刺高傷害。',
+  },
 ];
 
 // ─── HTML generation ──────────────────────────────────────────────────────────
@@ -290,6 +302,7 @@ async function enter(core: Core): Promise<void> {
   ];
   const entityImgs = [
     spriteToDataUrl(renderer as Renderer, createPetDisplay, 72),
+    spriteToDataUrl(renderer as Renderer, createBlackHoleDisplay, 140),
   ];
 
   const overlay = document.createElement('div');
@@ -458,6 +471,7 @@ async function enter(core: Core): Promise<void> {
   // ── Navigation ────────────────────────────────────────────────────────────
   const openedAt = Date.now();
   closeBtn.addEventListener('click', async () => {
+    if (Date.now() - openedAt < 350) return;
     await core.events.emit('scene/load', { key: 'title' });
   });
 
