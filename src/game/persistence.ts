@@ -133,7 +133,11 @@ export async function loadProgress(): Promise<void> {
       const slots = data.equippedSlots as Record<string, unknown>;
       for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
         const val = slots[slotId];
-        equipmentState.equippedSlots[slotId] = typeof val === 'string' ? (val as EquipmentId) : null;
+        if (typeof val === 'string' && equipmentState.obtained.has(val as EquipmentId)) {
+          equipmentState.equippedSlots[slotId] = val as EquipmentId;
+        } else {
+          equipmentState.equippedSlots[slotId] = null;
+        }
       }
     }
   } catch {
