@@ -1,7 +1,7 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
-import { createStarfield, createPlayerChicken, createCourageDisplay } from '../game/sprites';
+import { createStarfield, createPlayerChicken, createEnemyDisplay } from '../game/sprites';
 import { gameResult, costumeState, endlessState, voidState } from '../game/store';
 import { createLevel, getStoryLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
@@ -34,7 +34,22 @@ async function enter(core: Core): Promise<void> {
         ? endlessState.highScore
         : (gameResult.levelHighScores[gameResult.playedLevel] ?? 0));
 
-  const character = (won && !isVoidGameOver) ? createCourageDisplay() : createPlayerChicken(costumeState.selected);
+  // Resolve which boss was fought so the victory screen shows the right sprite.
+  const clearedLevel = gameResult.playedLevel;
+  const isNormalLevelWin = won && !isVoidGameOver && !isEndlessGameOver;
+  const bossEnemyType = isNormalLevelWin
+    ? ((gameResult.storyMode ? getStoryLevel(clearedLevel) : null) ?? createLevel(clearedLevel)).enemyType
+    : 'courage' as const;
+
+  const bossNameMap: Record<string, string> = {
+    courage:  '勇氣',
+    phantom:  '幽靈',
+    chaos:    '混沌',
+    mech:     '機甲',
+  };
+  const bossName = bossNameMap[bossEnemyType] ?? '強敵';
+
+  const character = (won && !isVoidGameOver) ? createEnemyDisplay(bossEnemyType) : createPlayerChicken(costumeState.selected);
   character.scale.set((won && !isVoidGameOver) ? 1.8 : 1.6);
   character.x = W * 0.5;
   character.y = H * 0.42;
@@ -109,7 +124,6 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(hiScoreLabel);
 
   // ── Level / endless wave reached ──────────────────────────────────────────
-  const clearedLevel = gameResult.playedLevel;
   const levelStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 16,
@@ -148,7 +162,7 @@ async function enter(core: Core): Promise<void> {
     : (isEndlessGameOver
         ? '被彈幕擊倒了...\n無盡的挑戰等著你！'
         : (won
-          ? '你用勇氣戰勝了勇氣！\n小雞的逆襲成功了！'
+          ? `你擊敗了${bossName}！\n小雞的逆襲成功了！`
           : '被彈幕擊倒了...\n再試一次！'));
   const msgLabel = new Text({ text: msgText, style: msgStyle });
   msgLabel.anchor.set(0.5);

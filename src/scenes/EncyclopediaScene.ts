@@ -6,6 +6,7 @@ import {
   createCourageDisplay,
   createPhantomDisplay,
   createChaosDisplay,
+  createMechDisplay,
   createPetDisplay,
   createBlackHoleDisplay,
 } from '../game/sprites';
@@ -108,6 +109,18 @@ const BOSSES: BossEntry[] = [
       '螺旋彈、環形彈、衝擊波、炸彈、雷射柱、追蹤彈…' +
       '並在第三階段召喚寵物護衛協同作戰。',
     weakness: '保留技能至第三階段；擊殺寵物護衛可減少子彈密度。',
+  },
+  {
+    name: '機甲',
+    subtitle: 'Mech',
+    color: '#0a1220',
+    borderColor: '#44aaff',
+    levels: '第 6 關',
+    hp: '520',
+    description:
+      '高度機械化的裝甲雞型戰機，配備螺旋彈、直落彈幕、雷射柱與追蹤彈等全套武裝。' +
+      '第三階段同時啟動所有系統，子彈密度極高，並透過衝擊波與延遲炸彈壓縮閃躲空間。',
+    weakness: '直落彈幕規律且成欄，橫向在兩欄之間穿梭可有效規避；追蹤彈以大圓弧甩開後趁機輸出。',
   },
 ];
 
@@ -299,6 +312,7 @@ async function enter(core: Core): Promise<void> {
     spriteToDataUrl(renderer as Renderer, createCourageDisplay, 130),
     spriteToDataUrl(renderer as Renderer, createPhantomDisplay, 130),
     spriteToDataUrl(renderer as Renderer, createChaosDisplay, 140),
+    spriteToDataUrl(renderer as Renderer, createMechDisplay, 140),
   ];
   const entityImgs = [
     spriteToDataUrl(renderer as Renderer, createPetDisplay, 72),

@@ -404,6 +404,12 @@ async function enter(core: Core): Promise<void> {
     regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / 1.5), 6000) : 0;
   }
 
+  // ── Fox costume: reduce item spawn intervals by 30% (more frequent drops) ──
+  if (costumeState.selected === 'fox') {
+    itemSpawnMinMs = Math.max(Math.round(itemSpawnMinMs * 0.7), 2000);
+    itemSpawnMaxMs = Math.max(Math.round(itemSpawnMaxMs * 0.7), 4000);
+  }
+
   // ── Apply flat equipment bonuses (on top of buff/costume derived stats) ────
   bulletDamage   += equipAttackBonus;
   effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
@@ -553,7 +559,7 @@ async function enter(core: Core): Promise<void> {
   // ── Fox costume passive state ─────────────────────────────────────────────
   // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
   const isFoxCostume = costumeState.selected === 'fox';
-  const FOX_ATTRACT_RADIUS = 150;
+  const FOX_ATTRACT_RADIUS = 250;
   const FOX_ATTRACT_ACCEL  = 420; // extra px/s added toward player each second
 
   // ── Wizard costume active state ───────────────────────────────────────────
@@ -562,7 +568,7 @@ async function enter(core: Core): Promise<void> {
   const isWizardCostume = costumeState.selected === 'wizard';
   const WIZARD_CHANNEL_MS              = 2000;  // charge duration in ms
   const WIZARD_COOLDOWN_MS             = 15000; // cooldown after firing in ms
-  const WIZARD_FIREBALL_DAMAGE         = 15;    // base HP damage dealt to enemy on first use
+  const WIZARD_FIREBALL_DAMAGE         = 25;    // base HP damage dealt to enemy on first use
   const WIZARD_FIREBALL_DAMAGE_BONUS   = 8;     // extra damage added for each prior use this level
   const WIZARD_FIREBALL_SPEED          = 360;   // px/s
   const WIZARD_FIREBALL_HITBOX_R       = 20;    // collision radius for the large fireball sprite
@@ -1200,6 +1206,12 @@ async function enter(core: Core): Promise<void> {
       itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / BOSS_STAT_MULT), 2000);
       itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / BOSS_STAT_MULT), 4000);
       regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / BOSS_STAT_MULT), 6000) : 0;
+    }
+
+    // Fox costume: re-apply 30% item spawn interval reduction after buff recomputation
+    if (isFoxCostume) {
+      itemSpawnMinMs = Math.max(Math.round(itemSpawnMinMs * 0.7), 2000);
+      itemSpawnMaxMs = Math.max(Math.round(itemSpawnMaxMs * 0.7), 4000);
     }
 
     // Re-apply flat equipment bonuses after every recomputation.
