@@ -1714,19 +1714,30 @@ async function enter(core: Core): Promise<void> {
     return Math.sqrt(dx * dx + dy * dy) <= SKILL_BTN_R + 10;
   }
 
+  // When both buttons are in hit-test range (their expanded zones overlap), activate
+  // the one whose centre is closest to the tap so neither button steals the other's tap.
+  function handleBtnTap(canvasX: number, canvasY: number): boolean {
+    const inCostume = isOverCostumeBtn(canvasX, canvasY);
+    const inSkill   = isOverSkillBtn(canvasX, canvasY);
+    if (!inCostume && !inSkill) return false;
+    if (inCostume && inSkill) {
+      const dc = Math.hypot(canvasX - COSTUME_BTN_X, canvasY - COSTUME_BTN_Y);
+      const ds = Math.hypot(canvasX - SKILL_BTN_X,   canvasY - SKILL_BTN_Y);
+      if (dc <= ds) tryActivateCostumeAbility(); else tryActivateSkill();
+    } else if (inCostume) {
+      tryActivateCostumeAbility();
+    } else {
+      tryActivateSkill();
+    }
+    return true;
+  }
+
   const unsubTouchStart = core.events.on(
     'game',
     'input/touch:start',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
-      if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateCostumeAbility();
-        return;
-      }
-      if (isOverSkillBtn(pos.x, pos.y)) {
-        tryActivateSkill();
-        return;
-      }
+      if (handleBtnTap(pos.x, pos.y)) return;
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
@@ -1754,14 +1765,7 @@ async function enter(core: Core): Promise<void> {
     'input/pointer:down',
     ({ x, y }: { x: number; y: number }) => {
       const pos = toCanvas(x, y, core);
-      if (isOverCostumeBtn(pos.x, pos.y)) {
-        tryActivateCostumeAbility();
-        return;
-      }
-      if (isOverSkillBtn(pos.x, pos.y)) {
-        tryActivateSkill();
-        return;
-      }
+      if (handleBtnTap(pos.x, pos.y)) return;
       touchActive = true;
       touchTargetX = pos.x;
       touchTargetY = pos.y;
