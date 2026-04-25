@@ -3,6 +3,9 @@ import { gameResult, endlessState, costumeState, currencyState, equipmentState }
 import type { CostumeId } from './costumes';
 import type { EquipmentId } from './equipment';
 
+/** Convenience type alias for the upgrade-levels record. */
+type UpgradeLevelsRecord = Record<EquipmentId, number>;
+
 /** The default costume used when resetting progress. */
 const DEFAULT_COSTUME: CostumeId = 'default';
 
@@ -120,7 +123,7 @@ export async function loadProgress(): Promise<void> {
     if (data.equipmentUpgradeLevels && typeof data.equipmentUpgradeLevels === 'object') {
       for (const [id, lvl] of Object.entries(data.equipmentUpgradeLevels as Record<string, unknown>)) {
         if (typeof lvl === 'number' && Number.isFinite(lvl)) {
-          (equipmentState.upgradeLevels as Record<string, number>)[id] = lvl;
+          (equipmentState.upgradeLevels as UpgradeLevelsRecord)[id as EquipmentId] = lvl;
         }
       }
     }
@@ -144,7 +147,7 @@ export async function clearProgress(): Promise<void> {
     costumeState.selected = DEFAULT_COSTUME;
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
-    equipmentState.upgradeLevels = {} as Record<EquipmentId, number>;
+    equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {

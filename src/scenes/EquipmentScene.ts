@@ -564,11 +564,9 @@ async function enter(core: Core): Promise<void> {
       progressTxt.text = `收集進度：${equipmentState.obtained.size} / ${EQUIPMENT_DEFS.length}`;
 
       setTimeout(() => {
-        const newRemaining = EQUIPMENT_DEFS.filter((d) => !equipmentState.obtained.has(d.id));
-        subResultText.text = newRemaining.length > 0
-          ? '（點擊下方按鈕繼續抽獎）'
-          : '（已收集全部裝備！）';
-        subResultText.style.fill = newRemaining.length > 0 ? 0x555577 : 0xffdd44;
+        const allCollected = equipmentState.obtained.size >= EQUIPMENT_DEFS.length;
+        subResultText.text = allCollected ? '（已收集全部裝備！）' : '（點擊下方按鈕繼續抽獎）';
+        subResultText.style.fill = allCollected ? 0xffdd44 : 0x555577;
       }, 3000);
     });
   }
