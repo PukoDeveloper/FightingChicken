@@ -113,6 +113,8 @@ interface BulletData {
   deflected?: boolean;
   /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
   damage?: number;
+  /** Override collision radius for special projectiles (e.g. wizard fireball). Defaults to PLAYER_BULLET_R. */
+  radius?: number;
   /** When false, the display was NOT acquired from a pool (e.g. wizard fireball) and must be destroyed rather than released. Defaults to true for pool-acquired bullets. */
   pooled?: boolean;
 }
@@ -554,13 +556,25 @@ async function enter(core: Core): Promise<void> {
 
   // ── Wizard costume active state ───────────────────────────────────────────
   // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
+  // Damage scales with wizardFireballUseCount (accumulates across waves within the same level).
   const isWizardCostume = costumeState.selected === 'wizard';
-  const WIZARD_CHANNEL_MS       = 2000;  // charge duration in ms
-  const WIZARD_COOLDOWN_MS      = 15000; // cooldown after firing in ms
-  const WIZARD_FIREBALL_DAMAGE  = 15;    // HP damage dealt to enemy on hit
-  const WIZARD_FIREBALL_SPEED   = 360;   // px/s
-  let wizardCooldownMs    = 0;
-  let wizardChannelingMs  = 0; // counts DOWN from WIZARD_CHANNEL_MS while charging (0 = not charging)
+  const WIZARD_CHANNEL_MS              = 2000;  // charge duration in ms
+  const WIZARD_COOLDOWN_MS             = 15000; // cooldown after firing in ms
+  const WIZARD_FIREBALL_DAMAGE         = 15;    // base HP damage dealt to enemy on first use
+  const WIZARD_FIREBALL_DAMAGE_BONUS   = 8;     // extra damage added for each prior use this level
+  const WIZARD_FIREBALL_SPEED          = 360;   // px/s
+  const WIZARD_FIREBALL_HITBOX_R       = 20;    // collision radius for the large fireball sprite
+  const WIZARD_CIRCLE_ROTATION_SPEED   = 0.0018;  // outer ring rotation speed (radians/ms)
+  const WIZARD_RUNE_ROTATION_MULT      = 1.5;     // rune arc counter-rotation multiplier vs outer ring
+  const WIZARD_CIRCLE_BASE_RADIUS      = 50;      // starting radius of the magic circle (px)
+  const WIZARD_CIRCLE_CHARGE_EXPANSION = 30;      // extra radius gained as charge completes (px)
+  const WIZARD_CIRCLE_TIER_BONUS       = 8;       // extra radius per prior fireball use this level (px)
+  const WIZARD_CIRCLE_MIN_ALPHA        = 0.30;    // magic circle alpha at start of channeling
+  const WIZARD_CIRCLE_ALPHA_EXPANSION  = 0.55;    // alpha increase from start to end of channeling
+  let wizardCooldownMs       = 0;
+  let wizardChannelingMs     = 0; // counts DOWN from WIZARD_CHANNEL_MS while charging (0 = not charging)
+  let wizardFireballUseCount = 0; // increments each time fireball is fired; never resets within a level
+  let wizardCircleAngle      = 0; // accumulated rotation angle for the magic circle effect
 
   // ── Hero costume active state ─────────────────────────────────────────────
   // Active ability: 英雄之力 – invincible for HERO_INVINCIBLE_MS; absorbs all incoming bullets;
@@ -781,6 +795,11 @@ async function enter(core: Core): Promise<void> {
   let deflectAnimMs = 0;
   worldLayer.addChild(costumeRing);
 
+  // ── Wizard magic circle (drawn around player while channeling fireball) ───
+  const wizardMagicCircle = new Graphics();
+  wizardMagicCircle.visible = false;
+  worldLayer.addChild(wizardMagicCircle);
+
   // ── Active skill button (bottom-right) ────────────────────────────────────
   // Only rendered when an active skill is selected.
   const skillBtnContainer = new Container();
@@ -915,7 +934,8 @@ async function enter(core: Core): Promise<void> {
         costumeBtnLabel.text = `${Math.ceil(wizardCooldownMs / 1000)}s`;
         costumeBtnLabel.style.fill = 0x888888;
       } else {
-        costumeBtnLabel.text = '火球';
+        const nextDmg = WIZARD_FIREBALL_DAMAGE + wizardFireballUseCount * WIZARD_FIREBALL_DAMAGE_BONUS;
+        costumeBtnLabel.text = wizardFireballUseCount > 0 ? `火球\n×${wizardFireballUseCount + 1}\n${nextDmg}` : '火球';
         costumeBtnLabel.style.fill = 0xffffff;
       }
     } else if (isHeroCostume) {
@@ -1117,8 +1137,11 @@ async function enter(core: Core): Promise<void> {
     if (activeSkillId === 'burst_fire' && skillActiveMs > 0) timerEntries.push([skillTimerText, `🔥 爆發射擊 ${Math.ceil(skillActiveMs / 1000)}s`]);
     // elegant costume: show deflect shield duration
     if (deflectActiveMs > 0) timerEntries.push([deflectTimerText, `🌸 彈幕反彈 ${Math.ceil(deflectActiveMs / 1000)}s`]);
-    // wizard costume: show channel countdown
-    if (wizardChannelingMs > 0) timerEntries.push([wizardTimerText, `✨ 蓄力中 ${Math.ceil(wizardChannelingMs / 1000)}s`]);
+    // wizard costume: show channel countdown with next-shot damage
+    if (wizardChannelingMs > 0) {
+      const nextDmg = WIZARD_FIREBALL_DAMAGE + wizardFireballUseCount * WIZARD_FIREBALL_DAMAGE_BONUS;
+      timerEntries.push([wizardTimerText, `✨ 蓄力中 ${Math.ceil(wizardChannelingMs / 1000)}s  傷害:${nextDmg}`]);
+    }
     // hero costume: show active invincibility countdown
     if (heroActiveMs > 0) timerEntries.push([heroTimerText, `🛡 英雄無敵 ${Math.ceil(heroActiveMs / 1000)}s`]);
     // hero costume: show charged damage ready to fire
@@ -2005,8 +2028,49 @@ async function enter(core: Core): Promise<void> {
               },
             });
           }
+
+          // ── Magic circle animation ──────────────────────────────────────
+          wizardCircleAngle += dt * WIZARD_CIRCLE_ROTATION_SPEED;
+          const tierBonus  = wizardFireballUseCount * WIZARD_CIRCLE_TIER_BONUS;
+          const baseR      = WIZARD_CIRCLE_BASE_RADIUS + chargePct * WIZARD_CIRCLE_CHARGE_EXPANSION + tierBonus;
+          const circAlpha  = WIZARD_CIRCLE_MIN_ALPHA + chargePct * WIZARD_CIRCLE_ALPHA_EXPANSION;
+          wizardMagicCircle.visible = true;
+          wizardMagicCircle.x = playerEntity.position.x;
+          wizardMagicCircle.y = playerEntity.position.y;
+          wizardMagicCircle.clear();
+          // Outermost faint halo
+          wizardMagicCircle
+            .circle(0, 0, baseR + 16)
+            .stroke({ color: 0xff6600, width: 1, alpha: circAlpha * 0.35 });
+          // Outer ring
+          wizardMagicCircle
+            .circle(0, 0, baseR)
+            .stroke({ color: 0xffaa00, width: 2.5, alpha: circAlpha });
+          // Inner ring
+          wizardMagicCircle
+            .circle(0, 0, baseR - 16)
+            .stroke({ color: 0xffdd44, width: 1.5, alpha: circAlpha * 0.75 });
+          // Rotating spokes between inner and outer rings
+          const spokeCount = 8;
+          for (let si = 0; si < spokeCount; si++) {
+            const sa = wizardCircleAngle + (si / spokeCount) * Math.PI * 2;
+            wizardMagicCircle
+              .moveTo(Math.cos(sa) * (baseR - 16), Math.sin(sa) * (baseR - 16))
+              .lineTo(Math.cos(sa) * baseR,        Math.sin(sa) * baseR)
+              .stroke({ color: 0xffee44, width: 1.5, alpha: circAlpha });
+          }
+          // Counter-rotating arc rune segments
+          const runeCount = 6;
+          for (let ri = 0; ri < runeCount; ri++) {
+            const ra = -wizardCircleAngle * WIZARD_RUNE_ROTATION_MULT + (ri / runeCount) * Math.PI * 2;
+            wizardMagicCircle
+              .arc(0, 0, baseR - 8, ra, ra + 0.30)
+              .stroke({ color: 0xffffff, width: 2.5, alpha: circAlpha * 0.85 });
+          }
+
           if (wizardChannelingMs <= 0) {
             // Channel complete: fire the fireball
+            wizardMagicCircle.visible = false;
             wizardCooldownMs = WIZARD_COOLDOWN_MS;
             const ex = enemyEntity.position.x;
             const ey = enemyEntity.position.y;
@@ -2015,25 +2079,33 @@ async function enter(core: Core): Promise<void> {
             const dist = Math.sqrt((ex - px) * (ex - px) + (ey - py) * (ey - py)) || 1;
             const fbVx = ((ex - px) / dist) * WIZARD_FIREBALL_SPEED;
             const fbVy = ((ey - py) / dist) * WIZARD_FIREBALL_SPEED;
+            const fbDamage = WIZARD_FIREBALL_DAMAGE + wizardFireballUseCount * WIZARD_FIREBALL_DAMAGE_BONUS;
             const fbDisplay = createFireball();
+            // Scale the fireball sprite larger with each use
+            const fbScale = 1 + wizardFireballUseCount * 0.18;
+            fbDisplay.scale.set(fbScale);
             fbDisplay.x = px;
             fbDisplay.y = py - 10;
             playerBulletsContainer.addChild(fbDisplay);
-            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE, pooled: false });
+            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: fbDamage, radius: WIZARD_FIREBALL_HITBOX_R, pooled: false });
+            wizardFireballUseCount++;
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
-            flashOverlay.alpha = 0.20;
-            phaseFlashTimer = Math.max(phaseFlashTimer, 250);
+            flashOverlay.alpha = 0.22;
+            phaseFlashTimer = Math.max(phaseFlashTimer, 280);
+            core.events.emitSync('camera/shake', { intensity: 5, duration: 200 });
             core.events.emitSync('particle/emit', {
               config: {
                 x: px, y: py,
-                burst: true, burstCount: 28, speed: 160, speedVariance: 80,
-                spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
-                startScale: 1.5, endScale: 0,
-                startColor: 0xffcc00, endColor: 0xff4400, radius: 6,
+                burst: true, burstCount: 36, speed: 180, speedVariance: 90,
+                spread: 180, lifetime: 650, startAlpha: 1, endAlpha: 0,
+                startScale: 1.8, endScale: 0,
+                startColor: 0xffcc00, endColor: 0xff4400, radius: 7,
               },
             });
             redrawCostumeBtn();
           }
+        } else {
+          wizardMagicCircle.visible = false;
         }
       }
 
@@ -2275,7 +2347,7 @@ async function enter(core: Core): Promise<void> {
             const pet = pets[pi];
             const pdx = b.x - pet.x;
             const pdy = b.y - pet.display.y;
-            if (Math.sqrt(pdx * pdx + pdy * pdy) < PET_HITBOX_R + PLAYER_BULLET_R) {
+            if (Math.sqrt(pdx * pdx + pdy * pdy) < PET_HITBOX_R + (b.radius ?? PLAYER_BULLET_R)) {
               removeBullet(playerBullets, i, playerBulletsContainer, true);
               const petDmg = critChance > 0 && Math.random() < critChance ? bulletDamage * 2 : bulletDamage;
               pet.hp = Math.max(0, pet.hp - petDmg);
@@ -2316,7 +2388,7 @@ async function enter(core: Core): Promise<void> {
         const dx = b.x - enemyEntity.position.x;
         const dy = b.y - enemyEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
+        if (dist < ENEMY_HITBOX_R + (b.radius ?? PLAYER_BULLET_R)) {
           const baseDmg = b.damage ?? bulletDamage;
           const isCrit = critChance > 0 && Math.random() < critChance;
           const dmg = isCrit ? baseDmg * 2 : baseDmg;
@@ -3388,6 +3460,7 @@ async function enter(core: Core): Promise<void> {
     petsContainer.destroy({ children: true });
     trapRing.destroy();
     costumeRing.destroy();
+    wizardMagicCircle.destroy();
 
     // Destroy UI
     uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, skillBtnContainer, costumeBtnContainer);

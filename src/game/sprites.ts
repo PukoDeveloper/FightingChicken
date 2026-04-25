@@ -598,17 +598,21 @@ export function createGiftBoxItem(): Container {
   return c;
 }
 
-/** Wizard fireball projectile (魔法小雞 active): a glowing orange-yellow sphere. */
+/** Wizard fireball projectile (魔法小雞 active): a large glowing orange-yellow sphere. */
 export function createFireball(): Graphics {
   const g = new Graphics();
-  // Outer glow
-  g.circle(0, 0, 22).fill({ color: 0xff6600, alpha: 0.22 });
+  // Wide outer halo
+  g.circle(0, 0, 38).fill({ color: 0xff4400, alpha: 0.12 });
+  // Mid glow
+  g.circle(0, 0, 28).fill({ color: 0xff6600, alpha: 0.30 });
   // Core
-  g.circle(0, 0, 14).fill(0xff8800);
+  g.circle(0, 0, 20).fill(0xff8800);
   // Inner hot centre
-  g.circle(0, 0, 8).fill(0xffdd00);
+  g.circle(0, 0, 12).fill(0xffcc00);
+  // Bright centre
+  g.circle(0, 0, 7).fill(0xffee88);
   // Highlight
-  g.circle(-4, -5, 3).fill({ color: 0xffffff, alpha: 0.55 });
+  g.circle(-6, -7, 4).fill({ color: 0xffffff, alpha: 0.60 });
   return g;
 }
 
