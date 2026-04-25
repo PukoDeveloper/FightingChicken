@@ -286,7 +286,8 @@ async function enter(core: Core): Promise<void> {
   const enemyDisplay = createEnemyDisplay(enemyTypeForDisplay);
   const enemyHitFlashRadius = enemyTypeForDisplay === 'chaos' ? 48
     : enemyTypeForDisplay === 'phantom' ? 42
-    : enemyTypeForDisplay === 'blackhole' ? 34 : 44;
+    : enemyTypeForDisplay === 'blackhole' ? 34
+    : enemyTypeForDisplay === 'mech' ? 46 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
 
@@ -494,6 +495,7 @@ async function enter(core: Core): Promise<void> {
   let bombTimer = 0;
   let laserTimer = 0;
   let curveTimer = 0;
+  let straightTimer = 0;
   let spiralAngle = 0;
   let enemyBobTimer = 0;
   let hitFlashTimer = 0;
@@ -628,6 +630,7 @@ async function enter(core: Core): Promise<void> {
   });
   const bossDisplayName = enemyTypeForDisplay === 'courage' ? '勇氣'
     : enemyTypeForDisplay === 'phantom' ? '幽靈'
+    : enemyTypeForDisplay === 'mech' ? '機甲'
     : enemyTypeForDisplay === 'blackhole' ? '黑洞' : '混沌';
   const bossLabelInitialText = isVoid ? `⏱ 剩餘時間` : `${bossDisplayName}  HP`;
   const bossLabel = new Text({ text: bossLabelInitialText, style: bossLabelStyle });
@@ -1280,6 +1283,7 @@ async function enter(core: Core): Promise<void> {
       bombTimer = 0;
       laserTimer = 0;
       curveTimer = 0;
+      straightTimer = 0;
 
       // When entering phase 3 on the final wave of level 5: summon pet guardians
       if (
@@ -1466,6 +1470,19 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  /** Straight: fires count bullets in a horizontal spread, all going straight down.
+   *  Used by the mech enemy to rain bullets from its current (tracked) position. */
+  function fireStraight(count: number, speed: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const gap = 22; // horizontal px between adjacent bullets
+    const totalSpread = (count - 1) * gap;
+    for (let i = 0; i < count; i++) {
+      const ox = ex - totalSpread / 2 + i * gap;
+      spawnEnemyBullet(ox, ey, 0, speed, color);
+    }
+  }
+
   // ── Pet guardian helpers ─────────────────────────────────────────────────
 
   /** Spawn the two pet guardians flanking the boss. */
@@ -1595,7 +1612,7 @@ async function enter(core: Core): Promise<void> {
     petBannerTimer = 1600;
     // Reset all boss attack timers so there is a brief pause before the first shot
     spiralTimer = 0; aimTimer = 0; spreadTimer = 0; ringTimer = 0;
-    shockwaveTimer = 0; bubbleTimer = 0; bombTimer = 0; laserTimer = 0; curveTimer = 0;
+    shockwaveTimer = 0; bubbleTimer = 0; bombTimer = 0; laserTimer = 0; curveTimer = 0; straightTimer = 0;
   }
 
   // ── Active skill activation helper ───────────────────────────────────────
@@ -1910,6 +1927,18 @@ async function enter(core: Core): Promise<void> {
       // ── Enemy bobbing animation ───────────────────────────────────────────
       enemyBobTimer += dt;
       enemyEntity.position.y = H * 0.18 + Math.sin(enemyBobTimer / 800) * 12;
+
+      // ── Mech enemy: smooth horizontal tracking toward the player ──────────
+      // Active when waveConfig.enemyTracksPlayer is true (Level 6 Wave 1).
+      // The enemy glides left-right to stay above the player, combined with
+      // the vertical bob to create a natural "swaying" motion.
+      if (!waveTransitioning && waveConfig.enemyTracksPlayer) {
+        const trackTarget = Math.max(70, Math.min(W - 70, playerEntity.position.x));
+        const trackDx = trackTarget - enemyEntity.position.x;
+        const MECH_TRACK_SPEED = 90; // px/s
+        const maxMove = MECH_TRACK_SPEED * (dt / 1000);
+        enemyEntity.position.x += Math.sign(trackDx) * Math.min(Math.abs(trackDx), maxMove);
+      }
 
       // ── Phase flash ───────────────────────────────────────────────────────
       if (phaseFlashTimer > 0) {
@@ -2275,6 +2304,14 @@ async function enter(core: Core): Promise<void> {
           if (curveTimer <= 0) {
             curveTimer = p.curveInterval;
             fireCurve(p.curveWays, p.curveSpeed, p.curveTurnRate, p.curveColor);
+          }
+        }
+
+        if (p.straightInterval > 0) {
+          straightTimer -= dt;
+          if (straightTimer <= 0) {
+            straightTimer = p.straightInterval;
+            fireStraight(p.straightCount, p.straightSpeed, p.straightColor);
           }
         }
       }
@@ -3206,6 +3243,7 @@ async function enter(core: Core): Promise<void> {
     bombTimer = 0;
     laserTimer = 0;
     curveTimer = 0;
+    straightTimer = 0;
     trappedMs = 0;
     trapAnimMs = 0;
     phaseFlashTimer = 0;

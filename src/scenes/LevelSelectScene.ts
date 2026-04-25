@@ -40,9 +40,9 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(titleLabel);
 
   // ── Level buttons ─────────────────────────────────────────────────────────
-  const levelColors = [0x226622, 0xcc7700, 0x880088, 0x005588, 0x660000];
-  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444];
-  const btnW = 260, btnH = 76;
+  const levelColors = [0x226622, 0xcc7700, 0x880088, 0x005588, 0x660000, 0x111a2a];
+  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444, 0x44aaff];
+  const btnW = 260, btnH = 68;
   const levelBtns: Container[] = [];
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
@@ -90,7 +90,7 @@ async function enter(core: Core): Promise<void> {
     btn.addChild(waveLabel);
 
     btn.x = W * 0.5;
-    btn.y = H * (0.27 + (i - 1) * 0.145);
+    btn.y = H * (0.25 + (i - 1) * 0.12);
     uiLayer.addChild(btn);
     levelBtns.push(btn);
 

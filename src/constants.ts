@@ -67,7 +67,7 @@ export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Enemy types ─────────────────────────────────────────────────────────────
 /** Identifies which enemy sprite & theme is used for a level. */
-export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole';
+export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole' | 'mech';
 
 // ─── Void Realm mode ─────────────────────────────────────────────────────────
 /** Duration of a Void Realm timed session in ms (60 seconds). */
@@ -104,6 +104,7 @@ export const COL_BUBBLE      = 0x44ddff; // trap bubble – cyan
 export const COL_BULLET_BOMB  = 0xff7700; // exploding bomb projectile – orange
 export const COL_BULLET_LASER = 0x00ffff; // top-screen laser column – bright cyan
 export const COL_BULLET_CURVE = 0xff44cc; // homing/curving bullet – pink
+export const COL_BULLET_MECH  = 0x44aaff; // mech straight-down shot – steel blue
 
 // ─── Adventure Chicken ────────────────────────────────────────────────────────
 /** Distance (px) at or below which the adventure costume's max damage multiplier applies */

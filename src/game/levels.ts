@@ -11,6 +11,7 @@ import {
   COL_BULLET_BOMB,
   COL_BULLET_LASER,
   COL_BULLET_CURVE,
+  COL_BULLET_MECH,
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
 } from '../constants';
@@ -70,6 +71,11 @@ export interface WavePhaseConfig {
   curveSpeed: number;        // px/s travel speed
   curveTurnRate: number;     // radians/s to turn toward the player
   curveColor: number;
+
+  straightInterval: number;  // ms between straight-down volleys; 0 = disabled
+  straightCount: number;     // bullets per volley (spread horizontally)
+  straightSpeed: number;     // px/s downward speed
+  straightColor: number;
 }
 
 /** Configuration for one enemy encounter (wave) within a level. */
@@ -79,6 +85,12 @@ export interface WaveConfig {
   phase2Frac: number;   // HP fraction at which phase 2 starts
   phase3Frac: number;   // HP fraction at which phase 3 starts
   phases: [WavePhaseConfig, WavePhaseConfig, WavePhaseConfig]; // [phase1, phase2, phase3]
+  /**
+   * When true the enemy smoothly tracks the player's X position (horizontally)
+   * during gameplay, creating a "left-right swaying tracking" movement pattern.
+   * Defaults to false when omitted.
+   */
+  enemyTracksPlayer?: boolean;
 }
 
 /** Configuration for a complete level. */
@@ -139,6 +151,10 @@ export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
     curveSpeed: BULLET_SPEED_SLOW + 20,
     curveTurnRate: 1.2,
     curveColor: COL_BULLET_CURVE,
+    straightInterval: 0,
+    straightCount: 3,
+    straightSpeed: BULLET_SPEED_FAST,
+    straightColor: COL_BULLET_MECH,
     ...overrides,
   };
 }
@@ -643,8 +659,92 @@ const LEVEL_5: LevelConfig = {
   ],
 };
 
+// ─── Level 6 · 機甲試煉 (2 waves) ─────────────────────────────────────────────
+// Wave 1: Tracking Mech – sways left-right to follow the player and rains
+//         bullets straight down, mixing in rings, aimed shots, and bombs.
+// Wave 2: Mech Chicken BOSS – full arsenal with straight-down curtains.
 
-const LEVELS: LevelConfig[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5];
+const LEVEL_6: LevelConfig = {
+  levelNumber: 6,
+  name: '機甲試煉',
+  enemyType: 'mech',
+  itemDropMult: 0.85,
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 320,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      enemyTracksPlayer: true,
+      phases: [
+        phase({
+          spiralInterval: 280, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_MECH,
+          aimInterval: 1600,   aimWays: 2,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_MECH,
+          straightInterval: 1800, straightCount: 3, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+        }),
+        phase({
+          spiralInterval: 220, spiralWays: 10, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_MECH,
+          aimInterval: 1200,   aimWays: 3,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P2,
+          ringInterval: 4000,  ringCount: 18,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
+          straightInterval: 1400, straightCount: 5, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+          bombInterval: 7000,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+        }),
+        phase({
+          spiralInterval: 160, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 850,    aimWays: 4,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          ringInterval: 3000,  ringCount: 22,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 5500, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 30,  shockwaveColor: COL_SHOCKWAVE,
+          straightInterval: 1000, straightCount: 7, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+          bombInterval: 5500,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 6000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 6500, curveWays: 2,  curveSpeed: 160, curveTurnRate: 1.0, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 520,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 200, spiralWays: 10, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1200,   aimWays: 3,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P2,
+          spreadInterval: 1800, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P2,
+          straightInterval: 1600, straightCount: 4, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+          bombInterval: 8000,  bombCount: 1, bombFuseMs: 2300, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 7000, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+        }),
+        phase({
+          spiralInterval: 155, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 900,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          spreadInterval: 1300, spreadWays: 7, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 3500,  ringCount: 24,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 5000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 50,  shockwaveColor: COL_SHOCKWAVE,
+          straightInterval: 1200, straightCount: 6, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+          bombInterval: 6000,  bombCount: 2, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 5000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 6000, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          spiralInterval: 110, spiralWays: 15, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 560,    aimWays: 5,     aimSpread: 0.16,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          spreadInterval: 780,  spreadWays: 9, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 2400,  ringCount: 32,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 3700, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 70,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 4500, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 20,  bubbleColor: COL_BUBBLE,
+          straightInterval: 800,  straightCount: 8, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
+          bombInterval: 4500,  bombCount: 2, bombFuseMs: 1700, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 3800, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 4200, curveWays: 3,  curveSpeed: 180, curveTurnRate: 1.3, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+  ],
+};
+
+
+const LEVELS: LevelConfig[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
 
 /** Total number of defined levels. */
 export const TOTAL_LEVELS = LEVELS.length;
