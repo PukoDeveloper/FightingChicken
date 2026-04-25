@@ -52,7 +52,7 @@ import {
   ADVENTURE_PROXIMITY_MAX_DIST,
   ADVENTURE_PROXIMITY_MAX_MULT,
 } from '../constants';
-import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState } from '../game/store';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
@@ -324,6 +324,29 @@ async function enter(core: Core): Promise<void> {
   let hasBerserker        = (isEndless && endlessState.buffs.includes('berserker')) || giftBuffs.includes('berserker');
   let hasPeriodicShield   = (isEndless && endlessState.buffs.includes('periodic_shield')) || giftBuffs.includes('periodic_shield');
 
+  // ── Equipment bonuses (computed once at run start; slot changes aren't allowed mid-game) ──
+  const _eqWeapon    = equipmentState.equippedSlots.weapon;
+  const _eqArmor     = equipmentState.equippedSlots.armor;
+  const _eqAccessory = equipmentState.equippedSlots.accessory;
+  // 攻擊力: silver_blade +1/lv, flame_bracer +2/lv
+  const equipAttackBonus  =
+    (_eqWeapon === 'silver_blade' ? (equipmentState.upgradeLevels['silver_blade'] ?? 1) * 1 : 0) +
+    (_eqWeapon === 'flame_bracer' ? (equipmentState.upgradeLevels['flame_bracer'] ?? 1) * 2 : 0);
+  // 防禦力: iron_shield +1/lv, frost_gem +2/lv  → extra max HP
+  const equipDefenseBonus =
+    (_eqArmor === 'iron_shield' ? (equipmentState.upgradeLevels['iron_shield'] ?? 1) * 1 : 0) +
+    (_eqArmor === 'frost_gem'   ? (equipmentState.upgradeLevels['frost_gem']   ?? 1) * 2 : 0);
+  // 速度: jade_ring +15 px/s per lv, thunder_boots +30 px/s per lv
+  const equipSpeedBonus   =
+    (_eqAccessory === 'jade_ring'      ? (equipmentState.upgradeLevels['jade_ring']     ?? 1) * 15 : 0) +
+    (_eqAccessory === 'thunder_boots'  ? (equipmentState.upgradeLevels['thunder_boots'] ?? 1) * 30 : 0);
+  // 暴擊: stardust_necklace +5% per lv
+  const equipCritBonus    =
+    _eqAccessory === 'stardust_necklace' ? (equipmentState.upgradeLevels['stardust_necklace'] ?? 1) * 0.05 : 0;
+  // 閃躲: moon_cape +2% per lv
+  const equipEvasionBonus =
+    _eqArmor === 'moon_cape' ? (equipmentState.upgradeLevels['moon_cape'] ?? 1) * 0.02 : 0;
+
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
   // iron_will skill: +1 max HP
   const skillIronWill = skillState.selected === 'iron_will';
@@ -365,6 +388,13 @@ async function enter(core: Core): Promise<void> {
     itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / 1.5), 4000);
     regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / 1.5), 6000) : 0;
   }
+
+  // ── Apply flat equipment bonuses (on top of buff/costume derived stats) ────
+  bulletDamage   += equipAttackBonus;
+  effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
+  evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
+  // Crit chance from stardust_necklace (5% per upgrade level, capped at 50%)
+  let critChance  = Math.min(equipCritBonus, 0.50);
 
   // Periodic shield: counts down ms until next activation.
   // Carry over the remaining time from the previous wave (or start fresh at 12 s).
@@ -1021,6 +1051,7 @@ async function enter(core: Core): Promise<void> {
       : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`;
     if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
     if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
+    if (critChance > 0) statusLine += `  CRT:${Math.round(critChance * 100)}%`;
     if (buffLongInvCount > 0) statusLine += `  INV:${(effectiveInvincibleMs / 1000).toFixed(1)}s`;
     if (buffItemDropCount > 0) statusLine += `  ITEM:${Math.round(itemSpawnMinMs / 1000)}s`;
     levelWaveText.text = statusLine;
@@ -1093,6 +1124,14 @@ async function enter(core: Core): Promise<void> {
       itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / BOSS_STAT_MULT), 4000);
       regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / BOSS_STAT_MULT), 6000) : 0;
     }
+
+    // Re-apply flat equipment bonuses after every recomputation.
+    // This is safe because effectiveHpMax, bulletDamage, and evasionChance
+    // are fully reset from buff counts above (lines 1102-1105), so adding
+    // equipment bonuses here does not double-stack with the initial calc.
+    bulletDamage   += equipAttackBonus;
+    effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
+    evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
   }
 
   // ── Helper: apply a gift buff received from the moose costume's gift box ────
@@ -1761,7 +1800,7 @@ async function enter(core: Core): Promise<void> {
         const dy = targetY - playerEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const speedMult = trappedMs > 0 ? TRAP_SLOW_FACTOR : 1;
-        const maxMove = devConfig.playerMoveSpeed * speedMult * (dt / 1000);
+        const maxMove = (devConfig.playerMoveSpeed + equipSpeedBonus) * speedMult * (dt / 1000);
         if (dist < maxMove) {
           playerEntity.position.x = targetX;
           playerEntity.position.y = targetY;
@@ -2169,9 +2208,10 @@ async function enter(core: Core): Promise<void> {
             const pdy = b.y - pet.display.y;
             if (Math.sqrt(pdx * pdx + pdy * pdy) < PET_HITBOX_R + PLAYER_BULLET_R) {
               removeBullet(playerBullets, i, playerBulletsContainer, true);
-              pet.hp = Math.max(0, pet.hp - bulletDamage);
+              const petDmg = critChance > 0 && Math.random() < critChance ? bulletDamage * 2 : bulletDamage;
+              pet.hp = Math.max(0, pet.hp - petDmg);
               pet.hitFlashMs = 80;
-              score += SCORE_PER_HIT * bulletDamage;
+              score += SCORE_PER_HIT * petDmg;
               sfxEnemyHit();
 
               // Update pet HP bar fill
@@ -2208,7 +2248,9 @@ async function enter(core: Core): Promise<void> {
         const dy = b.y - enemyEntity.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ENEMY_HITBOX_R + PLAYER_BULLET_R) {
-          const dmg = b.damage ?? bulletDamage;
+          const baseDmg = b.damage ?? bulletDamage;
+          const isCrit = critChance > 0 && Math.random() < critChance;
+          const dmg = isCrit ? baseDmg * 2 : baseDmg;
           removeBullet(playerBullets, i, playerBulletsContainer, true);
           enemyHP = Math.max(0, enemyHP - dmg);
           score += SCORE_PER_HIT * dmg;
