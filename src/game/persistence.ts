@@ -1,6 +1,7 @@
 import type { Core } from '@inkshot/engine';
-import { gameResult, endlessState, costumeState, currencyState } from './store';
+import { gameResult, endlessState, costumeState, currencyState, equipmentState } from './store';
 import type { CostumeId } from './costumes';
+import type { EquipmentId } from './equipment';
 
 /** The default costume used when resetting progress. */
 const DEFAULT_COSTUME: CostumeId = 'default';
@@ -50,6 +51,8 @@ export async function saveProgress(): Promise<void> {
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
         cosmicAsh: currencyState.cosmicAsh,
+        obtainedEquipment: [...equipmentState.obtained],
+        equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
         _achievements: achievementsSnapshot,
       },
     });
@@ -105,6 +108,22 @@ export async function loadProgress(): Promise<void> {
     if (typeof data.cosmicAsh === 'number' && Number.isFinite(data.cosmicAsh)) {
       currencyState.cosmicAsh = Math.max(0, Math.floor(data.cosmicAsh));
     }
+
+    if (Array.isArray(data.obtainedEquipment)) {
+      for (const id of data.obtainedEquipment) {
+        if (typeof id === 'string') {
+          equipmentState.obtained.add(id as EquipmentId);
+        }
+      }
+    }
+
+    if (data.equipmentUpgradeLevels && typeof data.equipmentUpgradeLevels === 'object') {
+      for (const [id, lvl] of Object.entries(data.equipmentUpgradeLevels as Record<string, unknown>)) {
+        if (typeof lvl === 'number' && Number.isFinite(lvl)) {
+          (equipmentState.upgradeLevels as Record<string, number>)[id] = lvl;
+        }
+      }
+    }
   } catch {
     // Silently ignore corrupt or unreadable save data.
   }
@@ -124,6 +143,8 @@ export async function clearProgress(): Promise<void> {
     costumeState.clearedLevels = new Set();
     costumeState.selected = DEFAULT_COSTUME;
     currencyState.cosmicAsh = 0;
+    equipmentState.obtained = new Set();
+    equipmentState.upgradeLevels = {} as Record<EquipmentId, number>;
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {
@@ -135,6 +156,8 @@ export async function clearProgress(): Promise<void> {
         endlessBestWave: 1,
         endlessHighScore: 0,
         cosmicAsh: 0,
+        obtainedEquipment: [],
+        equipmentUpgradeLevels: {},
         _achievements: { data: {} },
       },
     });

@@ -2,9 +2,15 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { currencyState } from '../game/store';
+import { currencyState, equipmentState } from '../game/store';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { saveProgress } from '../game/persistence';
+import {
+  EQUIPMENT_DEFS,
+  EQUIPMENT_MAX_LEVEL,
+  EQUIPMENT_UPGRADE_COST,
+  type EquipmentId,
+} from '../game/equipment';
 
 let _cleanup: (() => void) | null = null;
 let _transitioning = false;
@@ -213,11 +219,11 @@ async function enter(core: Core): Promise<void> {
     return c;
   }
 
-  // ── Equipment slot definitions (stub) ─────────────────────────────────────
+  // ── Equipment slot definitions ────────────────────────────────────────────
   const EQUIP_SLOTS = [
-    { name: '武器', desc: '（尚未裝備）', icon: '⚔️' },
-    { name: '防具', desc: '（尚未裝備）', icon: '🛡️' },
-    { name: '飾品', desc: '（尚未裝備）', icon: '💍' },
+    { name: '武器', icon: '⚔️' },
+    { name: '防具', icon: '🛡️' },
+    { name: '飾品', icon: '💍' },
   ];
 
   // ── Panel builder ─────────────────────────────────────────────────────────
@@ -253,7 +259,7 @@ async function enter(core: Core): Promise<void> {
       parent.addChild(iconTxt);
 
       const descTxt = new Text({
-        text: slot.desc,
+        text: '（尚未裝備）',
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
           fontSize: 13,
@@ -265,11 +271,32 @@ async function enter(core: Core): Promise<void> {
       parent.addChild(descTxt);
     });
 
-    const comingText = makeLabel('（裝備功能即將推出）', cx, PANEL_Y + 230, 14, 0x555577);
-    parent.addChild(comingText);
+    // Show obtained equipment list below slots
+    const obtained = [...equipmentState.obtained];
+    if (obtained.length > 0) {
+      parent.addChild(makeLabel('已獲得裝備', cx, PANEL_Y + 230, 15, 0xaaddff));
+      obtained.forEach((id, idx) => {
+        const def = EQUIPMENT_DEFS.find((d) => d.id === id);
+        if (!def) return;
+        const lvl = equipmentState.upgradeLevels[id] ?? 1;
+        const listTxt = new Text({
+          text: `${def.icon} ${def.name}  Lv.${lvl}`,
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 13,
+            fill: 0x88ffaa,
+          }),
+        });
+        listTxt.anchor.set(0.5);
+        listTxt.x = cx;
+        listTxt.y = PANEL_Y + 256 + idx * 22;
+        parent.addChild(listTxt);
+      });
+    } else {
+      parent.addChild(makeLabel('（尚未獲得任何裝備，前往裝備抽獎！）', cx, PANEL_Y + 230, 13, 0x555577));
+    }
   }
 
-  const UPGRADE_COST = 3;
   const INSUFFICIENT_FUNDS_COLOR = 0xff4444;
   const COST_LABEL_COLOR = 0xaaddff;
 
@@ -277,19 +304,23 @@ async function enter(core: Core): Promise<void> {
     const cx = W * 0.5;
 
     parent.addChild(makeLabel('裝備升級', cx, PANEL_Y + 24, 17, 0xffd700));
-    parent.addChild(makeLabel('消耗宇宙灰燼來強化你的裝備能力。', cx, PANEL_Y + 60, 13, 0x888899));
 
-    // Upgrade option rows (stubs)
-    const UPGRADE_OPTS = [
-      { name: '攻擊力 +1', cost: UPGRADE_COST, color: 0x882200 },
-      { name: '防禦力 +1', cost: UPGRADE_COST, color: 0x224488 },
-      { name: '速度 +1',   cost: UPGRADE_COST, color: 0x226622 },
-    ];
+    const obtained = [...equipmentState.obtained];
 
-    const ITEM_W = PANEL_W - 30, ITEM_H = 58, ITEM_GAP = 10;
-    const startY = PANEL_Y + 86;
+    if (obtained.length === 0) {
+      parent.addChild(makeLabel('（尚未獲得任何裝備，請先前往裝備抽獎！）', cx, PANEL_Y + 80, 13, 0x555577));
+      return;
+    }
 
-    UPGRADE_OPTS.forEach((opt, i) => {
+    parent.addChild(makeLabel(`升級費用：✨×${EQUIPMENT_UPGRADE_COST}／次　最高 Lv.${EQUIPMENT_MAX_LEVEL}`, cx, PANEL_Y + 52, 12, 0x888899));
+
+    const ITEM_W = PANEL_W - 30, ITEM_H = 58, ITEM_GAP = 8;
+    const startY = PANEL_Y + 72;
+
+    obtained.forEach((id, i) => {
+      const def = EQUIPMENT_DEFS.find((d) => d.id === id);
+      if (!def) return;
+
       const iy = startY + i * (ITEM_H + ITEM_GAP);
       const itemBg = new Graphics();
       itemBg
@@ -301,88 +332,114 @@ async function enter(core: Core): Promise<void> {
       parent.addChild(itemBg);
 
       const nameTxt = new Text({
-        text: opt.name,
+        text: `${def.icon} ${def.name}`,
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: 'bold',
           fill: 0xddddee,
         }),
       });
       nameTxt.x = PANEL_X + 28;
-      nameTxt.y = iy + ITEM_H / 2 - 10;
+      nameTxt.y = iy + ITEM_H / 2 - 12;
       parent.addChild(nameTxt);
 
-      const costTxt = new Text({
-        text: `✨ ×${opt.cost}`,
+      const currentLvl = equipmentState.upgradeLevels[id] ?? 1;
+
+      const lvlTxt = new Text({
+        text: `Lv.${currentLvl}  ${def.stat}`,
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 13,
-          fill: COST_LABEL_COLOR,
+          fontSize: 12,
+          fill: 0x88aadd,
+        }),
+      });
+      lvlTxt.x = PANEL_X + 28;
+      lvlTxt.y = iy + ITEM_H / 2 + 4;
+      parent.addChild(lvlTxt);
+
+      const costTxt = new Text({
+        text: currentLvl >= EQUIPMENT_MAX_LEVEL ? '（已達最高等級）' : `✨ ×${EQUIPMENT_UPGRADE_COST}`,
+        style: new TextStyle({
+          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+          fontSize: 12,
+          fill: currentLvl >= EQUIPMENT_MAX_LEVEL ? 0x55aa55 : COST_LABEL_COLOR,
         }),
       });
       costTxt.x = PANEL_X + 28;
-      costTxt.y = iy + ITEM_H / 2 + 8;
+      costTxt.y = iy + ITEM_H / 2 + 18;
       parent.addChild(costTxt);
 
-      // Upgrade button
-      const upgradeBtn = new Container();
-      upgradeBtn.eventMode = 'static';
-      upgradeBtn.cursor = 'pointer';
+      if (currentLvl < EQUIPMENT_MAX_LEVEL) {
+        // Upgrade button
+        const upgradeBtn = new Container();
+        upgradeBtn.eventMode = 'static';
+        upgradeBtn.cursor = 'pointer';
 
-      const btnW = 80, btnH = 34;
-      const btnBg = new Graphics();
-      btnBg
-        .roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 8)
-        .fill({ color: opt.color, alpha: 0.88 });
-      btnBg
-        .roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 8)
-        .stroke({ color: 0xffffff, width: 1.5, alpha: 0.4 });
-      upgradeBtn.addChild(btnBg);
+        const btnW = 72, btnH = 32;
+        const btnBg = new Graphics();
+        btnBg
+          .roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 8)
+          .fill({ color: 0x334488, alpha: 0.9 });
+        btnBg
+          .roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 8)
+          .stroke({ color: 0x6688ff, width: 1.5 });
+        upgradeBtn.addChild(btnBg);
 
-      const btnTxt = new Text({
-        text: '升級',
-        style: new TextStyle({
-          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 15,
-          fontWeight: 'bold',
-          fill: 0xffffff,
-        }),
-      });
-      btnTxt.anchor.set(0.5);
-      upgradeBtn.addChild(btnTxt);
+        const btnTxt = new Text({
+          text: '升級',
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 14,
+            fontWeight: 'bold',
+            fill: 0xffffff,
+          }),
+        });
+        btnTxt.anchor.set(0.5);
+        upgradeBtn.addChild(btnTxt);
 
-      upgradeBtn.x = PANEL_X + ITEM_W - 14;
-      upgradeBtn.y = iy + ITEM_H / 2;
+        upgradeBtn.x = PANEL_X + ITEM_W - 8;
+        upgradeBtn.y = iy + ITEM_H / 2;
 
-      upgradeBtn.on('pointerdown', async () => {
-        if (currencyState.cosmicAsh < opt.cost) {
-          // Flash the label red briefly to indicate insufficient funds
-          costTxt.style.fill = INSUFFICIENT_FUNDS_COLOR;
-          setTimeout(() => { costTxt.style.fill = COST_LABEL_COLOR; }, 800);
-          return;
-        }
-        sfxMenuClick();
-        currencyState.cosmicAsh -= opt.cost;
-        refreshAshLabel();
-        await saveProgress();
-        // Show brief confirmation
-        btnTxt.text = '✓';
-        setTimeout(() => { btnTxt.text = '升級'; }, 1000);
-      });
-      upgradeBtn.on('pointerover', () => upgradeBtn.scale.set(1.06));
-      upgradeBtn.on('pointerout',  () => upgradeBtn.scale.set(1.0));
+        upgradeBtn.on('pointerdown', async () => {
+          if (currencyState.cosmicAsh < EQUIPMENT_UPGRADE_COST) {
+            costTxt.style.fill = INSUFFICIENT_FUNDS_COLOR;
+            setTimeout(() => { costTxt.style.fill = COST_LABEL_COLOR; }, 800);
+            return;
+          }
+          sfxMenuClick();
+          currencyState.cosmicAsh -= EQUIPMENT_UPGRADE_COST;
+          refreshAshLabel();
 
-      parent.addChild(upgradeBtn);
+          const newLvl = (equipmentState.upgradeLevels[id] ?? 1) + 1;
+          equipmentState.upgradeLevels[id as EquipmentId] = newLvl;
+
+          await saveProgress();
+
+          lvlTxt.text = `Lv.${newLvl}  ${def.stat}`;
+          btnTxt.text = '✓';
+          setTimeout(() => {
+            btnTxt.text = '升級';
+            if (newLvl >= EQUIPMENT_MAX_LEVEL) {
+              upgradeBtn.eventMode = 'none';
+              upgradeBtn.cursor = 'default';
+              upgradeBtn.alpha = 0.4;
+              costTxt.text = '（已達最高等級）';
+              costTxt.style.fill = 0x55aa55;
+            } else {
+              costTxt.text = `✨ ×${EQUIPMENT_UPGRADE_COST}`;
+            }
+          }, 800);
+        });
+        upgradeBtn.on('pointerover', () => upgradeBtn.scale.set(1.06));
+        upgradeBtn.on('pointerout',  () => upgradeBtn.scale.set(1.0));
+
+        parent.addChild(upgradeBtn);
+      }
     });
   }
 
   const GACHA_COST = 1;
-  const GACHA_RESULTS = [
-    '⚔️ 銀色劍刃', '🛡️ 鐵製盾牌', '💍 翡翠戒指',
-    '🌟 星塵項鍊', '🔥 炎焰護腕', '❄️ 霜雪寶石',
-    '⚡ 雷光靴子', '🌙 月影斗篷',
-  ];
 
   function buildGachaPanel(parent: Container): void {
     const cx = W * 0.5;
@@ -433,6 +490,21 @@ async function enter(core: Core): Promise<void> {
     subResultText.y = RESULT_Y + RESULT_H + 16;
     parent.addChild(subResultText);
 
+    // Collection progress indicator
+    const progressTxt = new Text({
+      text: `收集進度：${equipmentState.obtained.size} / ${EQUIPMENT_DEFS.length}`,
+      style: new TextStyle({
+        fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+        fontSize: 12,
+        fill: 0x8888aa,
+        align: 'center',
+      }),
+    });
+    progressTxt.anchor.set(0.5);
+    progressTxt.x = cx;
+    progressTxt.y = RESULT_Y + RESULT_H + 36;
+    parent.addChild(progressTxt);
+
     const gachaBtn = makeActionBtn({
       label: `✨ 抽獎  (×${GACHA_COST} 灰燼)`,
       fillColor: 0x440066,
@@ -442,10 +514,22 @@ async function enter(core: Core): Promise<void> {
       h: 52,
     });
     gachaBtn.x = cx;
-    gachaBtn.y = PANEL_Y + 238;
+    gachaBtn.y = PANEL_Y + 256;
     parent.addChild(gachaBtn);
 
     gachaBtn.on('pointerdown', async () => {
+      // Check if all equipment has been obtained
+      const remaining = EQUIPMENT_DEFS.filter((d) => !equipmentState.obtained.has(d.id));
+      if (remaining.length === 0) {
+        subResultText.text = '🎊 已收集全部裝備！';
+        subResultText.style.fill = 0xffdd44;
+        setTimeout(() => {
+          subResultText.text = '（已收集全部裝備）';
+          subResultText.style.fill = 0x888899;
+        }, 2000);
+        return;
+      }
+
       if (currencyState.cosmicAsh < GACHA_COST) {
         subResultText.text = '⚠️ 宇宙灰燼不足！';
         subResultText.style.fill = 0xff4444;
@@ -459,22 +543,32 @@ async function enter(core: Core): Promise<void> {
       sfxMenuClick();
       currencyState.cosmicAsh -= GACHA_COST;
       refreshAshLabel();
-      await saveProgress();
 
       // Spin animation
-      const items = ['...', '?!', '✨✨✨'];
-      for (const frame of items) {
+      const frames = ['...', '?!', '✨✨✨'];
+      for (const frame of frames) {
         resultText.text = frame;
         await new Promise<void>((r) => setTimeout(r, 300));
       }
 
-      const reward = GACHA_RESULTS[Math.floor(Math.random() * GACHA_RESULTS.length)];
-      resultText.text = reward;
-      subResultText.text = '🎉 恭喜獲得裝備！';
+      // Draw from equipment not yet obtained
+      const pick = remaining[Math.floor(Math.random() * remaining.length)];
+      equipmentState.obtained.add(pick.id);
+      equipmentState.upgradeLevels[pick.id] = 1;
+
+      await saveProgress();
+
+      resultText.text = `${pick.icon} ${pick.name}`;
+      subResultText.text = '🎉 恭喜獲得新裝備！';
       subResultText.style.fill = 0x88ffaa;
+      progressTxt.text = `收集進度：${equipmentState.obtained.size} / ${EQUIPMENT_DEFS.length}`;
+
       setTimeout(() => {
-        subResultText.text = '（點擊下方按鈕繼續抽獎）';
-        subResultText.style.fill = 0x555577;
+        const newRemaining = EQUIPMENT_DEFS.filter((d) => !equipmentState.obtained.has(d.id));
+        subResultText.text = newRemaining.length > 0
+          ? '（點擊下方按鈕繼續抽獎）'
+          : '（已收集全部裝備！）';
+        subResultText.style.fill = newRemaining.length > 0 ? 0x555577 : 0xffdd44;
       }, 3000);
     });
   }
