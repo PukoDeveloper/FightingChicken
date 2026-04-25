@@ -2,7 +2,7 @@ import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 import type { BuffId } from './endless';
 import type { CostumeId } from './costumes';
 import type { SkillId } from './skills';
-import type { EquipmentId } from './equipment';
+import type { EquipmentId, EquipSlotId } from './equipment';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -81,5 +81,7 @@ export const equipmentState = {
   obtained: new Set<EquipmentId>(),
   /** Upgrade level for each obtained equipment piece (1 = base, max 5). */
   upgradeLevels: {} as Record<EquipmentId, number>,
+  /** The equipment currently equipped in each slot (null = empty). */
+  equippedSlots: { weapon: null, armor: null, accessory: null } as Record<EquipSlotId, EquipmentId | null>,
 };
 

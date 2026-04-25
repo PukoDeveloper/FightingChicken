@@ -1,7 +1,7 @@
 import type { Core } from '@inkshot/engine';
 import { gameResult, endlessState, costumeState, currencyState, equipmentState } from './store';
 import type { CostumeId } from './costumes';
-import type { EquipmentId } from './equipment';
+import type { EquipmentId, EquipSlotId } from './equipment';
 
 /** Convenience type alias for the upgrade-levels record. */
 type UpgradeLevelsRecord = Record<EquipmentId, number>;
@@ -56,6 +56,7 @@ export async function saveProgress(): Promise<void> {
         cosmicAsh: currencyState.cosmicAsh,
         obtainedEquipment: [...equipmentState.obtained],
         equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
+        equippedSlots: { ...equipmentState.equippedSlots },
         _achievements: achievementsSnapshot,
       },
     });
@@ -127,6 +128,18 @@ export async function loadProgress(): Promise<void> {
         }
       }
     }
+
+    if (data.equippedSlots && typeof data.equippedSlots === 'object') {
+      const slots = data.equippedSlots as Record<string, unknown>;
+      for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
+        const val = slots[slotId];
+        if (typeof val === 'string' && equipmentState.obtained.has(val as EquipmentId)) {
+          equipmentState.equippedSlots[slotId] = val as EquipmentId;
+        } else {
+          equipmentState.equippedSlots[slotId] = null;
+        }
+      }
+    }
   } catch {
     // Silently ignore corrupt or unreadable save data.
   }
@@ -148,6 +161,7 @@ export async function clearProgress(): Promise<void> {
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
     equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
+    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null };
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {
@@ -161,6 +175,7 @@ export async function clearProgress(): Promise<void> {
         cosmicAsh: 0,
         obtainedEquipment: [],
         equipmentUpgradeLevels: {},
+        equippedSlots: { weapon: null, armor: null, accessory: null },
         _achievements: { data: {} },
       },
     });

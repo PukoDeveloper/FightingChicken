@@ -10,6 +10,7 @@ import {
   EQUIPMENT_MAX_LEVEL,
   EQUIPMENT_UPGRADE_COST,
   type EquipmentId,
+  type EquipSlotId,
 } from '../game/equipment';
 
 let _cleanup: (() => void) | null = null;
@@ -220,81 +221,187 @@ async function enter(core: Core): Promise<void> {
   }
 
   // ── Equipment slot definitions ────────────────────────────────────────────
-  const EQUIP_SLOTS = [
-    { name: '武器', icon: '⚔️' },
-    { name: '防具', icon: '🛡️' },
-    { name: '飾品', icon: '💍' },
+  const EQUIP_SLOT_DEFS: { id: EquipSlotId; name: string; icon: string }[] = [
+    { id: 'weapon',    name: '武器', icon: '⚔️' },
+    { id: 'armor',     name: '防具', icon: '🛡️' },
+    { id: 'accessory', name: '飾品', icon: '💍' },
   ];
 
   // ── Panel builder ─────────────────────────────────────────────────────────
   function buildEquipPanel(parent: Container): void {
     const cx = W * 0.5;
-    const SLOT_W = PANEL_W - 30, SLOT_H = 58, SLOT_GAP = 10;
-    const startY = PANEL_Y + 28;
+    const SLOT_W = PANEL_W - 30;
+    const SLOT_H = 50, SLOT_GAP = 8;
+    const slotsStartY = PANEL_Y + 38;
 
-    parent.addChild(makeLabel('目前裝備欄位', cx, PANEL_Y + 20, 17, 0xffd700));
+    parent.addChild(makeLabel('裝備欄位', cx, PANEL_Y + 18, 16, 0xffd700));
 
-    EQUIP_SLOTS.forEach((slot, i) => {
-      const sy = startY + 24 + i * (SLOT_H + SLOT_GAP);
+    // ── Slot rows ──────────────────────────────────────────────────────────
+    EQUIP_SLOT_DEFS.forEach((slotDef, i) => {
+      const sy = slotsStartY + i * (SLOT_H + SLOT_GAP);
+
       const slotBg = new Graphics();
-      slotBg
-        .roundRect(PANEL_X + 14, sy, SLOT_W, SLOT_H, 10)
+      slotBg.roundRect(PANEL_X + 14, sy, SLOT_W, SLOT_H, 10)
         .fill({ color: 0x111130, alpha: 0.92 });
-      slotBg
-        .roundRect(PANEL_X + 14, sy, SLOT_W, SLOT_H, 10)
+      slotBg.roundRect(PANEL_X + 14, sy, SLOT_W, SLOT_H, 10)
         .stroke({ color: 0x3344aa, width: 1.5 });
       parent.addChild(slotBg);
 
-      const iconTxt = new Text({
-        text: `${slot.icon} ${slot.name}`,
+      const slotTypeTxt = new Text({
+        text: `${slotDef.icon} ${slotDef.name}`,
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: 'bold',
           fill: 0xaaccff,
         }),
       });
-      iconTxt.x = PANEL_X + 28;
-      iconTxt.y = sy + SLOT_H / 2 - 10;
-      parent.addChild(iconTxt);
+      slotTypeTxt.x = PANEL_X + 28;
+      slotTypeTxt.y = sy + SLOT_H / 2 - 9;
+      parent.addChild(slotTypeTxt);
 
-      const descTxt = new Text({
-        text: '（尚未裝備）',
+      const equippedId = equipmentState.equippedSlots[slotDef.id];
+      const equippedDef = equippedId ? EQUIPMENT_DEFS.find((d) => d.id === equippedId) : null;
+      const lvl = equippedId ? (equipmentState.upgradeLevels[equippedId] ?? 1) : 0;
+
+      const equippedTxt = new Text({
+        text: equippedDef
+          ? `${equippedDef.icon} ${equippedDef.name}  Lv.${lvl}  ${equippedDef.stat}`
+          : '（空）',
+        style: new TextStyle({
+          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+          fontSize: 12,
+          fill: equippedDef ? 0x88ffaa : 0x555566,
+        }),
+      });
+      equippedTxt.x = PANEL_X + 28;
+      equippedTxt.y = sy + SLOT_H / 2 + 7;
+      parent.addChild(equippedTxt);
+
+      if (equippedDef) {
+        const bW = 52, bH = 28;
+        const unequipBtn = new Container();
+        unequipBtn.eventMode = 'static';
+        unequipBtn.cursor = 'pointer';
+        const unequipBg = new Graphics();
+        unequipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+          .fill({ color: 0x441111, alpha: 0.9 });
+        unequipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+          .stroke({ color: 0xff5555, width: 1.5 });
+        unequipBtn.addChild(unequipBg);
+        const unequipTxt = new Text({
+          text: '卸除',
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: 0xff9999,
+          }),
+        });
+        unequipTxt.anchor.set(0.5);
+        unequipBtn.addChild(unequipTxt);
+        unequipBtn.x = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
+        unequipBtn.y = sy + SLOT_H / 2;
+        unequipBtn.on('pointerdown', async () => {
+          sfxMenuClick();
+          equipmentState.equippedSlots[slotDef.id] = null;
+          await saveProgress();
+          rebuildPanel();
+        });
+        unequipBtn.on('pointerover', () => unequipBtn.scale.set(1.06));
+        unequipBtn.on('pointerout',  () => unequipBtn.scale.set(1.0));
+        parent.addChild(unequipBtn);
+      }
+    });
+
+    // ── Obtained equipment list ────────────────────────────────────────────
+    const obtained = [...equipmentState.obtained];
+    const listStartY = slotsStartY + EQUIP_SLOT_DEFS.length * (SLOT_H + SLOT_GAP) + 12;
+
+    if (obtained.length === 0) {
+      parent.addChild(makeLabel('（尚未獲得任何裝備，前往裝備抽獎！）', cx, listStartY + 12, 13, 0x555577));
+      return;
+    }
+
+    parent.addChild(makeLabel('已獲得裝備（點擊「裝備」按鈕換裝）', cx, listStartY, 13, 0xaaddff));
+
+    const LIST_H = 44, LIST_GAP = 6;
+    obtained.forEach((id, idx) => {
+      const def = EQUIPMENT_DEFS.find((d) => d.id === id);
+      if (!def) return;
+      const ly = listStartY + 20 + idx * (LIST_H + LIST_GAP);
+
+      const listBg = new Graphics();
+      listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+        .fill({ color: 0x0d1122, alpha: 0.9 });
+      listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+        .stroke({ color: 0x333366, width: 1.2 });
+      parent.addChild(listBg);
+
+      const itemLvl = equipmentState.upgradeLevels[id] ?? 1;
+      const itemNameTxt = new Text({
+        text: `${def.icon} ${def.name}  Lv.${itemLvl}`,
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
           fontSize: 13,
-          fill: 0x666688,
+          fontWeight: 'bold',
+          fill: 0xddddee,
         }),
       });
-      descTxt.x = PANEL_X + 28;
-      descTxt.y = sy + SLOT_H / 2 + 8;
-      parent.addChild(descTxt);
-    });
+      itemNameTxt.x = PANEL_X + 28;
+      itemNameTxt.y = ly + LIST_H / 2 - 8;
+      parent.addChild(itemNameTxt);
 
-    // Show obtained equipment list below slots
-    const obtained = [...equipmentState.obtained];
-    if (obtained.length > 0) {
-      parent.addChild(makeLabel('已獲得裝備', cx, PANEL_Y + 230, 15, 0xaaddff));
-      obtained.forEach((id, idx) => {
-        const def = EQUIPMENT_DEFS.find((d) => d.id === id);
-        if (!def) return;
-        const lvl = equipmentState.upgradeLevels[id] ?? 1;
-        const listTxt = new Text({
-          text: `${def.icon} ${def.name}  Lv.${lvl}`,
-          style: new TextStyle({
-            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-            fontSize: 13,
-            fill: 0x88ffaa,
-          }),
-        });
-        listTxt.anchor.set(0.5);
-        listTxt.x = cx;
-        listTxt.y = PANEL_Y + 256 + idx * 22;
-        parent.addChild(listTxt);
+      const slotInfo = EQUIP_SLOT_DEFS.find((s) => s.id === def.slot);
+      const slotTagTxt = new Text({
+        text: slotInfo ? `${slotInfo.icon} ${slotInfo.name}` : '',
+        style: new TextStyle({
+          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+          fontSize: 11,
+          fill: 0x7799bb,
+        }),
       });
-    } else {
-      parent.addChild(makeLabel('（尚未獲得任何裝備，前往裝備抽獎！）', cx, PANEL_Y + 230, 13, 0x555577));
-    }
+      slotTagTxt.x = PANEL_X + 28;
+      slotTagTxt.y = ly + LIST_H / 2 + 7;
+      parent.addChild(slotTagTxt);
+
+      const isEquipped = equipmentState.equippedSlots[def.slot] === id;
+      const bW = 56, bH = 28;
+      const equipBtn = new Container();
+      equipBtn.eventMode = 'static';
+      equipBtn.cursor = isEquipped ? 'default' : 'pointer';
+      const equipBg = new Graphics();
+      equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+        .fill({ color: isEquipped ? 0x115511 : 0x224488, alpha: 0.9 });
+      equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+        .stroke({ color: isEquipped ? 0x55cc55 : 0x6688ff, width: 1.5 });
+      equipBtn.addChild(equipBg);
+      const equipBtnTxt = new Text({
+        text: isEquipped ? '已裝備' : '裝備',
+        style: new TextStyle({
+          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+          fontSize: 12,
+          fontWeight: 'bold',
+          fill: isEquipped ? 0x88ee88 : 0xffffff,
+        }),
+      });
+      equipBtnTxt.anchor.set(0.5);
+      equipBtn.addChild(equipBtnTxt);
+      equipBtn.x = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
+      equipBtn.y = ly + LIST_H / 2;
+
+      if (!isEquipped) {
+        equipBtn.on('pointerdown', async () => {
+          sfxMenuClick();
+          equipmentState.equippedSlots[def.slot] = id;
+          await saveProgress();
+          rebuildPanel();
+        });
+        equipBtn.on('pointerover', () => equipBtn.scale.set(1.06));
+        equipBtn.on('pointerout',  () => equipBtn.scale.set(1.0));
+      }
+      parent.addChild(equipBtn);
+    });
   }
 
   const INSUFFICIENT_FUNDS_COLOR = 0xff4444;
@@ -358,25 +465,41 @@ async function enter(core: Core): Promise<void> {
       lvlTxt.y = iy + ITEM_H / 2 + 4;
       parent.addChild(lvlTxt);
 
-      const costTxt = new Text({
-        text: currentLvl >= EQUIPMENT_MAX_LEVEL ? '（已達最高等級）' : `✨ ×${EQUIPMENT_UPGRADE_COST}`,
-        style: new TextStyle({
-          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 12,
-          fill: currentLvl >= EQUIPMENT_MAX_LEVEL ? 0x55aa55 : COST_LABEL_COLOR,
-        }),
-      });
-      costTxt.x = PANEL_X + 28;
-      costTxt.y = iy + ITEM_H / 2 + 18;
-      parent.addChild(costTxt);
+      const BTN_X = PANEL_X + 14 + ITEM_W - 44;
+      const btnW = 72, btnH = 32;
 
-      if (currentLvl < EQUIPMENT_MAX_LEVEL) {
+      if (currentLvl >= EQUIPMENT_MAX_LEVEL) {
+        const maxTxt = new Text({
+          text: '✅ 已達最高等級',
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 12,
+            fill: 0x55aa55,
+          }),
+        });
+        maxTxt.anchor.set(1, 0.5);
+        maxTxt.x = PANEL_X + 14 + ITEM_W - 10;
+        maxTxt.y = iy + ITEM_H / 2;
+        parent.addChild(maxTxt);
+      } else {
+        const costTxt = new Text({
+          text: `✨×${EQUIPMENT_UPGRADE_COST}`,
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 12,
+            fill: COST_LABEL_COLOR,
+          }),
+        });
+        costTxt.anchor.set(1, 0.5);
+        costTxt.x = BTN_X - btnW / 2 - 8;
+        costTxt.y = iy + ITEM_H / 2;
+        parent.addChild(costTxt);
+
         // Upgrade button
         const upgradeBtn = new Container();
         upgradeBtn.eventMode = 'static';
         upgradeBtn.cursor = 'pointer';
 
-        const btnW = 72, btnH = 32;
         const btnBg = new Graphics();
         btnBg
           .roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 8)
@@ -398,7 +521,7 @@ async function enter(core: Core): Promise<void> {
         btnTxt.anchor.set(0.5);
         upgradeBtn.addChild(btnTxt);
 
-        upgradeBtn.x = PANEL_X + ITEM_W - 8;
+        upgradeBtn.x = BTN_X;
         upgradeBtn.y = iy + ITEM_H / 2;
 
         upgradeBtn.on('pointerdown', async () => {
@@ -416,20 +539,8 @@ async function enter(core: Core): Promise<void> {
 
           await saveProgress();
 
-          lvlTxt.text = `Lv.${newLvl}  ${def.stat}`;
           btnTxt.text = '✓';
-          setTimeout(() => {
-            btnTxt.text = '升級';
-            if (newLvl >= EQUIPMENT_MAX_LEVEL) {
-              upgradeBtn.eventMode = 'none';
-              upgradeBtn.cursor = 'default';
-              upgradeBtn.alpha = 0.4;
-              costTxt.text = '（已達最高等級）';
-              costTxt.style.fill = 0x55aa55;
-            } else {
-              costTxt.text = `✨ ×${EQUIPMENT_UPGRADE_COST}`;
-            }
-          }, 800);
+          setTimeout(() => { rebuildPanel(); }, 800);
         });
         upgradeBtn.on('pointerover', () => upgradeBtn.scale.set(1.06));
         upgradeBtn.on('pointerout',  () => upgradeBtn.scale.set(1.0));
