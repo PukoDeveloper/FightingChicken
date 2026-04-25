@@ -111,7 +111,7 @@ interface BulletData {
   deflected?: boolean;
   /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
   damage?: number;
-  /** False for displays that were NOT acquired from a pool (e.g. wizard fireball) and must be destroyed, not released. */
+  /** When false, the display was NOT acquired from a pool (e.g. wizard fireball) and must be destroyed rather than released. Defaults to true for pool-acquired bullets. */
   pooled?: boolean;
 }
 
