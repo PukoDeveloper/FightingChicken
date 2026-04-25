@@ -52,7 +52,7 @@ import {
   ADVENTURE_PROXIMITY_MAX_DIST,
   ADVENTURE_PROXIMITY_MAX_MULT,
 } from '../constants';
-import { gameResult, devConfig, endlessState, costumeState, skillState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState } from '../game/store';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
@@ -3045,6 +3045,16 @@ async function enter(core: Core): Promise<void> {
       endlessState.bestWave = endlessState.wave;
     }
 
+    // Award 宇宙灰燼 every 10 waves completed
+    const completedWave = endlessState.wave - 1;
+    if (completedWave > 0 && completedWave % 10 === 0) {
+      currencyState.cosmicAsh += 1;
+      waveBannerText.text = `✨ 獲得宇宙灰燼 ×1！`;
+      waveBannerText.alpha = 1;
+      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+      waveBannerText.alpha = 0;
+    }
+
     await saveProgress();
     await core.events.emit('scene/load', { key: 'endlessbuff' });
   }
@@ -3081,6 +3091,9 @@ async function enter(core: Core): Promise<void> {
         const isNewClear = !costumeState.clearedLevels.has(gameResult.currentLevel);
         costumeState.clearedLevels.add(gameResult.currentLevel);
         gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+
+        // Award 宇宙灰燼 on level clear
+        currencyState.cosmicAsh += 1;
 
         // Achievement events
         core.events.emitSync('game/win', { isNewClear });

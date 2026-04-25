@@ -25,6 +25,8 @@ export const devConfig = {
   itemFallSpeed: ITEM_FALL_SPEED,
   /** Whether the Story Mode option is shown on the title screen. */
   storyModeEnabled: false,
+  /** Whether the Equipment button and currency display are shown on the title screen. */
+  equipmentModeEnabled: false,
 };
 
 /** Endless mode state shared between GameScene and EndlessBuffScene. */
@@ -64,5 +66,11 @@ export const costumeState = {
 export const skillState = {
   /** The skill selected before the current run, or null for no skill. */
   selected: null as SkillId | null,
+};
+
+/** Persistent currency state. */
+export const currencyState = {
+  /** Amount of 宇宙灰燼 (Cosmic Ash) the player has collected. */
+  cosmicAsh: 0,
 };
 
