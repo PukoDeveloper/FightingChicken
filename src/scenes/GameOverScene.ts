@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createPlayerChicken, createCourageDisplay } from '../game/sprites';
-import { gameResult, costumeState, endlessState } from '../game/store';
+import { gameResult, costumeState, endlessState, voidState } from '../game/store';
 import { createLevel, getStoryLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 
@@ -26,23 +26,26 @@ async function enter(core: Core): Promise<void> {
 
   // ── Character display ────────────────────────────────────────────────────
   const { won, score } = gameResult;
-  const isEndlessGameOver = endlessState.active && gameResult.playedLevel === 0;
-  const highScore = isEndlessGameOver
-    ? endlessState.highScore
-    : (gameResult.levelHighScores[gameResult.playedLevel] ?? 0);
+  const isVoidGameOver    = gameResult.playedLevel === -1;
+  const isEndlessGameOver = !isVoidGameOver && endlessState.active && gameResult.playedLevel === 0;
+  const highScore = isVoidGameOver
+    ? voidState.highScore
+    : (isEndlessGameOver
+        ? endlessState.highScore
+        : (gameResult.levelHighScores[gameResult.playedLevel] ?? 0));
 
-  const character = won ? createCourageDisplay() : createPlayerChicken(costumeState.selected);
-  character.scale.set(won ? 1.8 : 1.6);
+  const character = (won && !isVoidGameOver) ? createCourageDisplay() : createPlayerChicken(costumeState.selected);
+  character.scale.set((won && !isVoidGameOver) ? 1.8 : 1.6);
   character.x = W * 0.5;
   character.y = H * 0.42;
-  if (!won) {
+  if (!won || isVoidGameOver) {
     character.rotation = 0.4;
   }
   worldLayer.addChild(character);
 
-  // X mark over courage if defeated
+  // X mark over courage if defeated (not used in void mode)
   let xMark: Graphics | null = null;
-  if (won) {
+  if (won && !isVoidGameOver) {
     xMark = new Graphics();
     xMark.moveTo(-35, -35).lineTo(35, 35).stroke({ color: 0xff0000, width: 8, alpha: 0.9 });
     xMark.moveTo(35, -35).lineTo(-35, 35).stroke({ color: 0xff0000, width: 8, alpha: 0.9 });
@@ -53,15 +56,17 @@ async function enter(core: Core): Promise<void> {
   }
 
   // ── Result title ──────────────────────────────────────────────────────────
-  const titleText = won ? '勝利！🎉' : '敗北...';
-  const titleColor = won ? 0xffd700 : 0xff6666;
+  const titleText = isVoidGameOver
+    ? (won ? '時間到！⏱' : '虛空湮滅...')
+    : (won ? '勝利！🎉' : '敗北...');
+  const titleColor = isVoidGameOver ? 0xcc88ff : (won ? 0xffd700 : 0xff6666);
   const titleStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 52,
     fontWeight: 'bold',
     fill: titleColor,
     stroke: { color: 0x220000, width: 5 },
-    dropShadow: { color: won ? 0xdd8800 : 0x880000, distance: 4, alpha: 0.85, blur: 3 },
+    dropShadow: { color: isVoidGameOver ? 0x660088 : (won ? 0xdd8800 : 0x880000), distance: 4, alpha: 0.85, blur: 3 },
   });
   const titleLabel = new Text({ text: titleText, style: titleStyle });
   titleLabel.anchor.set(0.5);
@@ -78,7 +83,10 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffffff,
     fontWeight: 'bold',
   });
-  const scoreLabel = new Text({ text: `得分：${score}`, style: scoreStyle });
+  const scoreLabel = new Text({
+    text: isVoidGameOver ? `總傷害：${score}` : `得分：${score}`,
+    style: scoreStyle,
+  });
   scoreLabel.anchor.set(0.5);
   scoreLabel.x = W * 0.5;
   scoreLabel.y = H * 0.60;
@@ -90,7 +98,10 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xffdd88,
   });
-  const hiScoreLabel = new Text({ text: `最高分：${highScore}`, style: hiScoreStyle });
+  const hiScoreLabel = new Text({
+    text: isVoidGameOver ? `最高傷害：${highScore}` : `最高分：${highScore}`,
+    style: hiScoreStyle,
+  });
   hiScoreLabel.anchor.set(0.5);
   hiScoreLabel.x = W * 0.5;
   hiScoreLabel.y = H * 0.67;
@@ -105,7 +116,9 @@ async function enter(core: Core): Promise<void> {
     fill: 0xaaddff,
   });
   let levelLabelText: string;
-  if (isEndlessGameOver) {
+  if (isVoidGameOver) {
+    levelLabelText = won ? '虛空之境 · 60秒挑戰完成！' : '虛空之境 · 被黑洞湮滅了';
+  } else if (isEndlessGameOver) {
     const waveReached = endlessState.wave;
     const best = endlessState.bestWave;
     levelLabelText = `無盡模式 · 第 ${waveReached} 波  最高：第 ${best} 波`;
@@ -127,14 +140,16 @@ async function enter(core: Core): Promise<void> {
   const msgStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 17,
-    fill: won ? 0xaaffaa : 0xffaaaa,
+    fill: isVoidGameOver ? 0xddaaff : (won ? 0xaaffaa : 0xffaaaa),
     align: 'center',
   });
-  const msgText = isEndlessGameOver
-    ? '被彈幕擊倒了...\n無盡的挑戰等著你！'
-    : (won
-      ? '你用勇氣戰勝了勇氣！\n小雞的逆襲成功了！'
-      : '被彈幕擊倒了...\n再試一次！');
+  const msgText = isVoidGameOver
+    ? (won ? '黑洞無法被消滅...\n但你的傷害已被記錄！' : '被彈幕擊倒了...\n再接再厲！')
+    : (isEndlessGameOver
+        ? '被彈幕擊倒了...\n無盡的挑戰等著你！'
+        : (won
+          ? '你用勇氣戰勝了勇氣！\n小雞的逆襲成功了！'
+          : '被彈幕擊倒了...\n再試一次！'));
   const msgLabel = new Text({ text: msgText, style: msgStyle });
   msgLabel.anchor.set(0.5);
   msgLabel.x = W * 0.5;
@@ -143,7 +158,7 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(msgLabel);
 
   // ── Replay button ─────────────────────────────────────────────────────────
-  const isStoryWin = gameResult.storyMode && won && !isEndlessGameOver;
+  const isStoryWin = gameResult.storyMode && won && !isEndlessGameOver && !isVoidGameOver;
 
   const btnW = 220, btnH = 58;
   const btn = new Container();
@@ -151,11 +166,12 @@ async function enter(core: Core): Promise<void> {
   btn.cursor = 'pointer';
 
   const btnBg = new Graphics();
-  const btnColor = won ? 0x006600 : 0x880000;
+  const btnColor = isVoidGameOver ? 0x330055 : (won ? 0x006600 : 0x880000);
+  const btnStroke = isVoidGameOver ? 0x9933ff : (won ? 0x44ff44 : 0xff6644);
   btnBg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
     .fill({ color: btnColor, alpha: 0.9 });
   btnBg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-    .stroke({ color: won ? 0x44ff44 : 0xff6644, width: 2 });
+    .stroke({ color: btnStroke, width: 2 });
   btn.addChild(btnBg);
 
   const btnStyle = new TextStyle({
@@ -175,7 +191,9 @@ async function enter(core: Core): Promise<void> {
 
   btn.on('pointerdown', async () => {
     sfxMenuClick();
-    if (isEndlessGameOver) {
+    if (isVoidGameOver) {
+      voidState.active = true;
+    } else if (isEndlessGameOver) {
       endlessState.active = true;
       endlessState.wave = 1;
       endlessState.buffs = [];

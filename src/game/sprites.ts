@@ -170,9 +170,10 @@ export function createPetDisplay(): Container {
 /** Create the correct enemy display Container for the given enemy type. */
 export function createEnemyDisplay(type: EnemyType): Container {
   switch (type) {
-    case 'phantom': return createPhantomDisplay();
-    case 'chaos':   return createChaosDisplay();
-    default:        return createCourageDisplay();
+    case 'phantom':   return createPhantomDisplay();
+    case 'chaos':     return createChaosDisplay();
+    case 'blackhole': return createBlackHoleDisplay();
+    default:          return createCourageDisplay();
   }
 }
 
@@ -456,6 +457,52 @@ export function createHeart(filled: boolean): Graphics {
   // Bottom triangle
   g.moveTo(-11, -2).lineTo(0, 12).lineTo(11, -2).closePath().fill(col);
   return g;
+}
+
+// ─── Black Hole (黑洞) ────────────────────────────────────────────────────────
+/**
+ * Build a Container for the Black Hole enemy (虛空之境 mode).
+ * An imposing singularity with concentric event-horizon rings and an
+ * accretion-disk glow.  Origin at centre.
+ */
+export function createBlackHoleDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer accretion-disk glow (wide, faint)
+  g.circle(0, 0, 68).fill({ color: 0x220044, alpha: 0.10 });
+  g.circle(0, 0, 60).fill({ color: 0x6600cc, alpha: 0.08 });
+
+  // Accretion rings
+  g.circle(0, 0, 54).stroke({ color: 0x9922ff, width: 3, alpha: 0.30 });
+  g.circle(0, 0, 46).stroke({ color: 0x6600ff, width: 2, alpha: 0.35 });
+  g.circle(0, 0, 38).stroke({ color: 0x4400cc, width: 1.5, alpha: 0.45 });
+
+  // Event horizon (dark solid disc)
+  g.circle(0, 0, 34).fill(0x000000);
+  g.circle(0, 0, 34).stroke({ color: 0x8800ff, width: 3, alpha: 0.85 });
+
+  // Inner void (perfectly black)
+  g.circle(0, 0, 28).fill(0x000000);
+
+  // Gravitational lensing shimmer (thin bright ring just inside horizon)
+  g.circle(0, 0, 30).stroke({ color: 0xcc88ff, width: 1, alpha: 0.50 });
+  g.circle(0, 0, 26).stroke({ color: 0x9933ff, width: 1, alpha: 0.35 });
+
+  // Pulsing core highlight
+  g.circle(0, 0, 10).fill({ color: 0x440066, alpha: 0.55 });
+  g.circle(0, 0, 5).fill({ color: 0xaa44ff, alpha: 0.35 });
+
+  // Four radial jet-streams (gravitational poles)
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const cx = Math.cos(a) * 44;
+    const cy = Math.sin(a) * 44;
+    g.circle(cx, cy, 3.5).fill({ color: 0xaa44ff, alpha: 0.28 });
+  }
+
+  c.addChild(g);
+  return c;
 }
 
 // ─── Boss HP bar ─────────────────────────────────────────────────────────────

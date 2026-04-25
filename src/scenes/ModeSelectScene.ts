@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { endlessState, devConfig } from '../game/store';
+import { endlessState, devConfig, voidState } from '../game/store';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { saveProgress } from '../game/persistence';
 
@@ -183,10 +183,36 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'skillselect' });
   });
 
+  // 虛空之境
+  const voidBtn = makeModeBtn({
+    label: '⬛  虛空之境',
+    subLabel: voidState.highScore > 0 ? `最高傷害：${voidState.highScore}` : '60秒造成最多傷害！',
+    fillColor: 0x110022,
+    strokeColor: 0x8833ff,
+    textColor: 0xcc88ff,
+    subTextColor: 0x9966cc,
+    w: 260,
+    h: 70,
+  });
+  voidBtn.x = W * 0.5;
+  voidBtn.alpha = 0;
+  uiLayer.addChild(voidBtn);
+  allBtns.push(voidBtn);
+
+  voidBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    voidState.active = true;
+    endlessState.active = false;
+    await saveProgress();
+    await core.events.emit('scene/load', { key: 'skillselect' });
+  });
+
   // ── Position all buttons vertically ──────────────────────────────────────
-  // Spread them evenly between H*0.27 and H*0.82
-  const topY = H * 0.27;
-  const spacing = storyEnabled ? 0.20 : 0.23;
+  // Spread them evenly between H*0.22 and H*0.88
+  const topY = H * 0.22;
+  const spacing = storyEnabled ? 0.165 : 0.175;
   allBtns.forEach((b, i) => {
     b.y = topY + i * spacing * H;
   });

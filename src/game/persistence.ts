@@ -1,5 +1,5 @@
 import type { Core } from '@inkshot/engine';
-import { gameResult, endlessState, costumeState, currencyState, equipmentState } from './store';
+import { gameResult, endlessState, costumeState, currencyState, equipmentState, voidState } from './store';
 import type { CostumeId } from './costumes';
 import type { EquipmentId, EquipSlotId } from './equipment';
 
@@ -57,6 +57,7 @@ export async function saveProgress(): Promise<void> {
         obtainedEquipment: [...equipmentState.obtained],
         equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
         equippedSlots: { ...equipmentState.equippedSlots },
+        voidHighScore: voidState.highScore,
         _achievements: achievementsSnapshot,
       },
     });
@@ -109,6 +110,10 @@ export async function loadProgress(): Promise<void> {
       endlessState.highScore = data.endlessHighScore;
     }
 
+    if (typeof data.voidHighScore === 'number' && Number.isFinite(data.voidHighScore)) {
+      voidState.highScore = data.voidHighScore;
+    }
+
     if (typeof data.cosmicAsh === 'number' && Number.isFinite(data.cosmicAsh)) {
       currencyState.cosmicAsh = Math.max(0, Math.floor(data.cosmicAsh));
     }
@@ -156,6 +161,7 @@ export async function clearProgress(): Promise<void> {
     gameResult.levelHighScores = {};
     endlessState.bestWave = 1;
     endlessState.highScore = 0;
+    voidState.highScore = 0;
     costumeState.clearedLevels = new Set();
     costumeState.selected = DEFAULT_COSTUME;
     currencyState.cosmicAsh = 0;
@@ -172,6 +178,7 @@ export async function clearProgress(): Promise<void> {
         selectedCostume: DEFAULT_COSTUME,
         endlessBestWave: 1,
         endlessHighScore: 0,
+        voidHighScore: 0,
         cosmicAsh: 0,
         obtainedEquipment: [],
         equipmentUpgradeLevels: {},

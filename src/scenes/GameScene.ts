@@ -51,12 +51,14 @@ import {
   ADVENTURE_PROXIMITY_MIN_DIST,
   ADVENTURE_PROXIMITY_MAX_DIST,
   ADVENTURE_PROXIMITY_MAX_MULT,
+  VOID_DURATION_MS,
 } from '../constants';
-import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
 import type { BuffId } from '../game/endless';
+import { createVoidWaveConfig } from '../game/void';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
 import {
@@ -213,25 +215,31 @@ async function enter(core: Core): Promise<void> {
 
   // ── Level / wave config ────────────────────────────────────────────────────
   const isEndless = endlessState.active;
+  const isVoid    = voidState.active;
 
   // For endless mode we compute a single-wave "level" from endlessState.wave;
   // for normal mode we load the full level and set up multi-wave progression.
   // For story mode we use the story-exclusive level config when available.
-  const levelConfig = isEndless
+  // For void mode we use the black-hole wave config.
+  const levelConfig = (isEndless || isVoid)
     ? null
     : (gameResult.storyMode
         ? (getStoryLevel(gameResult.currentLevel) ?? createLevel(gameResult.currentLevel))
         : createLevel(gameResult.currentLevel));
 
   let waveIdx = 0;
-  let waveConfig: WaveConfig = isEndless
-    ? createEndlessWaveConfig(endlessState.wave)
-    : levelConfig!.waves[waveIdx];
+  let waveConfig: WaveConfig = isVoid
+    ? createVoidWaveConfig()
+    : (isEndless
+        ? createEndlessWaveConfig(endlessState.wave)
+        : levelConfig!.waves[waveIdx]);
   let waveMaxHp = waveConfig.enemyHp;
 
-  const enemyTypeForDisplay = isEndless
-    ? endlessEnemyType(endlessState.wave)
-    : levelConfig!.enemyType;
+  const enemyTypeForDisplay = isVoid
+    ? 'blackhole'
+    : (isEndless
+        ? endlessEnemyType(endlessState.wave)
+        : levelConfig!.enemyType);
 
   // ── Layers ──────────────────────────────────────────────────────────────
   const { output: worldOut } = core.events.emitSync('renderer/layer', { name: 'world' });
@@ -275,7 +283,8 @@ async function enter(core: Core): Promise<void> {
   // ── Enemy entity ─────────────────────────────────────────────────────────
   const enemyDisplay = createEnemyDisplay(enemyTypeForDisplay);
   const enemyHitFlashRadius = enemyTypeForDisplay === 'chaos' ? 48
-    : enemyTypeForDisplay === 'phantom' ? 42 : 44;
+    : enemyTypeForDisplay === 'phantom' ? 42
+    : enemyTypeForDisplay === 'blackhole' ? 34 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
 
@@ -436,6 +445,10 @@ async function enter(core: Core): Promise<void> {
   let enemyHP = waveMaxHp;
   // In endless mode, score is cumulative across waves; carry it over from the previous wave.
   let score = isEndless ? endlessState.score : 0;
+  // In void mode, track total damage dealt (replaces the score system).
+  let totalDamage = 0;
+  // Void mode countdown timer (ms remaining).
+  let voidTimerMs = VOID_DURATION_MS;
   let phase: 1 | 2 | 3 = 1;
   let invincibleMs = 0;
   let gameEnded = false;
@@ -536,7 +549,7 @@ async function enter(core: Core): Promise<void> {
   // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
   const isFoxCostume = costumeState.selected === 'fox';
   const FOX_ATTRACT_RADIUS = 150;
-  const FOX_ATTRACT_ACCEL  = 280; // extra px/s added toward player each second
+  const FOX_ATTRACT_ACCEL  = 420; // extra px/s added toward player each second
 
   // ── Wizard costume active state ───────────────────────────────────────────
   // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
@@ -598,7 +611,11 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffcccc,
     fontWeight: 'bold',
   });
-  const bossLabel = new Text({ text: '勇氣  HP', style: bossLabelStyle });
+  const bossDisplayName = enemyTypeForDisplay === 'courage' ? '勇氣'
+    : enemyTypeForDisplay === 'phantom' ? '幽靈'
+    : enemyTypeForDisplay === 'blackhole' ? '黑洞' : '混沌';
+  const bossLabelInitialText = isVoid ? `⏱ 剩餘時間` : `${bossDisplayName}  HP`;
+  const bossLabel = new Text({ text: bossLabelInitialText, style: bossLabelStyle });
   bossLabel.anchor.set(0.5);
   bossLabel.x = W * 0.5;
   bossLabel.y = 35;
@@ -611,22 +628,23 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffffff,
     fontWeight: 'bold',
   });
-  const scoreText = new Text({ text: 'SCORE: 0', style: scoreStyle });
+  const scoreText = new Text({ text: isVoid ? '傷害：0' : 'SCORE: 0', style: scoreStyle });
   scoreText.anchor.set(1, 0);
   scoreText.x = W - 10;
   scoreText.y = 10;
   uiLayer.addChild(scoreText);
 
-  // Phase text
+  // Phase text (hidden in void mode)
   const phaseStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 14,
     fill: 0xff8888,
   });
-  const phaseText = new Text({ text: 'PHASE 1', style: phaseStyle });
+  const phaseText = new Text({ text: isVoid ? '' : 'PHASE 1', style: phaseStyle });
   phaseText.anchor.set(0.5);
   phaseText.x = W * 0.5;
   phaseText.y = 48;
+  phaseText.visible = !isVoid;
   uiLayer.addChild(phaseText);
 
   // Level & wave info text (bottom-right)
@@ -637,9 +655,11 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
   });
   const levelWaveText = new Text({
-    text: isEndless
-      ? `∞ 無盡  第 ${endlessState.wave} 波`
-      : `LVL ${levelConfig!.levelNumber}  WAVE 1/${levelConfig!.waves.length}`,
+    text: isVoid
+      ? `⬛ 虛空之境`
+      : (isEndless
+          ? `∞ 無盡  第 ${endlessState.wave} 波`
+          : `LVL ${levelConfig!.levelNumber}  WAVE 1/${levelConfig!.waves.length}`),
     style: levelWaveStyle,
   });
   levelWaveText.anchor.set(1, 1);
@@ -1040,24 +1060,44 @@ async function enter(core: Core): Promise<void> {
       hearts[i].circle(5, -4, 6).fill(col);
       hearts[i].moveTo(-11, -2).lineTo(0, 12).lineTo(11, -2).closePath().fill(col);
     }
+    // Clear hearts beyond current effectiveHpMax (e.g. after blood_price reduces max HP)
+    for (let i = effectiveHpMax; i < hearts.length; i++) {
+      hearts[i].clear();
+    }
 
-    // Boss HP bar
-    const frac = Math.max(0, enemyHP / waveMaxHp);
+    // Boss HP bar / void timer bar
     hpBarFill.clear();
-    if (frac > 0) {
-      const barColor = frac > waveConfig.phase2Frac ? 0xff2222
-        : frac > waveConfig.phase3Frac ? 0xff8800 : 0xaa00ff;
-      hpBarFill.rect(0, 0, BAR_W * frac, 18).fill(barColor);
+    if (isVoid) {
+      // Show remaining time as a depleting bar (blue → purple → pink)
+      const timeFrac = Math.max(0, voidTimerMs / VOID_DURATION_MS);
+      if (timeFrac > 0) {
+        const barColor = timeFrac > 0.5 ? 0x4444ff : timeFrac > 0.25 ? 0x8844ff : 0xff44ff;
+        hpBarFill.rect(0, 0, BAR_W * timeFrac, 18).fill(barColor);
+      }
+    } else {
+      const frac = Math.max(0, enemyHP / waveMaxHp);
+      if (frac > 0) {
+        const barColor = frac > waveConfig.phase2Frac ? 0xff2222
+          : frac > waveConfig.phase3Frac ? 0xff8800 : 0xaa00ff;
+        hpBarFill.rect(0, 0, BAR_W * frac, 18).fill(barColor);
+      }
     }
 
     // Score / phase / wave
-    scoreText.text = `SCORE: ${score}`;
-    phaseText.text = `PHASE ${phase}`;
+    if (isVoid) {
+      scoreText.text = `傷害：${totalDamage}`;
+      bossLabel.text = `⏱ ${Math.ceil(voidTimerMs / 1000)}s`;
+    } else {
+      scoreText.text = `SCORE: ${score}`;
+      phaseText.text = `PHASE ${phase}`;
+    }
 
     // Build bottom-right status line
-    let statusLine = isEndless
-      ? `∞ 無盡  第 ${endlessState.wave} 波`
-      : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`;
+    let statusLine = isVoid
+      ? `⬛ 虛空之境`
+      : (isEndless
+          ? `∞ 無盡  第 ${endlessState.wave} 波`
+          : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`);
     if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
     if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
     if (critChance > 0) statusLine += `  CRT:${Math.round(critChance * 100)}%`;
@@ -2279,22 +2319,30 @@ async function enter(core: Core): Promise<void> {
           const isCrit = critChance > 0 && Math.random() < critChance;
           const dmg = isCrit ? baseDmg * 2 : baseDmg;
           removeBullet(playerBullets, i, playerBulletsContainer, true);
-          enemyHP = Math.max(0, enemyHP - dmg);
-          score += SCORE_PER_HIT * dmg;
           hitFlashTimer = 80;
           sfxEnemyHit();
 
-          // Score milestone achievements
-          if (!score1000Notified && score >= 1000) {
-            score1000Notified = true;
-            core.events.emitSync('game/score_1000', {});
-          }
-          if (!score10000Notified && score >= 10000) {
-            score10000Notified = true;
-            core.events.emitSync('game/score_10000', {});
+          if (isVoid) {
+            // Black hole is invincible — accumulate damage, never deplete HP.
+            totalDamage += dmg;
+          } else {
+            enemyHP = Math.max(0, enemyHP - dmg);
+            score += SCORE_PER_HIT * dmg;
+
+            // Score milestone achievements
+            if (!score1000Notified && score >= 1000) {
+              score1000Notified = true;
+              core.events.emitSync('game/score_1000', {});
+            }
+            if (!score10000Notified && score >= 10000) {
+              score10000Notified = true;
+              core.events.emitSync('game/score_10000', {});
+            }
           }
 
-          // Emit explosion particles
+          // Emit explosion particles (purple/violet for blackhole, orange otherwise)
+          const pStart = isVoid ? 0xaa44ff : 0xff6600;
+          const pEnd   = isVoid ? 0x6600cc : 0xff0000;
           core.events.emitSync('particle/emit', {
             config: {
               x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
@@ -2310,27 +2358,29 @@ async function enter(core: Core): Promise<void> {
               endAlpha: 0,
               startScale: 1,
               endScale: 0,
-              startColor: 0xff6600,
-              endColor: 0xff0000,
+              startColor: pStart,
+              endColor: pEnd,
               radius: 4,
             },
           });
 
-          checkPhase();
+          if (!isVoid) {
+            checkPhase();
 
-          if (enemyHP <= 0) {
-            score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
-            if (isEndless) {
-              advanceEndlessWave();
-            } else {
-              const nextWaveIdx = waveIdx + 1;
-              if (nextWaveIdx < levelConfig!.waves.length) {
-                advanceWave(nextWaveIdx);
+            if (enemyHP <= 0) {
+              score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
+              if (isEndless) {
+                advanceEndlessWave();
               } else {
-                endGame(true);
+                const nextWaveIdx = waveIdx + 1;
+                if (nextWaveIdx < levelConfig!.waves.length) {
+                  advanceWave(nextWaveIdx);
+                } else {
+                  endGame(true);
+                }
               }
+              return;
             }
-            return;
           }
         }
       }
@@ -2963,6 +3013,15 @@ async function enter(core: Core): Promise<void> {
         powerUpTimer = Math.max(0, powerUpTimer - dt);
       }
 
+      // ── Void mode: countdown timer ────────────────────────────────────────
+      if (isVoid && !waveTransitioning) {
+        voidTimerMs = Math.max(0, voidTimerMs - dt);
+        if (voidTimerMs <= 0) {
+          endGame(true);
+          return;
+        }
+      }
+
       updateHUD();
     }
   );
@@ -3134,9 +3193,16 @@ async function enter(core: Core): Promise<void> {
     gameEnded = true;
 
     gameResult.won = won;
-    gameResult.score = score;
 
-    if (isEndless) {
+    if (isVoid) {
+      // Void mode: score = total damage dealt; signal void mode to GameOverScene via playedLevel = -1
+      gameResult.score = totalDamage;
+      voidState.lastDamage = totalDamage;
+      if (totalDamage > voidState.highScore) voidState.highScore = totalDamage;
+      voidState.active = false;
+      gameResult.playedLevel = -1; // sentinel for void mode
+    } else if (isEndless) {
+      gameResult.score = score;
       // In endless mode, record the wave reached, update endless high score, and reset the session
       if (score > endlessState.highScore) endlessState.highScore = score;
       if (endlessState.wave > endlessState.bestWave) {
@@ -3148,6 +3214,7 @@ async function enter(core: Core): Promise<void> {
       endlessState.regenTimer = 0;
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
+      gameResult.score = score;
       // Update per-level high score
       const lvl = gameResult.currentLevel;
       if (score > (gameResult.levelHighScores[lvl] ?? 0)) {

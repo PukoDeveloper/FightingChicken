@@ -56,7 +56,7 @@ export const POWER_FIRE_INTERVAL = 140;
 /** Probability (0–1) that a spawned pickup is a health item vs a power item */
 export const HEALTH_ITEM_PROB = 0.7;
 /** Probability (0–1) that a moose-costume gift box also spawns alongside each normal item */
-export const MOOSE_GIFT_PROB = 0.35;
+export const MOOSE_GIFT_PROB = 0.50;
 /** Invincibility duration granted when collecting a health item (ms) */
 export const HEALTH_ITEM_INVINCIBLE_MS = 2000;
 
@@ -67,7 +67,11 @@ export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Enemy types ─────────────────────────────────────────────────────────────
 /** Identifies which enemy sprite & theme is used for a level. */
-export type EnemyType = 'courage' | 'phantom' | 'chaos';
+export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole';
+
+// ─── Void Realm mode ─────────────────────────────────────────────────────────
+/** Duration of a Void Realm timed session in ms (60 seconds). */
+export const VOID_DURATION_MS = 60000;
 
 // ─── Shockwave ────────────────────────────────────────────────────────────────
 /** Default shockwave ring expansion speed in px/s */
