@@ -63,6 +63,16 @@ export const costumeState = {
   clearedLevels: new Set<number>(),
 };
 
+/** Void Realm (虛空之境) mode state. */
+export const voidState = {
+  /** Whether the current game session is void mode. */
+  active: false,
+  /** Best (highest) total damage in a single void session. */
+  highScore: 0,
+  /** Total damage dealt in the most recently completed session. */
+  lastDamage: 0,
+};
+
 /** Skill state for the current run. Reset when SkillSelectScene is entered. */
 export const skillState = {
   /** The skill selected before the current run, or null for no skill. */

@@ -67,7 +67,11 @@ export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Enemy types ─────────────────────────────────────────────────────────────
 /** Identifies which enemy sprite & theme is used for a level. */
-export type EnemyType = 'courage' | 'phantom' | 'chaos';
+export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole';
+
+// ─── Void Realm mode ─────────────────────────────────────────────────────────
+/** Duration of a Void Realm timed session in ms (60 seconds). */
+export const VOID_DURATION_MS = 60000;
 
 // ─── Shockwave ────────────────────────────────────────────────────────────────
 /** Default shockwave ring expansion speed in px/s */
