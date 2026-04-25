@@ -2,6 +2,7 @@ import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 import type { BuffId } from './endless';
 import type { CostumeId } from './costumes';
 import type { SkillId } from './skills';
+import type { EquipmentId } from './equipment';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -72,5 +73,13 @@ export const skillState = {
 export const currencyState = {
   /** Amount of 宇宙灰燼 (Cosmic Ash) the player has collected. */
   cosmicAsh: 0,
+};
+
+/** Persistent equipment state. */
+export const equipmentState = {
+  /** IDs of equipment pieces the player has obtained (each obtainable only once). */
+  obtained: new Set<EquipmentId>(),
+  /** Upgrade level for each obtained equipment piece (1 = base, max 5). */
+  upgradeLevels: {} as Record<EquipmentId, number>,
 };
 
