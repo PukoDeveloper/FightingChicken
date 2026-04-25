@@ -3139,7 +3139,6 @@ async function enter(core: Core): Promise<void> {
     phaseFlashTimer = 0;
     flashOverlay.alpha = 0;
     itemSpawnTimer = 3000; // first item spawns 3 s into new wave
-    mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS; // reset gift timer on new wave
 
     // Reset enemy position
     enemyEntity.position.x = W * 0.5;
