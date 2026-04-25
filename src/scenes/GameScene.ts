@@ -1723,7 +1723,11 @@ async function enter(core: Core): Promise<void> {
     if (inCostume && inSkill) {
       const dc = Math.hypot(canvasX - COSTUME_BTN_X, canvasY - COSTUME_BTN_Y);
       const ds = Math.hypot(canvasX - SKILL_BTN_X,   canvasY - SKILL_BTN_Y);
-      if (dc <= ds) tryActivateCostumeAbility(); else tryActivateSkill();
+      if (dc <= ds) {
+        tryActivateCostumeAbility();
+      } else {
+        tryActivateSkill();
+      }
     } else if (inCostume) {
       tryActivateCostumeAbility();
     } else {
