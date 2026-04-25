@@ -111,6 +111,8 @@ interface BulletData {
   deflected?: boolean;
   /** Override damage for special projectiles (e.g. wizard fireball). Defaults to bulletDamage. */
   damage?: number;
+  /** False for displays that were NOT acquired from a pool (e.g. wizard fireball) and must be destroyed, not released. */
+  pooled?: boolean;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -979,7 +981,11 @@ async function enter(core: Core): Promise<void> {
     const b = arr[idx];
     container.removeChild(b.display);
     if (isPlayer) {
-      playerBulletPool.release(b.display);
+      if (b.pooled !== false) {
+        playerBulletPool.release(b.display);
+      } else {
+        b.display.destroy();
+      }
     } else {
       enemyBulletPool.release(b.display);
     }
@@ -1971,7 +1977,7 @@ async function enter(core: Core): Promise<void> {
             fbDisplay.x = px;
             fbDisplay.y = py - 10;
             playerBulletsContainer.addChild(fbDisplay);
-            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE });
+            playerBullets.push({ display: fbDisplay, x: px, y: py - 10, vx: fbVx, vy: fbVy, damage: WIZARD_FIREBALL_DAMAGE, pooled: false });
             flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff8800, alpha: 1 });
             flashOverlay.alpha = 0.20;
             phaseFlashTimer = Math.max(phaseFlashTimer, 250);
@@ -3223,7 +3229,11 @@ async function enter(core: Core): Promise<void> {
     // Destroy all bullets (return to pools)
     for (const b of playerBullets) {
       playerBulletsContainer.removeChild(b.display);
-      playerBulletPool.release(b.display);
+      if (b.pooled !== false) {
+        playerBulletPool.release(b.display);
+      } else {
+        b.display.destroy();
+      }
     }
     for (const b of enemyBullets) {
       enemyBulletsContainer.removeChild(b.display);
