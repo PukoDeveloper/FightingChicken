@@ -25,6 +25,8 @@ export const devConfig = {
   itemFallSpeed: ITEM_FALL_SPEED,
   /** Whether the Story Mode option is shown on the title screen. */
   storyModeEnabled: false,
+  /** Whether the Equipment button and currency display are shown on the title screen. */
+  equipmentModeEnabled: false,
 };
 
 /** Endless mode state shared between GameScene and EndlessBuffScene. */

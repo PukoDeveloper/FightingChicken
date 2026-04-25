@@ -79,6 +79,16 @@ async function enter(core: Core): Promise<void> {
       </label>
     </div>
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <input id="dev-equipment-toggle" type="checkbox"
+        ${devConfig.equipmentModeEnabled ? 'checked' : ''}
+        style="width:18px;height:18px;accent-color:#ff6644;cursor:pointer;flex-shrink:0;"
+      />
+      <label for="dev-equipment-toggle" style="font-size:14px;color:#ffccaa;cursor:pointer;">
+        啟用裝備模式（主畫面顯示裝備按鈕與貨幣）
+      </label>
+    </div>
+
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button id="dev-reset"
         style="padding:8px 16px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:14px;">
@@ -120,7 +130,8 @@ async function enter(core: Core): Promise<void> {
   const speedVal    = panel.querySelector<HTMLElement>('#dev-speed-val')!;
   const fallSlider  = panel.querySelector<HTMLInputElement>('#dev-fall')!;
   const fallVal     = panel.querySelector<HTMLElement>('#dev-fall-val')!;
-  const storyToggle = panel.querySelector<HTMLInputElement>('#dev-story-toggle')!;
+  const storyToggle     = panel.querySelector<HTMLInputElement>('#dev-story-toggle')!;
+  const equipmentToggle = panel.querySelector<HTMLInputElement>('#dev-equipment-toggle')!;
   const resetBtn    = panel.querySelector<HTMLButtonElement>('#dev-reset')!;
   const closeBtn    = panel.querySelector<HTMLButtonElement>('#dev-close')!;
   const clearDataBtn    = panel.querySelector<HTMLButtonElement>('#dev-clear-data')!;
@@ -142,6 +153,10 @@ async function enter(core: Core): Promise<void> {
     devConfig.storyModeEnabled = storyToggle.checked;
   });
 
+  equipmentToggle.addEventListener('change', () => {
+    devConfig.equipmentModeEnabled = equipmentToggle.checked;
+  });
+
   resetBtn.addEventListener('click', () => {
     devConfig.playerMoveSpeed = PLAYER_MOVE_SPEED;
     speedSlider.value = String(PLAYER_MOVE_SPEED);
@@ -151,6 +166,8 @@ async function enter(core: Core): Promise<void> {
     fallVal.textContent = `${ITEM_FALL_SPEED} px/s`;
     devConfig.storyModeEnabled = false;
     storyToggle.checked = false;
+    devConfig.equipmentModeEnabled = false;
+    equipmentToggle.checked = false;
   });
 
   closeBtn.addEventListener('click', async () => {

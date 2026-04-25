@@ -13,7 +13,7 @@ import {
   createCourageDisplay,
   createStarfield,
 } from '../game/sprites';
-import { costumeState, endlessState, currencyState } from '../game/store';
+import { costumeState, endlessState, currencyState, devConfig } from '../game/store';
 import { COSTUMES, isCostumeUnlocked } from '../game/costumes';
 import type { CostumeId } from '../game/costumes';
 import { startBgm, sfxMenuClick } from '../game/audio';
@@ -374,57 +374,63 @@ async function enter(core: Core): Promise<void> {
   encBtn.on('pointerout',  () => encBtn.scale.set(1.0));
 
   // ── Equipment button (bottom-left, next to encyclopedia button) ───────────
-  const eqBtnW = 72, eqBtnH = 34;
-  const eqBtn = new Container();
-  eqBtn.eventMode = 'static';
-  eqBtn.cursor = 'pointer';
-  const eqBtnBg = new Graphics();
-  eqBtnBg
-    .roundRect(0, 0, eqBtnW, eqBtnH, 8)
-    .fill({ color: 0x1a1000, alpha: 0.92 })
-    .stroke({ color: 0xaa7700, width: 1.5 });
-  eqBtn.addChild(eqBtnBg);
-  const eqBtnText = new Text({
-    text: '⚔️ 裝備',
-    style: new TextStyle({
-      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-      fontSize: 14,
-      fontWeight: 'bold',
-      fill: 0xffcc44,
-    }),
-  });
-  eqBtnText.anchor.set(0.5);
-  eqBtnText.x = eqBtnW / 2;
-  eqBtnText.y = eqBtnH / 2;
-  eqBtn.addChild(eqBtnText);
-  eqBtn.x = 10 + cpBtnW + 8 + encBtnW + 8;
-  eqBtn.y = H - eqBtnH - 10;
-  uiLayer.addChild(eqBtn);
+  const equipmentEnabled = devConfig.equipmentModeEnabled;
+  let eqBtn: Container | null = null;
+  let ashDisplay: Text | null = null;
 
-  eqBtn.on('pointerdown', async () => {
-    if (_transitioning) return;
-    _transitioning = true;
-    sfxMenuClick();
-    await core.events.emit('scene/load', { key: 'equipment' });
-  });
-  eqBtn.on('pointerover', () => eqBtn.scale.set(1.06));
-  eqBtn.on('pointerout',  () => eqBtn.scale.set(1.0));
+  if (equipmentEnabled) {
+    const eqBtnW = 72, eqBtnH = 34;
+    eqBtn = new Container();
+    eqBtn.eventMode = 'static';
+    eqBtn.cursor = 'pointer';
+    const eqBtnBg = new Graphics();
+    eqBtnBg
+      .roundRect(0, 0, eqBtnW, eqBtnH, 8)
+      .fill({ color: 0x1a1000, alpha: 0.92 })
+      .stroke({ color: 0xaa7700, width: 1.5 });
+    eqBtn.addChild(eqBtnBg);
+    const eqBtnText = new Text({
+      text: '⚔️ 裝備',
+      style: new TextStyle({
+        fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+        fontSize: 14,
+        fontWeight: 'bold',
+        fill: 0xffcc44,
+      }),
+    });
+    eqBtnText.anchor.set(0.5);
+    eqBtnText.x = eqBtnW / 2;
+    eqBtnText.y = eqBtnH / 2;
+    eqBtn.addChild(eqBtnText);
+    eqBtn.x = 10 + cpBtnW + 8 + encBtnW + 8;
+    eqBtn.y = H - eqBtnH - 10;
+    uiLayer.addChild(eqBtn);
 
-  // ── Currency display (top-right corner) ──────────────────────────────────
-  const ashDisplay = new Text({
-    text: `✨ ${currencyState.cosmicAsh}`,
-    style: new TextStyle({
-      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-      fontSize: 15,
-      fontWeight: 'bold',
-      fill: 0xaaddff,
-      stroke: { color: 0x001133, width: 3 },
-    }),
-  });
-  ashDisplay.anchor.set(1, 0);
-  ashDisplay.x = W - 10;
-  ashDisplay.y = 10;
-  uiLayer.addChild(ashDisplay);
+    eqBtn.on('pointerdown', async () => {
+      if (_transitioning) return;
+      _transitioning = true;
+      sfxMenuClick();
+      await core.events.emit('scene/load', { key: 'equipment' });
+    });
+    eqBtn.on('pointerover', () => eqBtn!.scale.set(1.06));
+    eqBtn.on('pointerout',  () => eqBtn!.scale.set(1.0));
+
+    // ── Currency display (top-right corner) ────────────────────────────────
+    ashDisplay = new Text({
+      text: `✨ ${currencyState.cosmicAsh}`,
+      style: new TextStyle({
+        fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+        fontSize: 15,
+        fontWeight: 'bold',
+        fill: 0xaaddff,
+        stroke: { color: 0x001133, width: 3 },
+      }),
+    });
+    ashDisplay.anchor.set(1, 0);
+    ashDisplay.x = W - 10;
+    ashDisplay.y = 10;
+    uiLayer.addChild(ashDisplay);
+  }
 
   // ── Inline costume overlay ────────────────────────────────────────────────
   let overlayContainer: Container | null = null;
@@ -743,7 +749,9 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     closeOverlay();
     worldLayer.removeChild(stars, chickenContainer, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn, encBtn, eqBtn, ashDisplay);
+    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn, encBtn);
+    if (eqBtn) uiLayer.removeChild(eqBtn);
+    if (ashDisplay) uiLayer.removeChild(ashDisplay);
     stars.destroy({ children: true });
     chickenContainer.destroy({ children: true });
     couragePreview.destroy({ children: true });
@@ -759,8 +767,8 @@ async function enter(core: Core): Promise<void> {
     devBtn.destroy({ children: true });
     cpBtn.destroy({ children: true });
     encBtn.destroy({ children: true });
-    eqBtn.destroy({ children: true });
-    ashDisplay.destroy();
+    if (eqBtn) eqBtn.destroy({ children: true });
+    if (ashDisplay) ashDisplay.destroy();
     unsubTick();
   };
 }
