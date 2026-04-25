@@ -536,7 +536,7 @@ async function enter(core: Core): Promise<void> {
   // Passive: items within FOX_ATTRACT_RADIUS px are continuously pulled toward the player.
   const isFoxCostume = costumeState.selected === 'fox';
   const FOX_ATTRACT_RADIUS = 150;
-  const FOX_ATTRACT_ACCEL  = 280; // extra px/s added toward player each second
+  const FOX_ATTRACT_ACCEL  = 420; // extra px/s added toward player each second
 
   // ── Wizard costume active state ───────────────────────────────────────────
   // Active ability: 火球術 – charge for WIZARD_CHANNEL_MS ms, then launch a high-damage fireball.
@@ -598,7 +598,9 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffcccc,
     fontWeight: 'bold',
   });
-  const bossLabel = new Text({ text: '勇氣  HP', style: bossLabelStyle });
+  const bossDisplayName = enemyTypeForDisplay === 'courage' ? '勇氣'
+    : enemyTypeForDisplay === 'phantom' ? '幽靈' : '混沌';
+  const bossLabel = new Text({ text: `${bossDisplayName}  HP`, style: bossLabelStyle });
   bossLabel.anchor.set(0.5);
   bossLabel.x = W * 0.5;
   bossLabel.y = 35;
@@ -1039,6 +1041,10 @@ async function enter(core: Core): Promise<void> {
       hearts[i].circle(-5, -4, 6).fill(col);
       hearts[i].circle(5, -4, 6).fill(col);
       hearts[i].moveTo(-11, -2).lineTo(0, 12).lineTo(11, -2).closePath().fill(col);
+    }
+    // Clear hearts beyond current effectiveHpMax (e.g. after blood_price reduces max HP)
+    for (let i = effectiveHpMax; i < hearts.length; i++) {
+      hearts[i].clear();
     }
 
     // Boss HP bar

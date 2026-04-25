@@ -56,7 +56,7 @@ export const POWER_FIRE_INTERVAL = 140;
 /** Probability (0–1) that a spawned pickup is a health item vs a power item */
 export const HEALTH_ITEM_PROB = 0.7;
 /** Probability (0–1) that a moose-costume gift box also spawns alongside each normal item */
-export const MOOSE_GIFT_PROB = 0.35;
+export const MOOSE_GIFT_PROB = 0.50;
 /** Invincibility duration granted when collecting a health item (ms) */
 export const HEALTH_ITEM_INVINCIBLE_MS = 2000;
 
