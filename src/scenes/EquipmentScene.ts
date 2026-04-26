@@ -157,13 +157,97 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(panelBg);
 
   let panelContent: Container | null = null;
+  let panelMask: Graphics | null = null;
+  let panelScrollbar: Graphics | null = null;
 
   function clearPanel(): void {
+    panelBg.eventMode = 'none';
+    panelBg.off('wheel');
+    panelBg.off('pointerdown');
+    panelBg.off('pointermove');
+    panelBg.off('pointerup');
+    panelBg.off('pointerupoutside');
     if (panelContent) {
+      panelContent.mask = null;
       uiLayer.removeChild(panelContent);
       panelContent.destroy({ children: true });
       panelContent = null;
     }
+    if (panelMask) {
+      uiLayer.removeChild(panelMask);
+      panelMask.destroy();
+      panelMask = null;
+    }
+    if (panelScrollbar) {
+      uiLayer.removeChild(panelScrollbar);
+      panelScrollbar.destroy();
+      panelScrollbar = null;
+    }
+  }
+
+  function setupScroll(c: Container, contentBottom: number): void {
+    const contentH = contentBottom - PANEL_Y;
+    const maxScroll = Math.max(0, contentH - PANEL_H + 8);
+    if (maxScroll <= 0) return;
+
+    // Clip mask
+    const mask = new Graphics();
+    mask.rect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H).fill({ color: 0xffffff });
+    uiLayer.addChild(mask);
+    panelMask = mask;
+    c.mask = mask;
+
+    // Scrollbar
+    const SB_W = 5;
+    const SB_X = PANEL_X + PANEL_W - SB_W - 3;
+    const thumbH = Math.max(24, (PANEL_H / contentH) * PANEL_H);
+    const thumbRange = PANEL_H - thumbH - 8;
+
+    const scrollbar = new Graphics();
+    uiLayer.addChild(scrollbar);
+    panelScrollbar = scrollbar;
+
+    function drawScrollbar(sy: number): void {
+      scrollbar.clear();
+      scrollbar.roundRect(SB_X, PANEL_Y + 4, SB_W, PANEL_H - 8, 3)
+        .fill({ color: 0x333355, alpha: 0.7 });
+      const thumbY = PANEL_Y + 4 + (sy / maxScroll) * thumbRange;
+      scrollbar.roundRect(SB_X, thumbY, SB_W, thumbH, 3)
+        .fill({ color: 0x8888cc, alpha: 0.9 });
+    }
+
+    let scrollY = 0;
+    drawScrollbar(0);
+
+    function applyScroll(newY: number): void {
+      scrollY = Math.max(0, Math.min(maxScroll, newY));
+      c.y = -scrollY;
+      drawScrollbar(scrollY);
+    }
+
+    // Mouse wheel
+    panelBg.eventMode = 'static';
+    panelBg.on('wheel', (e: Event) => {
+      applyScroll(scrollY + (e as WheelEvent).deltaY * 0.5);
+    });
+
+    // Touch / pointer drag
+    let dragging = false;
+    let dragStartY = 0;
+    let dragStartScroll = 0;
+
+    panelBg.on('pointerdown', (e: { global: { y: number } }) => {
+      dragging = true;
+      dragStartY = e.global.y;
+      dragStartScroll = scrollY;
+    });
+    panelBg.on('pointermove', (e: { global: { y: number } }) => {
+      if (!dragging) return;
+      applyScroll(dragStartScroll + (dragStartY - e.global.y));
+    });
+    const endDrag = () => { dragging = false; };
+    panelBg.on('pointerup', endDrag);
+    panelBg.on('pointerupoutside', endDrag);
   }
 
   function makeLabel(text: string, x: number, y: number, size = 16, color = 0xcccccc): Text {
@@ -686,12 +770,34 @@ async function enter(core: Core): Promise<void> {
     clearPanel();
     const c = new Container();
     panelContent = c;
+
     switch (activeTab) {
-      case 'equip':   buildEquipPanel(c); break;
-      case 'upgrade': buildUpgradePanel(c); break;
-      case 'gacha':   buildGachaPanel(c); break;
+      case 'equip': {
+        buildEquipPanel(c);
+        const obtained = [...equipmentState.obtained];
+        const SLOT_H = 50, SLOT_GAP = 8, LIST_H = 44, LIST_GAP = 6;
+        const listStartY = PANEL_Y + 38 + EQUIP_SLOT_DEFS.length * (SLOT_H + SLOT_GAP) + 12;
+        const contentBottom = obtained.length === 0
+          ? listStartY + 30
+          : listStartY + 20 + obtained.length * (LIST_H + LIST_GAP) + 16;
+        uiLayer.addChild(c);
+        setupScroll(c, contentBottom);
+        break;
+      }
+      case 'upgrade': {
+        buildUpgradePanel(c);
+        const obtained = [...equipmentState.obtained];
+        const ITEM_H = 58, ITEM_GAP = 8;
+        const contentBottom = PANEL_Y + 72 + obtained.length * (ITEM_H + ITEM_GAP) + 16;
+        uiLayer.addChild(c);
+        setupScroll(c, contentBottom);
+        break;
+      }
+      case 'gacha':
+        buildGachaPanel(c);
+        uiLayer.addChild(c);
+        break;
     }
-    uiLayer.addChild(c);
   }
 
   buildTabs();
