@@ -52,8 +52,22 @@ import {
   ADVENTURE_PROXIMITY_MAX_DIST,
   ADVENTURE_PROXIMITY_MAX_MULT,
   VOID_DURATION_MS,
+  BEAM_CHARGE_MAX_MS,
+  BEAM_DAMAGE_PER_LEVEL,
+  BEAM_BULLET_R,
+  BEAM_SPEED,
+  COL_BEAM,
+  HOMING_TURN_RATE,
+  HOMING_DAMAGE_PER_LEVEL,
+  HOMING_SPEED,
+  COL_HOMING,
+  PULSE_INTERVAL_MS,
+  PULSE_DAMAGE_PER_LEVEL,
+  PULSE_SPEED,
+  COL_PULSE,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
+import { EQUIPMENT_DEFS } from '../game/equipment';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
@@ -117,6 +131,8 @@ interface BulletData {
   radius?: number;
   /** When false, the display was NOT acquired from a pool (e.g. wizard fireball) and must be destroyed rather than released. Defaults to true for pool-acquired bullets. */
   pooled?: boolean;
+  /** When true, this player bullet homes in on the enemy each frame (homing gun weapon mode). */
+  homing?: boolean;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -180,6 +196,18 @@ interface LaserBeamData {
   phaseMs: number;      // ms remaining in current phase
   color: number;
   hitDealt: boolean;    // only deal damage once per active phase
+}
+
+// ─── Player shockwave data (pulse emitter weapon) ─────────────────────────────
+interface PlayerShockwaveData {
+  display: Graphics;
+  x: number;       // spawn origin x (player position at fire time)
+  y: number;       // spawn origin y
+  radius: number;  // current ring radius (grows over time)
+  speed: number;   // expansion speed px/s
+  color: number;
+  damage: number;  // damage dealt when the ring touches the enemy
+  hitDealt: boolean; // true once the ring has dealt damage (one hit per pulse)
 }
 
 // ─── Pet Guardian data ────────────────────────────────────────────────────────
@@ -270,7 +298,8 @@ async function enter(core: Core): Promise<void> {
   const bubblesContainer = new Container();
   const lasersContainer = new Container();
   const petsContainer = new Container();
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer);
+  const playerShockwavesContainer = new Container(); // pulse emitter weapon
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -310,6 +339,7 @@ async function enter(core: Core): Promise<void> {
   const bombs: BombData[] = [];
   const curveBullets: CurveBulletData[] = [];
   const lasers: LaserBeamData[] = [];
+  const playerShockwaves: PlayerShockwaveData[] = []; // pulse emitter weapon
 
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
@@ -417,6 +447,18 @@ async function enter(core: Core): Promise<void> {
   // Crit chance from stardust_necklace (5% per upgrade level, capped at 50%)
   let critChance  = Math.min(equipCritBonus, 0.50);
 
+  // ── Weapon attack mode (weapon-slot equipment that replaces normal fire) ──
+  // Look up the equipped weapon's definition to see if it has a special attack mode.
+  const _weaponDef = _eqWeapon !== null
+    ? EQUIPMENT_DEFS.find(d => d.id === _eqWeapon) ?? null
+    : null;
+  const weaponAttackMode = _weaponDef?.attackMode ?? null;
+  const isBeamMode   = weaponAttackMode === 'beam';
+  const isHomingMode = weaponAttackMode === 'homing';
+  const isPulseMode  = weaponAttackMode === 'pulse';
+  // Upgrade level of the equipped weapon (used to scale special attack damage).
+  const weaponUpgLevel = _eqWeapon !== null ? (equipmentState.upgradeLevels[_eqWeapon] ?? 1) : 1;
+
   // Periodic shield: counts down ms until next activation.
   // Carry over the remaining time from the previous wave (or start fresh at 12 s).
   let periodicShieldTimer: number;
@@ -470,6 +512,12 @@ async function enter(core: Core): Promise<void> {
   // Score thresholds already notified (for score achievements).
   let score1000Notified = false;
   let score10000Notified = false;
+
+  // ── Weapon attack mode state ─────────────────────────────────────────────
+  // Beam cannon: accumulated charge (0 → BEAM_CHARGE_MAX_MS), then auto-fires.
+  let beamChargeMs = 0;
+  // Pulse emitter: ms countdown until the next pulse wave fires (0 = fire now).
+  let pulseTimer = 0;
 
   // ── Pet guardian state (Level 5, last wave, phase 3 only) ────────────────
   const pets: PetData[] = [];
@@ -780,6 +828,13 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0x882200, distance: 2, alpha: 0.8, blur: 2 },
   });
+  const weaponTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: COL_BEAM,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x005588, distance: 2, alpha: 0.8, blur: 2 },
+  });
   const powerUpText       = new Text({ text: '', style: powerUpStyle });
   const trappedTimerText  = new Text({ text: '', style: trappedTimerStyle });
   const shieldTimerText   = new Text({ text: '', style: shieldTimerStyle });
@@ -789,7 +844,8 @@ async function enter(core: Core): Promise<void> {
   const wizardTimerText   = new Text({ text: '', style: wizardTimerStyle });
   const heroTimerText     = new Text({ text: '', style: heroTimerStyle });
   const heroChargeText    = new Text({ text: '', style: heroChargeStyle });
-  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText].forEach(t => {
+  const weaponTimerText   = new Text({ text: '', style: weaponTimerStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText].forEach(t => {
     t.anchor.set(0, 1);
     t.x = 10;
     t.y = H - 38;
@@ -808,6 +864,12 @@ async function enter(core: Core): Promise<void> {
   const wizardMagicCircle = new Graphics();
   wizardMagicCircle.visible = false;
   worldLayer.addChild(wizardMagicCircle);
+
+  // ── Beam cannon charge bar (drawn below the player while charging) ────────
+  // A small fill-bar showing charge progress (0 → full) for the beam cannon weapon.
+  const beamChargeBar = new Graphics();
+  beamChargeBar.visible = isBeamMode;
+  worldLayer.addChild(beamChargeBar);
 
   // ── Active skill button (bottom-right) ────────────────────────────────────
   // Only rendered when an active skill is selected.
@@ -1072,6 +1134,38 @@ async function enter(core: Core): Promise<void> {
     items.push({ display: gDisplay, x: gx, y: gy, vx: 0, vy: devConfig.itemFallSpeed, type: 'gift', lifetime: ITEM_LIFETIME_MS });
   }
 
+  // ── Helper: spawn a homing player bullet (homing gun weapon mode) ─────────
+  function spawnHomingBullet(x: number, y: number, damage: number): void {
+    const display = new Graphics();
+    display.circle(0, 0, 8).fill({ color: COL_HOMING, alpha: 0.30 });
+    display.circle(0, 0, 5).fill(COL_HOMING);
+    display.circle(0, 0, 2).fill({ color: 0xffffff, alpha: 0.60 });
+    display.x = x;
+    display.y = y;
+    display.visible = true;
+    playerBulletsContainer.addChild(display);
+    // Point initially toward the enemy so the bullet doesn't start flying in the
+    // wrong direction before the homing steering kicks in.
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const initAngle = Math.atan2(ey - y, ex - x);
+    playerBullets.push({
+      display, x, y,
+      vx: Math.cos(initAngle) * HOMING_SPEED,
+      vy: Math.sin(initAngle) * HOMING_SPEED,
+      damage, pooled: false, homing: true,
+    });
+  }
+
+  // ── Helper: spawn a player shockwave pulse (pulse emitter weapon mode) ────
+  function spawnPlayerShockwave(x: number, y: number, damage: number): void {
+    const display = new Graphics();
+    display.x = x;
+    display.y = y;
+    playerShockwavesContainer.addChild(display);
+    playerShockwaves.push({ display, x, y, radius: 0, speed: PULSE_SPEED, color: COL_PULSE, damage, hitDealt: false });
+  }
+
   // ── Helper: remove pickup item ────────────────────────────────────────────
   function removeItem(arr: ItemData[], idx: number, container: Container): void {
     const item = arr[idx];
@@ -1155,10 +1249,19 @@ async function enter(core: Core): Promise<void> {
     if (heroActiveMs > 0) timerEntries.push([heroTimerText, `🛡 英雄無敵 ${Math.ceil(heroActiveMs / 1000)}s`]);
     // hero costume: show charged damage ready to fire
     if (heroChargedDamage > 0) timerEntries.push([heroChargeText, `⚔ 充能攻擊 ${heroChargedDamage}`]);
+    // beam cannon weapon: show charge progress
+    if (isBeamMode) {
+      const chargePct = Math.round((beamChargeMs / BEAM_CHARGE_MAX_MS) * 100);
+      timerEntries.push([weaponTimerText, chargePct >= 100 ? '🔵 光束就緒！' : `🔵 充能 ${chargePct}%`]);
+    }
+    // pulse emitter weapon: show cooldown
+    if (isPulseMode && pulseTimer > 0) {
+      timerEntries.push([weaponTimerText, `💫 脈衝 ${Math.ceil(pulseTimer / 1000)}s`]);
+    }
 
     const timerBaseY = H - 38;
     const timerLineH = 18;
-    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText].forEach(t => {
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText].forEach(t => {
       t.text = '';
       t.visible = false;
     });
@@ -2196,50 +2299,160 @@ async function enter(core: Core): Promise<void> {
       }
 
       // ── Player auto-fire ──────────────────────────────────────────────────
-      playerFireTimer -= dt;
-      if (playerFireTimer <= 0) {
-        // Berserker: halve fire interval when HP ≤ 2
-        const berserkerActive = hasBerserker && playerHP <= 2;
-        const baseInterval = berserkerActive
-          ? Math.max(effectiveFireInterval / 2, 60)
-          : effectiveFireInterval;
-        // burst_fire skill: halve fire interval while skillActiveMs > 0
-        const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
-        const fireInterval = powerUpTimer > 0
-          ? POWER_FIRE_INTERVAL
-          : burstFireActive
-            ? Math.max(Math.round(baseInterval / 2), 60)
-            : baseInterval;
-        playerFireTimer = fireInterval;
-        // Determine per-cycle damage override (costume abilities are mutually exclusive):
-        // - Hero: charged damage accumulated during invincibility (one-shot, then cleared).
-        // - Adventure: proximity-scaled damage based on distance to the enemy.
-        // - Otherwise: undefined → bullets default to `bulletDamage`.
-        let spawnDamage: number | undefined;
-        if (heroChargedDamage > 0) {
-          spawnDamage = heroChargedDamage;
-          heroChargedDamage = 0;
-          updateHUD();
-        } else if (isAdventureCostume) {
-          const adx = playerEntity.position.x - enemyEntity.position.x;
-          const ady = playerEntity.position.y - enemyEntity.position.y;
-          const adDist = Math.sqrt(adx * adx + ady * ady);
-          const adT = 1 - Math.min(1, Math.max(0,
-            (adDist - ADVENTURE_PROXIMITY_MIN_DIST) /
-            (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
-          ));
-          const adMult = 1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT;
-          spawnDamage = Math.max(1, Math.round(bulletDamage * adMult));
+      if (isBeamMode) {
+        // ── Beam cannon: auto-charge and release a powerful bolt ─────────────
+        // Power-up item doubles charge speed (halves charge time).
+        const chargeSpeed = powerUpTimer > 0 ? 2 : 1;
+        beamChargeMs = Math.min(beamChargeMs + dt * chargeSpeed, BEAM_CHARGE_MAX_MS);
+
+        // Update charge bar visual (small fill-bar below the player)
+        const chargeFrac = beamChargeMs / BEAM_CHARGE_MAX_MS;
+        beamChargeBar.visible = true;
+        beamChargeBar.x = playerEntity.position.x;
+        beamChargeBar.y = playerEntity.position.y + 32;
+        beamChargeBar.clear();
+        beamChargeBar.rect(-20, 0, 40, 5).fill({ color: 0x112233, alpha: 0.85 });
+        beamChargeBar.rect(-20, 0, Math.round(40 * chargeFrac), 5)
+          .fill({ color: chargeFrac >= 1 ? 0xffffff : COL_BEAM, alpha: 0.9 });
+
+        if (beamChargeMs >= BEAM_CHARGE_MAX_MS) {
+          beamChargeMs = 0;
+          // Calculate damage (hero charged override → adventure proximity → base + upgrade)
+          let beamDmg: number;
+          if (heroChargedDamage > 0) {
+            beamDmg = heroChargedDamage;
+            heroChargedDamage = 0;
+            updateHUD();
+          } else if (isAdventureCostume) {
+            const adx = playerEntity.position.x - enemyEntity.position.x;
+            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const adDist = Math.sqrt(adx * adx + ady * ady);
+            const adT = 1 - Math.min(1, Math.max(0,
+              (adDist - ADVENTURE_PROXIMITY_MIN_DIST) / (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
+            ));
+            beamDmg = Math.max(1, Math.round(
+              (bulletDamage + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL) * (1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT),
+            ));
+          } else {
+            beamDmg = bulletDamage + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL;
+          }
+          if (critChance > 0 && Math.random() < critChance) beamDmg *= 2;
+
+          // Spawn beam bolt
+          const beamDisplay = new Graphics();
+          beamDisplay.circle(0, 0, BEAM_BULLET_R + 6).fill({ color: COL_BEAM, alpha: 0.20 });
+          beamDisplay.circle(0, 0, BEAM_BULLET_R).fill({ color: COL_BEAM, alpha: 0.85 });
+          beamDisplay.circle(0, 0, BEAM_BULLET_R - 4).fill({ color: 0xffffff, alpha: 0.90 });
+          beamDisplay.x = playerEntity.position.x;
+          beamDisplay.y = playerEntity.position.y - 20;
+          beamDisplay.visible = true;
+          playerBulletsContainer.addChild(beamDisplay);
+          playerBullets.push({
+            display: beamDisplay,
+            x: playerEntity.position.x, y: playerEntity.position.y - 20,
+            vx: 0, vy: -BEAM_SPEED,
+            damage: beamDmg, radius: BEAM_BULLET_R, pooled: false,
+          });
+          sfxShoot();
+          core.events.emitSync('particle/emit', {
+            config: {
+              x: playerEntity.position.x, y: playerEntity.position.y,
+              burst: true, burstCount: 14, speed: 110, speedVariance: 55,
+              spread: 180, lifetime: 380, startAlpha: 1, endAlpha: 0,
+              startScale: 1.3, endScale: 0,
+              startColor: COL_BEAM, endColor: 0xffffff, radius: 5,
+            },
+          });
         }
-        spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, spawnDamage);
-        spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18, spawnDamage);
-        // Centre bullet(s) from power-up or triple_shot buffs
-        const centreBullets = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
-        for (let k = 0; k < centreBullets; k++) {
-          const offset = (k - (centreBullets - 1) / 2) * 8;
-          spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22, spawnDamage);
+      } else if (isPulseMode) {
+        // ── Pulse emitter: fire expanding shockwave rings from the player ─────
+        pulseTimer -= dt;
+        if (pulseTimer <= 0) {
+          const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
+          const interval = (powerUpTimer > 0 || burstFireActive)
+            ? Math.max(Math.round(PULSE_INTERVAL_MS / 2), 600)
+            : PULSE_INTERVAL_MS;
+          pulseTimer = interval;
+
+          // Calculate pulse damage
+          let pulseDmg: number;
+          if (heroChargedDamage > 0) {
+            pulseDmg = heroChargedDamage;
+            heroChargedDamage = 0;
+            updateHUD();
+          } else if (isAdventureCostume) {
+            const adx = playerEntity.position.x - enemyEntity.position.x;
+            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const adDist = Math.sqrt(adx * adx + ady * ady);
+            const adT = 1 - Math.min(1, Math.max(0,
+              (adDist - ADVENTURE_PROXIMITY_MIN_DIST) / (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
+            ));
+            pulseDmg = Math.max(1, Math.round(
+              (bulletDamage + weaponUpgLevel * PULSE_DAMAGE_PER_LEVEL) * (1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT),
+            ));
+          } else {
+            pulseDmg = bulletDamage + weaponUpgLevel * PULSE_DAMAGE_PER_LEVEL;
+          }
+          if (critChance > 0 && Math.random() < critChance) pulseDmg *= 2;
+
+          spawnPlayerShockwave(playerEntity.position.x, playerEntity.position.y, pulseDmg);
+          sfxShoot();
         }
-        sfxShoot();
+      } else {
+        // ── Normal fire or homing gun ─────────────────────────────────────────
+        playerFireTimer -= dt;
+        if (playerFireTimer <= 0) {
+          // Berserker: halve fire interval when HP ≤ 2
+          const berserkerActive = hasBerserker && playerHP <= 2;
+          const baseInterval = berserkerActive
+            ? Math.max(effectiveFireInterval / 2, 60)
+            : effectiveFireInterval;
+          // burst_fire skill: halve fire interval while skillActiveMs > 0
+          const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
+          const fireInterval = powerUpTimer > 0
+            ? POWER_FIRE_INTERVAL
+            : burstFireActive
+              ? Math.max(Math.round(baseInterval / 2), 60)
+              : baseInterval;
+          playerFireTimer = fireInterval;
+          // Determine per-cycle damage override (costume abilities are mutually exclusive):
+          // - Hero: charged damage accumulated during invincibility (one-shot, then cleared).
+          // - Adventure: proximity-scaled damage based on distance to the enemy.
+          // - Otherwise: undefined → bullets default to `bulletDamage`.
+          let spawnDamage: number | undefined;
+          if (heroChargedDamage > 0) {
+            spawnDamage = heroChargedDamage;
+            heroChargedDamage = 0;
+            updateHUD();
+          } else if (isAdventureCostume) {
+            const adx = playerEntity.position.x - enemyEntity.position.x;
+            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const adDist = Math.sqrt(adx * adx + ady * ady);
+            const adT = 1 - Math.min(1, Math.max(0,
+              (adDist - ADVENTURE_PROXIMITY_MIN_DIST) /
+              (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
+            ));
+            const adMult = 1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT;
+            spawnDamage = Math.max(1, Math.round(bulletDamage * adMult));
+          }
+          if (isHomingMode) {
+            // Homing gun: fire a single tracking bullet toward the enemy.
+            let homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
+            if (critChance > 0 && Math.random() < critChance) homingDmg *= 2;
+            spawnHomingBullet(playerEntity.position.x, playerEntity.position.y - 18, homingDmg);
+          } else {
+            // Normal fire: two wing bullets + optional centre bullets.
+            spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, spawnDamage);
+            spawnPlayerBullet(playerEntity.position.x + 6, playerEntity.position.y - 18, spawnDamage);
+            // Centre bullet(s) from power-up or triple_shot buffs
+            const centreBullets = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
+            for (let k = 0; k < centreBullets; k++) {
+              const offset = (k - (centreBullets - 1) / 2) * 8;
+              spawnPlayerBullet(playerEntity.position.x + offset, playerEntity.position.y - 22, spawnDamage);
+            }
+          }
+          sfxShoot();
+        }
       }
 
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
@@ -2378,11 +2591,30 @@ async function enter(core: Core): Promise<void> {
       // ── Move player bullets ───────────────────────────────────────────────
       for (let i = playerBullets.length - 1; i >= 0; i--) {
         const b = playerBullets[i];
+
+        // Homing bullets steer toward the enemy each frame before moving.
+        if (b.homing && !waveTransitioning) {
+          const ex = enemyEntity.position.x;
+          const ey = enemyEntity.position.y;
+          const targetAngle = Math.atan2(ey - b.y, ex - b.x);
+          let diff = targetAngle - Math.atan2(b.vy, b.vx);
+          while (diff > Math.PI)  diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          const maxTurn = HOMING_TURN_RATE * (dt / 1000);
+          const newAngle = Math.atan2(b.vy, b.vx) + Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
+          const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          b.vx = Math.cos(newAngle) * speed;
+          b.vy = Math.sin(newAngle) * speed;
+          // Update x position for homing bullets (non-homing bullets have vx=0).
+          b.x += b.vx * (dt / 1000);
+          b.display.x = b.x;
+        }
+
         b.y += b.vy * (dt / 1000);
         b.display.y = b.y;
 
-        // Off-screen
-        if (b.y < -20) {
+        // Off-screen (extended check to cover homing bullets that can drift sideways)
+        if (b.y < -20 || b.x < -20 || b.x > W + 20) {
           removeBullet(playerBullets, i, playerBulletsContainer, true);
           continue;
         }
@@ -2740,6 +2972,87 @@ async function enter(core: Core): Promise<void> {
             });
 
             if (playerHP <= 0) { endGame(false); return; }
+          }
+        }
+      }
+
+      // ── Expand player shockwave rings (pulse emitter weapon) ─────────────
+      for (let i = playerShockwaves.length - 1; i >= 0; i--) {
+        const sw = playerShockwaves[i];
+        sw.radius += sw.speed * (dt / 1000);
+
+        // Redraw ring at updated radius (draw at local origin since display.x/y = spawn position)
+        const opacity = Math.max(0, 1 - sw.radius / SHOCKWAVE_MAX_RADIUS) * 0.90;
+        sw.display.clear();
+        if (sw.radius > 0) {
+          sw.display.circle(0, 0, sw.radius).stroke({ color: sw.color, width: SHOCKWAVE_THICKNESS, alpha: opacity });
+          sw.display.circle(0, 0, sw.radius).stroke({ color: 0xffffff, width: 2, alpha: opacity * 0.35 });
+        }
+
+        // Despawn when fully expanded
+        if (sw.radius >= SHOCKWAVE_MAX_RADIUS) {
+          playerShockwavesContainer.removeChild(sw.display);
+          sw.display.destroy();
+          playerShockwaves.splice(i, 1);
+          continue;
+        }
+
+        // Collision: ring boundary crosses the enemy hitbox
+        if (!sw.hitDealt && !waveTransitioning && !petPhaseActive) {
+          const edx = enemyEntity.position.x - sw.x;
+          const edy = enemyEntity.position.y - sw.y;
+          const edist = Math.sqrt(edx * edx + edy * edy);
+          const halfThick = SHOCKWAVE_THICKNESS / 2;
+          if (Math.abs(edist - sw.radius) < halfThick + ENEMY_HITBOX_R) {
+            sw.hitDealt = true;
+            hitFlashTimer = 80;
+            sfxEnemyHit();
+
+            if (isVoid) {
+              totalDamage += sw.damage;
+            } else {
+              enemyHP = Math.max(0, enemyHP - sw.damage);
+              score += SCORE_PER_HIT * sw.damage;
+
+              // Score milestone achievements
+              if (!score1000Notified && score >= 1000) {
+                score1000Notified = true;
+                core.events.emitSync('game/score_1000', {});
+              }
+              if (!score10000Notified && score >= 10000) {
+                score10000Notified = true;
+                core.events.emitSync('game/score_10000', {});
+              }
+            }
+
+            core.events.emitSync('particle/emit', {
+              config: {
+                x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
+                y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
+                burst: true, burstCount: 12, speed: 100, speedVariance: 50,
+                spread: 180, lifetime: 420, startAlpha: 1, endAlpha: 0,
+                startScale: 1.2, endScale: 0,
+                startColor: sw.color, endColor: 0xffffff, radius: 5,
+              },
+            });
+
+            if (!isVoid) {
+              checkPhase();
+              if (enemyHP <= 0) {
+                score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
+                if (isEndless) {
+                  advanceEndlessWave();
+                } else {
+                  const nextWaveIdx = waveIdx + 1;
+                  if (nextWaveIdx < levelConfig!.waves.length) {
+                    advanceWave(nextWaveIdx);
+                  } else {
+                    endGame(true);
+                  }
+                }
+                return;
+              }
+            }
           }
         }
       }
@@ -3208,6 +3521,13 @@ async function enter(core: Core): Promise<void> {
     }
     lasers.length = 0;
 
+    // Clear player shockwaves between waves
+    for (let i = playerShockwaves.length - 1; i >= 0; i--) {
+      playerShockwavesContainer.removeChild(playerShockwaves[i].display);
+      playerShockwaves[i].display.destroy();
+    }
+    playerShockwaves.length = 0;
+
     // Clear any leftover items between waves
     for (let i = items.length - 1; i >= 0; i--) {
       itemsContainer.removeChild(items[i].display);
@@ -3449,6 +3769,13 @@ async function enter(core: Core): Promise<void> {
     }
     shockwaves.length = 0;
 
+    // Destroy all player shockwaves (pulse emitter weapon)
+    for (const sw of playerShockwaves) {
+      playerShockwavesContainer.removeChild(sw.display);
+      sw.display.destroy();
+    }
+    playerShockwaves.length = 0;
+
     // Destroy all bubbles
     for (const bub of bubbles) {
       bubblesContainer.removeChild(bub.display);
@@ -3497,7 +3824,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -3508,12 +3835,14 @@ async function enter(core: Core): Promise<void> {
     bubblesContainer.destroy({ children: true });
     lasersContainer.destroy({ children: true });
     petsContainer.destroy({ children: true });
+    playerShockwavesContainer.destroy({ children: true });
+    beamChargeBar.destroy();
     trapRing.destroy();
     costumeRing.destroy();
     wizardMagicCircle.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, skillBtnContainer, costumeBtnContainer);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, skillBtnContainer, costumeBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -3530,6 +3859,7 @@ async function enter(core: Core): Promise<void> {
     wizardTimerText.destroy();
     heroTimerText.destroy();
     heroChargeText.destroy();
+    weaponTimerText.destroy();
     skillBtnContainer.destroy({ children: true });
     costumeBtnContainer.destroy({ children: true });
 
