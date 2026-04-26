@@ -1,4 +1,5 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
@@ -186,8 +187,12 @@ async function enter(core: Core): Promise<void> {
   }
 
   function setupScroll(c: Container, contentBottom: number): void {
+    const PANEL_BOTTOM_PADDING = 8;
+    const MIN_SCROLLBAR_THUMB_HEIGHT = 24;
+    const SCROLLBAR_VERTICAL_PADDING = 8;
+
     const contentH = contentBottom - PANEL_Y;
-    const maxScroll = Math.max(0, contentH - PANEL_H + 8);
+    const maxScroll = Math.max(0, contentH - PANEL_H + PANEL_BOTTOM_PADDING);
     if (maxScroll <= 0) return;
 
     // Clip mask
@@ -200,8 +205,8 @@ async function enter(core: Core): Promise<void> {
     // Scrollbar
     const SB_W = 5;
     const SB_X = PANEL_X + PANEL_W - SB_W - 3;
-    const thumbH = Math.max(24, (PANEL_H / contentH) * PANEL_H);
-    const thumbRange = PANEL_H - thumbH - 8;
+    const thumbH = Math.max(MIN_SCROLLBAR_THUMB_HEIGHT, (PANEL_H / contentH) * PANEL_H);
+    const thumbRange = PANEL_H - thumbH - SCROLLBAR_VERTICAL_PADDING;
 
     const scrollbar = new Graphics();
     uiLayer.addChild(scrollbar);
@@ -209,7 +214,7 @@ async function enter(core: Core): Promise<void> {
 
     function drawScrollbar(sy: number): void {
       scrollbar.clear();
-      scrollbar.roundRect(SB_X, PANEL_Y + 4, SB_W, PANEL_H - 8, 3)
+      scrollbar.roundRect(SB_X, PANEL_Y + 4, SB_W, PANEL_H - SCROLLBAR_VERTICAL_PADDING, 3)
         .fill({ color: 0x333355, alpha: 0.7 });
       const thumbY = PANEL_Y + 4 + (sy / maxScroll) * thumbRange;
       scrollbar.roundRect(SB_X, thumbY, SB_W, thumbH, 3)
@@ -227,8 +232,8 @@ async function enter(core: Core): Promise<void> {
 
     // Mouse wheel
     panelBg.eventMode = 'static';
-    panelBg.on('wheel', (e: Event) => {
-      applyScroll(scrollY + (e as WheelEvent).deltaY * 0.5);
+    panelBg.on('wheel', (e: FederatedWheelEvent) => {
+      applyScroll(scrollY + e.deltaY * 0.5);
     });
 
     // Touch / pointer drag
@@ -236,12 +241,12 @@ async function enter(core: Core): Promise<void> {
     let dragStartY = 0;
     let dragStartScroll = 0;
 
-    panelBg.on('pointerdown', (e: { global: { y: number } }) => {
+    panelBg.on('pointerdown', (e: FederatedPointerEvent) => {
       dragging = true;
       dragStartY = e.global.y;
       dragStartScroll = scrollY;
     });
-    panelBg.on('pointermove', (e: { global: { y: number } }) => {
+    panelBg.on('pointermove', (e: FederatedPointerEvent) => {
       if (!dragging) return;
       applyScroll(dragStartScroll + (dragStartY - e.global.y));
     });
