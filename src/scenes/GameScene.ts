@@ -1144,7 +1144,17 @@ async function enter(core: Core): Promise<void> {
     display.y = y;
     display.visible = true;
     playerBulletsContainer.addChild(display);
-    playerBullets.push({ display, x, y, vx: 0, vy: -HOMING_SPEED, damage, pooled: false, homing: true });
+    // Point initially toward the enemy so the bullet doesn't start flying in the
+    // wrong direction before the homing steering kicks in.
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const initAngle = Math.atan2(ey - y, ex - x);
+    playerBullets.push({
+      display, x, y,
+      vx: Math.cos(initAngle) * HOMING_SPEED,
+      vy: Math.sin(initAngle) * HOMING_SPEED,
+      damage, pooled: false, homing: true,
+    });
   }
 
   // ── Helper: spawn a player shockwave pulse (pulse emitter weapon mode) ────
@@ -2427,7 +2437,8 @@ async function enter(core: Core): Promise<void> {
           }
           if (isHomingMode) {
             // Homing gun: fire a single tracking bullet toward the enemy.
-            const homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
+            let homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
+            if (critChance > 0 && Math.random() < critChance) homingDmg *= 2;
             spawnHomingBullet(playerEntity.position.x, playerEntity.position.y - 18, homingDmg);
           } else {
             // Normal fire: two wing bullets + optional centre bullets.
