@@ -164,8 +164,6 @@ export const SNIPER_WARN_MS = 900;
 // ─── Princess Chicken (公主小姐) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
 export const PRINCESS_HP_COST = 1;
-/** Number of guard chickens summoned per activation (one at a time). */
-export const PRINCESS_GUARD_COUNT = 1;
 /** Maximum number of guard chickens that can be active simultaneously. */
 export const PRINCESS_GUARD_MAX = 6;
 /** HP of each summoned guard chicken. */
