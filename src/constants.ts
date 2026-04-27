@@ -164,14 +164,16 @@ export const SNIPER_WARN_MS = 900;
 // ─── Princess Chicken (公主小姐) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
 export const PRINCESS_HP_COST = 1;
-/** Number of guard chickens summoned per activation. */
-export const PRINCESS_GUARD_COUNT = 2;
+/** Number of guard chickens summoned per activation (one at a time). */
+export const PRINCESS_GUARD_COUNT = 1;
+/** Maximum number of guard chickens that can be active simultaneously. */
+export const PRINCESS_GUARD_MAX = 6;
 /** HP of each summoned guard chicken. */
 export const PRINCESS_GUARD_HP = 15;
 /** Orbit radius around the player for guard chickens (px). */
 export const PRINCESS_GUARD_ORBIT_R = 60;
 /** Milliseconds between each guard chicken's auto-fire shots at the enemy. */
-export const PRINCESS_GUARD_FIRE_INTERVAL_MS = 1200;
+export const PRINCESS_GUARD_FIRE_INTERVAL_MS = 600;
 /** Cooldown after activating the princess ability (ms). */
 export const PRINCESS_COOLDOWN_MS = 20000;
 /** Bullet colour for guard-chicken shots (soft rose). */

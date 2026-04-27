@@ -72,7 +72,7 @@ import {
   COL_BULLET_RING,
   BULLET_SPEED_MEDIUM,
   PRINCESS_HP_COST,
-  PRINCESS_GUARD_COUNT,
+  PRINCESS_GUARD_MAX,
   PRINCESS_GUARD_HP,
   PRINCESS_GUARD_ORBIT_R,
   PRINCESS_GUARD_FIRE_INTERVAL_MS,
@@ -737,7 +737,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Princess costume active state ─────────────────────────────────────────
   // Active ability: 給我過來 – consumes PRINCESS_HP_COST max HP and summons
-  // PRINCESS_GUARD_COUNT guard chickens that orbit the player, fire at the enemy,
+  // one guard chicken per activation (up to PRINCESS_GUARD_MAX) that orbits the player, fires at the enemy,
   // and intercept incoming enemy bullets (absorbing them at the cost of their own HP).
   // Guard HP is low; they are destroyed when reduced to 0.
   const isPrincessCostume = costumeState.selected === 'princess';
@@ -1154,7 +1154,7 @@ async function enter(core: Core): Promise<void> {
       const onCooldown = princessCooldownMs > 0;
       const hasGuards  = guards.length > 0;
       // ready when: no cooldown and below max guard count
-      const ready = !onCooldown;
+      const ready = !onCooldown && guards.length < PRINCESS_GUARD_MAX;
       const borderColor = hasGuards ? 0xff88dd : ready ? 0xff44aa : 0x555566;
       const fillColor   = hasGuards ? 0x1a0014 : ready ? 0x1a000e : 0x111122;
       costumeBtnBg.clear();
@@ -1169,7 +1169,10 @@ async function enter(core: Core): Promise<void> {
           .closePath()
           .fill({ color: 0x000000, alpha: 0.55 });
       }
-      if (hasGuards) {
+      if (hasGuards && guards.length >= PRINCESS_GUARD_MAX) {
+        costumeBtnLabel.text = `護衛\n×${guards.length}`;
+        costumeBtnLabel.style.fill = 0xffaa44;
+      } else if (hasGuards) {
         costumeBtnLabel.text = `護衛\n×${guards.length}`;
         costumeBtnLabel.style.fill = 0xff88dd;
       } else if (onCooldown) {
@@ -2132,8 +2135,9 @@ async function enter(core: Core): Promise<void> {
 
   // ── Princess costume: summon guard chickens ──────────────────────────────
   function tryActivatePrincess(): boolean {
-    // Require: no active cooldown, and max HP must be > 1 so cost can't reduce it to 0.
+    // Require: no active cooldown, below max guard count, and max HP > 1 for cost.
     if (!isPrincessCostume || gameEnded || princessCooldownMs > 0) return false;
+    if (guards.length >= PRINCESS_GUARD_MAX) return false; // at capacity
     if (effectiveHpMax <= 1) return false; // cannot afford the HP cost safely
 
     // Deduct HP cost from max HP — guards are "bought" with the player's life force.
@@ -2143,54 +2147,48 @@ async function enter(core: Core): Promise<void> {
 
     princessCooldownMs = PRINCESS_COOLDOWN_MS;
 
-    // Remove any existing guards (calling again replaces old guards with fresh ones).
-    for (let gi = guards.length - 1; gi >= 0; gi--) {
-      removeGuard(gi);
-    }
+    // Spawn one guard, spreading new arrivals evenly around the orbit.
+    const newIndex = guards.length;
+    const angle = (newIndex / PRINCESS_GUARD_MAX) * Math.PI * 2;
+    const gx = playerEntity.position.x + Math.cos(angle) * PRINCESS_GUARD_ORBIT_R;
+    const gy = playerEntity.position.y + Math.sin(angle) * PRINCESS_GUARD_ORBIT_R;
 
-    // Spawn PRINCESS_GUARD_COUNT guards evenly around the player.
-    for (let k = 0; k < PRINCESS_GUARD_COUNT; k++) {
-      const angle = (k / PRINCESS_GUARD_COUNT) * Math.PI * 2;
-      const gx = playerEntity.position.x + Math.cos(angle) * PRINCESS_GUARD_ORBIT_R;
-      const gy = playerEntity.position.y + Math.sin(angle) * PRINCESS_GUARD_ORBIT_R;
+    const display = createGuardChickenDisplay();
+    display.x = gx;
+    display.y = gy;
+    guardsContainer.addChild(display);
 
-      const display = createGuardChickenDisplay();
-      display.x = gx;
-      display.y = gy;
-      guardsContainer.addChild(display);
+    const hitFlash = createEnemyHitFlash(14);
+    display.addChild(hitFlash);
 
-      const hitFlash = createEnemyHitFlash(14);
-      display.addChild(hitFlash);
+    // HP bar
+    const hpBarContainer = new Container();
+    const hpBarBg = new Graphics();
+    hpBarBg.roundRect(0, 0, GUARD_BAR_W, 5, 2).fill({ color: 0x220011, alpha: 0.85 });
+    hpBarContainer.addChild(hpBarBg);
+    const hpBarFill = new Graphics();
+    hpBarFill.rect(0, 0, GUARD_BAR_W, 5).fill(0xff88dd);
+    hpBarContainer.addChild(hpBarFill);
+    const hpBarBorder = new Graphics();
+    hpBarBorder.roundRect(0, 0, GUARD_BAR_W, 5, 2).stroke({ color: 0xff44aa, width: 1 });
+    hpBarContainer.addChild(hpBarBorder);
+    hpBarContainer.x = gx - GUARD_BAR_W / 2;
+    hpBarContainer.y = gy - 26;
+    guardsContainer.addChild(hpBarContainer);
 
-      // HP bar
-      const hpBarContainer = new Container();
-      const hpBarBg = new Graphics();
-      hpBarBg.roundRect(0, 0, GUARD_BAR_W, 5, 2).fill({ color: 0x220011, alpha: 0.85 });
-      hpBarContainer.addChild(hpBarBg);
-      const hpBarFill = new Graphics();
-      hpBarFill.rect(0, 0, GUARD_BAR_W, 5).fill(0xff88dd);
-      hpBarContainer.addChild(hpBarFill);
-      const hpBarBorder = new Graphics();
-      hpBarBorder.roundRect(0, 0, GUARD_BAR_W, 5, 2).stroke({ color: 0xff44aa, width: 1 });
-      hpBarContainer.addChild(hpBarBorder);
-      hpBarContainer.x = gx - GUARD_BAR_W / 2;
-      hpBarContainer.y = gy - 26;
-      guardsContainer.addChild(hpBarContainer);
-
-      guards.push({
-        display,
-        hitFlash,
-        hpBarContainer,
-        hpBarFill,
-        hp: PRINCESS_GUARD_HP,
-        maxHp: PRINCESS_GUARD_HP,
-        orbitAngle: angle,
-        x: gx,
-        y: gy,
-        fireTimer: 400 + k * 300, // stagger first shots
-        hitFlashMs: 0,
-      });
-    }
+    guards.push({
+      display,
+      hitFlash,
+      hpBarContainer,
+      hpBarFill,
+      hp: PRINCESS_GUARD_HP,
+      maxHp: PRINCESS_GUARD_HP,
+      orbitAngle: angle,
+      x: gx,
+      y: gy,
+      fireTimer: 200 + newIndex * 100, // stagger first shots
+      hitFlashMs: 0,
+    });
 
     // HUD: update hearts to reflect new max HP.
     updateHUD();
@@ -2690,7 +2688,7 @@ async function enter(core: Core): Promise<void> {
               display: gBullet, x: guard.x, y: guard.y,
               vx: (ex - guard.x) / dist * PLAYER_BULLET_SPEED,
               vy: (ey - guard.y) / dist * PLAYER_BULLET_SPEED,
-              damage: 1,
+              damage: bulletDamage,
             });
           }
         }
