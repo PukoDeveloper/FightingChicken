@@ -2301,8 +2301,14 @@ async function enter(core: Core): Promise<void> {
       // ── Player auto-fire ──────────────────────────────────────────────────
       if (isBeamMode) {
         // ── Beam cannon: auto-charge and release a powerful bolt ─────────────
-        // Power-up item doubles charge speed (halves charge time).
-        const chargeSpeed = powerUpTimer > 0 ? 2 : 1;
+        // Charge speed scales with fire-rate buffs/costume; power-up, burst_fire, and
+        // berserker each further double the rate (mirrors normal-fire interval logic).
+        const berserkerActive = hasBerserker && playerHP <= 2;
+        const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
+        const fireRateScale = PLAYER_FIRE_INTERVAL / effectiveFireInterval;
+        const chargeSpeed = fireRateScale
+          * (powerUpTimer > 0 || burstFireActive ? 2 : 1)
+          * (berserkerActive ? 2 : 1);
         beamChargeMs = Math.min(beamChargeMs + dt * chargeSpeed, BEAM_CHARGE_MAX_MS);
 
         // Update charge bar visual (small fill-bar below the player)
@@ -2368,10 +2374,13 @@ async function enter(core: Core): Promise<void> {
         // ── Pulse emitter: fire expanding shockwave rings from the player ─────
         pulseTimer -= dt;
         if (pulseTimer <= 0) {
+          const berserkerActive = hasBerserker && playerHP <= 2;
           const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
-          const interval = (powerUpTimer > 0 || burstFireActive)
-            ? Math.max(Math.round(PULSE_INTERVAL_MS / 2), 600)
-            : PULSE_INTERVAL_MS;
+          const fireRateScale = PLAYER_FIRE_INTERVAL / effectiveFireInterval;
+          const basePulseInterval = Math.max(Math.round(PULSE_INTERVAL_MS / fireRateScale), 300);
+          const interval = (powerUpTimer > 0 || burstFireActive || berserkerActive)
+            ? Math.max(Math.round(basePulseInterval / 2), 300)
+            : basePulseInterval;
           pulseTimer = interval;
 
           // Calculate pulse damage
@@ -2436,10 +2445,16 @@ async function enter(core: Core): Promise<void> {
             spawnDamage = Math.max(1, Math.round(bulletDamage * adMult));
           }
           if (isHomingMode) {
-            // Homing gun: fire a single tracking bullet toward the enemy.
+            // Homing gun: fire a tracking bullet toward the enemy.
+            // Extra homing bullets from power-up (1) or triple_shot buff mirror normal-fire centre bullets.
             let homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
             if (critChance > 0 && Math.random() < critChance) homingDmg *= 2;
             spawnHomingBullet(playerEntity.position.x, playerEntity.position.y - 18, homingDmg);
+            const extraHoming = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
+            for (let k = 0; k < extraHoming; k++) {
+              const offset = (k - (extraHoming - 1) / 2) * 8;
+              spawnHomingBullet(playerEntity.position.x + offset, playerEntity.position.y - 18, homingDmg);
+            }
           } else {
             // Normal fire: two wing bullets + optional centre bullets.
             spawnPlayerBullet(playerEntity.position.x - 6, playerEntity.position.y - 18, spawnDamage);
