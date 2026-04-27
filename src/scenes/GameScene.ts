@@ -2664,19 +2664,18 @@ async function enter(core: Core): Promise<void> {
             const dist = Math.sqrt(
               (ex - guard.x) * (ex - guard.x) + (ey - guard.y) * (ey - guard.y),
             ) || 1;
-            const gBullet = playerBulletPool.acquire();
-            gBullet.clear();
+            const gBullet = new Graphics();
             gBullet.circle(0, 0, 7).fill({ color: COL_PRINCESS_GUARD_BULLET, alpha: 0.30 });
             gBullet.circle(0, 0, 5).fill(COL_PRINCESS_GUARD_BULLET);
             gBullet.x = guard.x;
             gBullet.y = guard.y;
-            gBullet.visible = true;
             playerBulletsContainer.addChild(gBullet);
             playerBullets.push({
               display: gBullet, x: guard.x, y: guard.y,
               vx: (ex - guard.x) / dist * PLAYER_BULLET_SPEED,
               vy: (ey - guard.y) / dist * PLAYER_BULLET_SPEED,
               damage: bulletDamage,
+              pooled: false,
             });
           }
         }
