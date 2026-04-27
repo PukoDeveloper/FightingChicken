@@ -155,8 +155,15 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
   const bloodPrice   = currentBuffs.filter(b => b === 'blood_price').length;
   const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bloodPrice, 1), 10);
 
+  // Pre-compute fire_rate_up floor check: once the interval can no longer decrease,
+  // further stacks provide no benefit and should be hidden.
+  const fireRateCount = currentBuffs.filter(b => b === 'fire_rate_up').length;
+  const curFireInterval = Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, fireRateCount)), 60);
+  const nxtFireInterval = Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, fireRateCount + 1)), 60);
+  const fireRateAtFloor = curFireInterval === nxtFireInterval;
+
   const pool = ALL_BUFFS.filter(buff => {
-    // Skip non-stackable buffs the player already has
+    // Skip non-stackable buffs the player already has (once acquired they cannot stack further)
     if (NON_STACKABLE_BUFFS.includes(buff.id) && currentBuffs.includes(buff.id)) {
       return false;
     }
@@ -169,6 +176,11 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
     // the -1 HP penalty would be silently capped to no effect, making it a
     // free damage buff with no trade-off.
     if (buff.id === 'blood_price' && effectiveHpMax <= 1) {
+      return false;
+    }
+    // Skip fire_rate_up when the fire interval is already at its hard floor (60 ms):
+    // additional stacks would have no effect.
+    if (buff.id === 'fire_rate_up' && fireRateAtFloor) {
       return false;
     }
     // Skip buffs that have reached their stack cap
@@ -427,8 +439,10 @@ export function buffDesc(
     case 'periodic_shield':
       return `每 12 秒自動觸發 2 秒無敵效果\n（不可疊加）`;
 
+    case 'berserker':
+      return `生命 ≤ 2 時射速加倍\n（不可疊加）`;
+
     default: {
-      // Non-stackable buffs (berserker): return their static description.
       return ALL_BUFFS.find(b => b.id === id)?.desc ?? '';
     }
   }
