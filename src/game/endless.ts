@@ -424,8 +424,11 @@ export function buffDesc(
       return `立即恢復 ${gained} HP\nHP：${hpNow}/${cur.effectiveHpMax} → ${hpAfter}/${cur.effectiveHpMax}`;
     }
 
+    case 'periodic_shield':
+      return `每 12 秒自動觸發 2 秒無敵效果\n（不可疊加）`;
+
     default: {
-      // Non-stackable buffs (berserker, periodic_shield): return their static description.
+      // Non-stackable buffs (berserker): return their static description.
       return ALL_BUFFS.find(b => b.id === id)?.desc ?? '';
     }
   }
