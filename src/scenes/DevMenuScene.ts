@@ -1,7 +1,7 @@
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { devConfig } from '../game/store';
-import { clearProgress } from '../game/persistence';
+import { clearProgress, exportProgress, importProgress } from '../game/persistence';
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
 
 // ─── DevMenu overlay (HTML) ──────────────────────────────────────────────────
@@ -103,6 +103,22 @@ async function enter(core: Core): Promise<void> {
     <hr style="border:none;border-top:1px solid #444;margin:20px 0 16px;" />
 
     <div style="text-align:center;">
+      <button id="dev-export"
+        style="padding:8px 20px;background:#1a4a2e;color:#aaffcc;border:1px solid #33aa66;border-radius:6px;cursor:pointer;font-size:14px;">
+        📤 匯出存檔資料
+      </button>
+      <span style="display:inline-block;width:10px;"></span>
+      <button id="dev-import"
+        style="padding:8px 20px;background:#1a2e4a;color:#aaccff;border:1px solid #3366aa;border-radius:6px;cursor:pointer;font-size:14px;">
+        📥 匯入存檔資料
+      </button>
+      <input id="dev-import-file" type="file" accept=".json" style="display:none;" />
+      <p id="dev-import-status" style="display:none;margin:10px 0 0;font-size:13px;color:#aaccff;"></p>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #444;margin:20px 0 16px;" />
+
+    <div style="text-align:center;">
       <button id="dev-clear-data"
         style="padding:8px 20px;background:#7a1010;color:#ffcccc;border:1px solid #cc3333;border-radius:6px;cursor:pointer;font-size:14px;">
         🗑 刪除存檔資料
@@ -138,6 +154,10 @@ async function enter(core: Core): Promise<void> {
   const clearConfirm    = panel.querySelector<HTMLElement>('#dev-clear-confirm')!;
   const clearYesBtn     = panel.querySelector<HTMLButtonElement>('#dev-clear-yes')!;
   const clearNoBtn      = panel.querySelector<HTMLButtonElement>('#dev-clear-no')!;
+  const exportBtn       = panel.querySelector<HTMLButtonElement>('#dev-export')!;
+  const importBtn       = panel.querySelector<HTMLButtonElement>('#dev-import')!;
+  const importFileInput = panel.querySelector<HTMLInputElement>('#dev-import-file')!;
+  const importStatus    = panel.querySelector<HTMLElement>('#dev-import-status')!;
 
   speedSlider.addEventListener('input', () => {
     devConfig.playerMoveSpeed = Number(speedSlider.value);
@@ -187,6 +207,35 @@ async function enter(core: Core): Promise<void> {
   clearYesBtn.addEventListener('click', async () => {
     await clearProgress();
     window.location.reload();
+  });
+
+  exportBtn.addEventListener('click', () => {
+    exportProgress();
+  });
+
+  importBtn.addEventListener('click', () => {
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener('change', async () => {
+    const file = importFileInput.files?.[0];
+    if (!file) return;
+    importStatus.style.display = 'block';
+    importStatus.style.color = '#aaccff';
+    importStatus.textContent = '⏳ 正在匯入...';
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as Record<string, unknown>;
+      await importProgress(data);
+      importStatus.style.color = '#aaffcc';
+      importStatus.textContent = '✅ 匯入成功！頁面即將重新載入…';
+      setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      importStatus.style.color = '#ffaaaa';
+      importStatus.textContent = '❌ 匯入失敗：檔案格式不正確';
+    }
+    // Reset file input so the same file can be re-selected if needed.
+    importFileInput.value = '';
   });
 
   // Close on clicking the dark backdrop (outside the panel).
