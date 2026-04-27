@@ -373,24 +373,23 @@ async function enter(core: Core): Promise<void> {
   const _eqWeapon    = equipmentState.equippedSlots.weapon;
   const _eqArmor     = equipmentState.equippedSlots.armor;
   const _eqAccessory = equipmentState.equippedSlots.accessory;
-  // 攻擊力: silver_blade +1/lv, flame_bracer +2/lv
+  // 攻擊力: rapid_shot +1/lv
   const equipAttackBonus  =
-    (_eqWeapon === 'silver_blade' ? (equipmentState.upgradeLevels['silver_blade'] ?? 1) * 1 : 0) +
-    (_eqWeapon === 'flame_bracer' ? (equipmentState.upgradeLevels['flame_bracer'] ?? 1) * 2 : 0);
-  // 防禦力: iron_shield +1/lv, frost_gem +2/lv  → extra max HP
+    (_eqWeapon === 'rapid_shot' ? (equipmentState.upgradeLevels['rapid_shot'] ?? 1) * 1 : 0);
+  // 防禦力: iron_shield +1/lv, frost_gem +1/lv  → extra max HP
   const equipDefenseBonus =
     (_eqArmor === 'iron_shield' ? (equipmentState.upgradeLevels['iron_shield'] ?? 1) * 1 : 0) +
-    (_eqArmor === 'frost_gem'   ? (equipmentState.upgradeLevels['frost_gem']   ?? 1) * 2 : 0);
-  // 速度: jade_ring +15 px/s per lv, thunder_boots +30 px/s per lv
+    (_eqArmor === 'frost_gem'   ? (equipmentState.upgradeLevels['frost_gem']   ?? 1) * 1 : 0);
+  // 速度: jade_ring +8 px/s per lv, thunder_boots +15 px/s per lv
   const equipSpeedBonus   =
-    (_eqAccessory === 'jade_ring'      ? (equipmentState.upgradeLevels['jade_ring']     ?? 1) * 15 : 0) +
-    (_eqAccessory === 'thunder_boots'  ? (equipmentState.upgradeLevels['thunder_boots'] ?? 1) * 30 : 0);
-  // 暴擊: stardust_necklace +5% per lv
+    (_eqAccessory === 'jade_ring'      ? (equipmentState.upgradeLevels['jade_ring']     ?? 1) * 8  : 0) +
+    (_eqAccessory === 'thunder_boots'  ? (equipmentState.upgradeLevels['thunder_boots'] ?? 1) * 15 : 0);
+  // 暴擊: stardust_necklace +3% per lv
   const equipCritBonus    =
-    _eqAccessory === 'stardust_necklace' ? (equipmentState.upgradeLevels['stardust_necklace'] ?? 1) * 0.05 : 0;
-  // 閃躲: moon_cape +2% per lv
+    _eqAccessory === 'stardust_necklace' ? (equipmentState.upgradeLevels['stardust_necklace'] ?? 1) * 0.03 : 0;
+  // 閃躲: moon_cape +1% per lv
   const equipEvasionBonus =
-    _eqArmor === 'moon_cape' ? (equipmentState.upgradeLevels['moon_cape'] ?? 1) * 0.02 : 0;
+    _eqArmor === 'moon_cape' ? (equipmentState.upgradeLevels['moon_cape'] ?? 1) * 0.01 : 0;
 
   // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
   // iron_will skill: +1 max HP
@@ -444,7 +443,7 @@ async function enter(core: Core): Promise<void> {
   bulletDamage   += equipAttackBonus;
   effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
   evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
-  // Crit chance from stardust_necklace (5% per upgrade level, capped at 50%)
+  // Crit chance from stardust_necklace (3% per upgrade level, capped at 50%)
   let critChance  = Math.min(equipCritBonus, 0.50);
 
   // ── Weapon attack mode (weapon-slot equipment that replaces normal fire) ──
