@@ -112,7 +112,7 @@ export const ADVENTURE_PROXIMITY_MIN_DIST = 60;
 /** Distance (px) at or beyond which the adventure costume grants no extra damage (1×) */
 export const ADVENTURE_PROXIMITY_MAX_DIST = 350;
 /** Maximum damage multiplier when the player is at ADVENTURE_PROXIMITY_MIN_DIST or closer */
-export const ADVENTURE_PROXIMITY_MAX_MULT = 3;
+export const ADVENTURE_PROXIMITY_MAX_MULT = 4;
 
 // ─── Weapon equipment attack modes ──────────────────────────────────────────
 
