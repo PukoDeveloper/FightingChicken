@@ -2135,7 +2135,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Princess costume: summon guard chickens ──────────────────────────────
   function tryActivatePrincess(): boolean {
-    // Require: no active cooldown, below max guard count, and max HP > 1 for cost.
+    // Require: no active cooldown (starts after all guards die), below max guard count, and max HP > 1 for cost.
     if (!isPrincessCostume || gameEnded || princessCooldownMs > 0) return false;
     if (guards.length >= PRINCESS_GUARD_MAX) return false; // at capacity
     if (effectiveHpMax <= 1) return false; // cannot afford the HP cost safely
@@ -2145,7 +2145,7 @@ async function enter(core: Core): Promise<void> {
     // Current HP must not exceed the new lower maximum, and must stay at least 1.
     playerHP = Math.max(1, Math.min(playerHP, effectiveHpMax));
 
-    princessCooldownMs = PRINCESS_COOLDOWN_MS;
+    // No per-summon cooldown — the cooldown only starts when all guards are lost (see removeGuard).
 
     // Spawn one guard, spreading new arrivals evenly around the orbit.
     const newIndex = guards.length;
@@ -2228,6 +2228,10 @@ async function enter(core: Core): Promise<void> {
     guardsContainer.removeChild(guard.hpBarContainer);
     guard.display.destroy();
     guards.splice(gi, 1);
+    // When the last guard is lost, start the re-summon cooldown.
+    if (guards.length === 0) {
+      princessCooldownMs = PRINCESS_COOLDOWN_MS;
+    }
     redrawCostumeBtn();
   }
 
