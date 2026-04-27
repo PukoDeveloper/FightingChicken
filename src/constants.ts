@@ -67,7 +67,7 @@ export const SCORE_BONUS_WAVE_MULT = 20;
 
 // ─── Enemy types ─────────────────────────────────────────────────────────────
 /** Identifies which enemy sprite & theme is used for a level. */
-export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole' | 'mech';
+export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole' | 'mech' | 'storm' | 'dragon';
 
 // ─── Void Realm mode ─────────────────────────────────────────────────────────
 /** Duration of a Void Realm timed session in ms (60 seconds). */
@@ -105,6 +105,9 @@ export const COL_BULLET_BOMB  = 0xff7700; // exploding bomb projectile – orang
 export const COL_BULLET_LASER = 0x00ffff; // top-screen laser column – bright cyan
 export const COL_BULLET_CURVE = 0xff44cc; // homing/curving bullet – pink
 export const COL_BULLET_MECH  = 0x44aaff; // mech straight-down shot – steel blue
+export const COL_BULLET_STORM  = 0xee66ff; // storm scatter – electric violet
+export const COL_BULLET_FLAME  = 0xff5500; // dragon flame – deep orange
+export const COL_BULLET_SNIPER = 0xffffff; // sniper beam – white
 
 // ─── Adventure Chicken ────────────────────────────────────────────────────────
 /** Distance (px) at or below which the adventure costume's max damage multiplier applies */
@@ -151,3 +154,9 @@ export const PULSE_DAMAGE_PER_LEVEL = 2;
 export const PULSE_SPEED = 260;
 /** Pulse wave ring colour (golden) */
 export const COL_PULSE = 0xffcc44;
+
+// ─── Storm & Dragon enemy constants ─────────────────────────────────────────
+/** Warning duration (ms) before the storm enemy teleports to its new position. */
+export const TELEPORT_WARN_MS = 800;
+/** Warning duration (ms) before a sniper bullet fires (default; can be overridden per phase). */
+export const SNIPER_WARN_MS = 900;

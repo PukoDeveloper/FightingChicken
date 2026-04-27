@@ -8,6 +8,7 @@ import {
   createEnemyDisplay,
   createEnemyHitFlash,
   createPetDisplay,
+  createDragonEyeDisplay,
   createTrapBubble,
   createTrapRing,
   createStarfield,
@@ -66,6 +67,9 @@ import {
   PULSE_SPEED,
   COL_PULSE,
   FROST_GEM_INVINCIBLE_BONUS,
+  TELEPORT_WARN_MS,
+  COL_BULLET_RING,
+  BULLET_SPEED_MEDIUM,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
@@ -224,6 +228,42 @@ interface PetData {
   bobTimer: number;
   fireTimer: number;
   hitFlashMs: number;
+  barColor: number;
+  bulletColor: number;
+}
+
+// ─── Flame wave pending (sequential burst queue) ──────────────────────────────
+interface FlameWavePending {
+  delayMs: number;   // ms until this burst fires
+  waveIndex: number; // 0-based, used for slight angle rotation
+  totalWaves: number;
+  count: number;
+  speed: number;
+  color: number;
+}
+
+// ─── Ground slam ring pending (sequential ring queue) ────────────────────────
+interface SlamRingPending {
+  delayMs: number;
+  speed: number;
+  color: number;
+}
+
+// ─── Sniper shot data (warning → fire) ───────────────────────────────────────
+interface SniperShotData {
+  warnMs: number;   // ms of warning remaining
+  warnTotal: number; // total warning duration (for fade calc)
+  targetX: number;  // locked-in target X
+  targetY: number;  // locked-in target Y
+  speed: number;
+  color: number;
+}
+
+// ─── Teleport event data (warning → teleport + ring) ─────────────────────────
+interface TeleportEventData {
+  warnMs: number;   // ms of warning remaining
+  targetX: number;  // destination X
+  display: Graphics; // pulsing warning circle at destination
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -300,7 +340,9 @@ async function enter(core: Core): Promise<void> {
   const lasersContainer = new Container();
   const petsContainer = new Container();
   const playerShockwavesContainer = new Container(); // pulse emitter weapon
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer);
+  // Warning display for sniper aim lines and teleport destination circles
+  const sniperWarningDisplay = new Graphics();
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer, sniperWarningDisplay);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -317,7 +359,9 @@ async function enter(core: Core): Promise<void> {
   const enemyHitFlashRadius = enemyTypeForDisplay === 'chaos' ? 48
     : enemyTypeForDisplay === 'phantom' ? 42
     : enemyTypeForDisplay === 'blackhole' ? 34
-    : enemyTypeForDisplay === 'mech' ? 46 : 44;
+    : enemyTypeForDisplay === 'mech' ? 46
+    : enemyTypeForDisplay === 'storm' ? 48
+    : enemyTypeForDisplay === 'dragon' ? 52 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
 
@@ -341,6 +385,10 @@ async function enter(core: Core): Promise<void> {
   const curveBullets: CurveBulletData[] = [];
   const lasers: LaserBeamData[] = [];
   const playerShockwaves: PlayerShockwaveData[] = []; // pulse emitter weapon
+  const flamePending: FlameWavePending[] = [];
+  const slamPending: SlamRingPending[] = [];
+  const sniperShots: SniperShotData[] = [];
+  const teleportEvents: TeleportEventData[] = [];
 
   // ── Item (pickup) state ───────────────────────────────────────────────────
   const items: ItemData[] = [];
@@ -553,8 +601,14 @@ async function enter(core: Core): Promise<void> {
   let laserTimer = 0;
   let curveTimer = 0;
   let straightTimer = 0;
+  let flameTimer = 0;
+  let groundSlamTimer = 0;
+  let scatterTimer = 0;
+  let sniperTimer = 0;
+  let teleportTimer = 0;
   let spiralAngle = 0;
   let enemyBobTimer = 0;
+  let enemySineTimer = 0;
   let hitFlashTimer = 0;
   let phaseFlashTimer = 0;
   // Regen: counts down to next HP regen tick.
@@ -688,7 +742,9 @@ async function enter(core: Core): Promise<void> {
   const bossDisplayName = enemyTypeForDisplay === 'courage' ? '勇氣'
     : enemyTypeForDisplay === 'phantom' ? '幽靈'
     : enemyTypeForDisplay === 'mech' ? '機甲'
-    : enemyTypeForDisplay === 'blackhole' ? '黑洞' : '混沌';
+    : enemyTypeForDisplay === 'blackhole' ? '黑洞'
+    : enemyTypeForDisplay === 'storm' ? '暴風魔'
+    : enemyTypeForDisplay === 'dragon' ? '龍王' : '混沌';
   const bossLabelInitialText = isVoid ? `⏱ 剩餘時間` : `${bossDisplayName}  HP`;
   const bossLabel = new Text({ text: bossLabelInitialText, style: bossLabelStyle });
   bossLabel.anchor.set(0.5);
@@ -1403,17 +1459,33 @@ async function enter(core: Core): Promise<void> {
       laserTimer = 0;
       curveTimer = 0;
       straightTimer = 0;
+      flameTimer = 0;
+      groundSlamTimer = 0;
+      scatterTimer = 0;
+      sniperTimer = 0;
+      teleportTimer = 0;
+      // Clear pending sequential burst queues
+      flamePending.length = 0;
+      slamPending.length = 0;
+      // Clear sniper warnings and teleport events
+      sniperShots.length = 0;
+      sniperWarningDisplay.clear();
+      for (const ev of teleportEvents) {
+        worldLayer.removeChild(ev.display);
+        ev.display.destroy();
+      }
+      teleportEvents.length = 0;
 
-      // When entering phase 3 on the final wave of level 5: summon pet guardians
+      // When entering phase 3 on the final wave of level 5 or 8: summon pet guardians
       if (
         newPhase === 3 &&
         !petPhaseTriggered &&
         !isEndless &&
-        levelConfig?.levelNumber === 5 &&
+        (levelConfig?.levelNumber === 5 || levelConfig?.levelNumber === 8) &&
         waveIdx === levelConfig.waves.length - 1
       ) {
         petPhaseTriggered = true;
-        spawnPets();
+        spawnPets(levelConfig.levelNumber === 8);
       }
     }
   }
@@ -1602,10 +1674,68 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  /** Flame: fires a sweeping fan volley; subsequent waves are queued with a short delay. */
+  function fireFlame(waves: number, waveGapMs: number, count: number, speed: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    const px = playerEntity.position.x;
+    const py = playerEntity.position.y;
+    const baseAngle = Math.atan2(py - ey, px - ex);
+    const half = (count - 1) / 2;
+    const spreadStep = count > 1 ? 0.20 : 0;
+    for (let j = 0; j < count; j++) {
+      const a = baseAngle + (j - half) * spreadStep;
+      spawnEnemyBullet(ex, ey, Math.cos(a) * speed, Math.sin(a) * speed, color);
+    }
+    for (let w = 1; w < waves; w++) {
+      flamePending.push({ delayMs: w * waveGapMs, waveIndex: w, totalWaves: waves, count, speed, color });
+    }
+  }
+
+  /** Ground slam: fires a ring of bullets immediately, then queues subsequent rings. */
+  function fireGroundSlam(rings: number, gapMs: number, speed: number, color: number): void {
+    fireRing(20, speed, color);
+    for (let r = 1; r < rings; r++) {
+      slamPending.push({ delayMs: r * gapMs, speed, color });
+    }
+  }
+
+  /** Scatter: fires count bullets in random directions with randomised speeds. */
+  function fireScatter(count: number, speedMin: number, speedMax: number, color: number): void {
+    const ex = enemyEntity.position.x;
+    const ey = enemyEntity.position.y;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = speedMin + Math.random() * (speedMax - speedMin);
+      spawnEnemyBullet(ex, ey, Math.cos(angle) * spd, Math.sin(angle) * spd, color);
+    }
+  }
+
+  /** Sniper aim: records the player's current position and queues a high-speed shot after a visible warning. */
+  function initSniperAim(warnMs: number, speed: number, color: number): void {
+    sniperShots.push({
+      warnMs, warnTotal: warnMs,
+      targetX: playerEntity.position.x,
+      targetY: playerEntity.position.y,
+      speed, color,
+    });
+  }
+
+  /** Teleport: picks a random X, shows a warning marker, then moves the enemy and fires a ring. */
+  function initTeleport(): void {
+    const margin = 80;
+    const targetX = margin + Math.random() * (W - margin * 2);
+    const display = new Graphics();
+    display.x = targetX;
+    display.y = enemyEntity.position.y;
+    worldLayer.addChild(display);
+    teleportEvents.push({ warnMs: TELEPORT_WARN_MS, targetX, display });
+  }
+
   // ── Pet guardian helpers ─────────────────────────────────────────────────
 
   /** Spawn the two pet guardians flanking the boss. */
-  function spawnPets(): void {
+  function spawnPets(isDragon: boolean = false): void {
     petPhaseActive = true;
     bossRegenTimer = BOSS_REGEN_INTERVAL;
     // Clear all existing boss bullets for a dramatic pause
@@ -1634,8 +1764,10 @@ async function enter(core: Core): Promise<void> {
       { x: W * 0.25, y: H * 0.20 },
       { x: W * 0.75, y: H * 0.20 },
     ];
+    const barColor   = isDragon ? 0xff6600 : 0xcc44ff;
+    const bulletColor = isDragon ? 0xff8800 : 0xaa44ff;
     for (const pos of petPositions) {
-      const display = createPetDisplay();
+      const display = isDragon ? createDragonEyeDisplay() : createPetDisplay();
       display.x = pos.x;
       display.y = pos.y;
       petsContainer.addChild(display);
@@ -1646,13 +1778,13 @@ async function enter(core: Core): Promise<void> {
       // HP bar background + fill
       const hpBarContainer = new Container();
       const hpBarBg = new Graphics();
-      hpBarBg.roundRect(0, 0, PET_BAR_W, 7, 2).fill({ color: 0x220033, alpha: 0.85 });
+      hpBarBg.roundRect(0, 0, PET_BAR_W, 7, 2).fill({ color: isDragon ? 0x330000 : 0x220033, alpha: 0.85 });
       hpBarContainer.addChild(hpBarBg);
       const hpBarFill = new Graphics();
-      hpBarFill.rect(0, 0, PET_BAR_W, 7).fill(0xcc44ff);
+      hpBarFill.rect(0, 0, PET_BAR_W, 7).fill(barColor);
       hpBarContainer.addChild(hpBarFill);
       const hpBarBorder = new Graphics();
-      hpBarBorder.roundRect(0, 0, PET_BAR_W, 7, 2).stroke({ color: 0xee88ff, width: 1 });
+      hpBarBorder.roundRect(0, 0, PET_BAR_W, 7, 2).stroke({ color: isDragon ? 0xff9944 : 0xee88ff, width: 1 });
       hpBarContainer.addChild(hpBarBorder);
       // Centre bar above the pet
       hpBarContainer.x = pos.x - PET_BAR_W / 2;
@@ -1671,17 +1803,19 @@ async function enter(core: Core): Promise<void> {
         bobTimer: 0,
         fireTimer: 600, // first shot fires after a short delay
         hitFlashMs: 0,
+        barColor,
+        bulletColor,
       });
     }
 
     // Show summoning banner
-    waveBannerText.text = '護衛召喚！';
+    waveBannerText.text = isDragon ? '龍眼降臨！' : '護衛召喚！';
     waveBannerText.alpha = 1;
     petBannerTimer = 2000;
 
     // Camera shake + flash
     core.events.emitSync('camera/shake', { intensity: 10, duration: 400 });
-    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xaa00ff, alpha: 1 });
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: isDragon ? 0xff4400 : 0xaa00ff, alpha: 1 });
     flashOverlay.alpha = 0.28;
     phaseFlashTimer = Math.max(phaseFlashTimer, 500);
 
@@ -1691,7 +1825,7 @@ async function enter(core: Core): Promise<void> {
         burst: true, burstCount: 28, speed: 160, speedVariance: 80,
         spread: 180, lifetime: 700, startAlpha: 1, endAlpha: 0,
         startScale: 1.4, endScale: 0,
-        startColor: 0xcc44ff, endColor: 0x660088, radius: 6,
+        startColor: isDragon ? 0xff6600 : 0xcc44ff, endColor: isDragon ? 0x660000 : 0x660088, radius: 6,
       },
     });
   }
@@ -1706,7 +1840,7 @@ async function enter(core: Core): Promise<void> {
         burst: true, burstCount: 22, speed: 140, speedVariance: 70,
         spread: 180, lifetime: 600, startAlpha: 1, endAlpha: 0,
         startScale: 1.4, endScale: 0,
-        startColor: 0xcc44ff, endColor: 0x440066, radius: 6,
+        startColor: pet.barColor, endColor: 0x000000, radius: 6,
       },
     });
     core.events.emitSync('camera/shake', { intensity: 8, duration: 250 });
@@ -1732,6 +1866,7 @@ async function enter(core: Core): Promise<void> {
     // Reset all boss attack timers so there is a brief pause before the first shot
     spiralTimer = 0; aimTimer = 0; spreadTimer = 0; ringTimer = 0;
     shockwaveTimer = 0; bubbleTimer = 0; bombTimer = 0; laserTimer = 0; curveTimer = 0; straightTimer = 0;
+    flameTimer = 0; groundSlamTimer = 0; scatterTimer = 0; sniperTimer = 0; teleportTimer = 0;
   }
 
   // ── Active skill activation helper ───────────────────────────────────────
@@ -1802,6 +1937,15 @@ async function enter(core: Core): Promise<void> {
         lasers[i].display.destroy();
       }
       lasers.length = 0;
+      flamePending.length = 0;
+      slamPending.length = 0;
+      sniperShots.length = 0;
+      sniperWarningDisplay.clear();
+      for (const ev of teleportEvents) {
+        worldLayer.removeChild(ev.display);
+        ev.display.destroy();
+      }
+      teleportEvents.length = 0;
       flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xcc44ff, alpha: 1 });
       flashOverlay.alpha = 0.25;
       phaseFlashTimer = Math.max(phaseFlashTimer, 300);
@@ -2043,7 +2187,7 @@ async function enter(core: Core): Promise<void> {
         if (trappedMs <= 0) { trapRing.visible = false; trapAnimMs = 0; }
       }
 
-      // ── Enemy bobbing animation ───────────────────────────────────────────
+      // ── Enemy movement ───────────────────────────────────────────────────
       enemyBobTimer += dt;
       enemyEntity.position.y = H * 0.18 + Math.sin(enemyBobTimer / 800) * 12;
 
@@ -2057,6 +2201,15 @@ async function enter(core: Core): Promise<void> {
         const MECH_TRACK_SPEED = 90; // px/s
         const maxMove = MECH_TRACK_SPEED * (dt / 1000);
         enemyEntity.position.x += Math.sign(trackDx) * Math.min(Math.abs(trackDx), maxMove);
+      }
+
+      // ── Storm enemy: sinusoidal horizontal oscillation ────────────────────
+      // Active when waveConfig.enemySineMoves is true (Level 7 waves 1-2).
+      if (!waveTransitioning && waveConfig.enemySineMoves) {
+        enemySineTimer += dt;
+        const amplitude = waveConfig.enemySineAmplitude ?? 120;
+        const period = waveConfig.enemySinePeriodMs ?? 2000;
+        enemyEntity.position.x = W * 0.5 + Math.sin((enemySineTimer / period) * Math.PI * 2) * amplitude;
       }
 
       // ── Phase flash ───────────────────────────────────────────────────────
@@ -2568,6 +2721,145 @@ async function enter(core: Core): Promise<void> {
             fireStraight(p.straightCount, p.straightSpeed, p.straightColor);
           }
         }
+
+        if (p.flameInterval > 0) {
+          flameTimer -= dt;
+          if (flameTimer <= 0) {
+            flameTimer = p.flameInterval;
+            fireFlame(p.flameWaves, p.flameWaveGapMs, p.flameCount, p.flameSpeed, p.flameColor);
+          }
+        }
+
+        if (p.groundSlamInterval > 0) {
+          groundSlamTimer -= dt;
+          if (groundSlamTimer <= 0) {
+            groundSlamTimer = p.groundSlamInterval;
+            fireGroundSlam(p.groundSlamRings, p.groundSlamGapMs, p.groundSlamSpeed, p.groundSlamColor);
+          }
+        }
+
+        if (p.scatterInterval > 0) {
+          scatterTimer -= dt;
+          if (scatterTimer <= 0) {
+            scatterTimer = p.scatterInterval;
+            fireScatter(p.scatterCount, p.scatterSpeedMin, p.scatterSpeedMax, p.scatterColor);
+          }
+        }
+
+        if (p.sniperInterval > 0) {
+          sniperTimer -= dt;
+          if (sniperTimer <= 0) {
+            sniperTimer = p.sniperInterval;
+            initSniperAim(p.sniperWarnMs, p.sniperSpeed, p.sniperColor);
+          }
+        }
+
+        if (p.teleportInterval > 0) {
+          teleportTimer -= dt;
+          if (teleportTimer <= 0) {
+            teleportTimer = p.teleportInterval;
+            initTeleport();
+          }
+        }
+      }
+
+      // ── Process flame burst queue ─────────────────────────────────────────
+      for (let i = flamePending.length - 1; i >= 0; i--) {
+        flamePending[i].delayMs -= dt;
+        if (flamePending[i].delayMs <= 0) {
+          const fp = flamePending[i];
+          const ex = enemyEntity.position.x;
+          const ey = enemyEntity.position.y;
+          const px = playerEntity.position.x;
+          const py = playerEntity.position.y;
+          // rotOffset: sweeps from -0.25 rad (first wave) to +0.25 rad (last wave)
+          const rotOffset = (fp.waveIndex / fp.totalWaves - 0.5) * 0.5;
+          const baseAngle = Math.atan2(py - ey, px - ex) + rotOffset;
+          const half = (fp.count - 1) / 2;
+          const spreadStep = fp.count > 1 ? 0.20 : 0;
+          for (let j = 0; j < fp.count; j++) {
+            const a = baseAngle + (j - half) * spreadStep;
+            spawnEnemyBullet(ex, ey, Math.cos(a) * fp.speed, Math.sin(a) * fp.speed, fp.color);
+          }
+          flamePending.splice(i, 1);
+        }
+      }
+
+      // ── Process ground slam ring queue ────────────────────────────────────
+      for (let i = slamPending.length - 1; i >= 0; i--) {
+        slamPending[i].delayMs -= dt;
+        if (slamPending[i].delayMs <= 0) {
+          const sp = slamPending[i];
+          fireRing(20, sp.speed, sp.color);
+          slamPending.splice(i, 1);
+        }
+      }
+
+      // ── Process sniper shots (warning display, then fire) ─────────────────
+      sniperWarningDisplay.clear();
+      for (let i = sniperShots.length - 1; i >= 0; i--) {
+        const shot = sniperShots[i];
+        shot.warnMs -= dt;
+        if (shot.warnMs <= 0) {
+          // Fire high-speed bullet from current enemy position toward locked target
+          const ex = enemyEntity.position.x;
+          const ey = enemyEntity.position.y;
+          const dx = shot.targetX - ex;
+          const dy = shot.targetY - ey;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          spawnEnemyBullet(ex, ey, (dx / dist) * shot.speed, (dy / dist) * shot.speed, shot.color);
+          sniperShots.splice(i, 1);
+        } else {
+          // Draw warning line from current enemy position to locked target
+          const ex = enemyEntity.position.x;
+          const ey = enemyEntity.position.y;
+          const flashAlpha = 0.3 + 0.6 * Math.abs(Math.sin(shot.warnMs / 80));
+          sniperWarningDisplay
+            .moveTo(ex, ey)
+            .lineTo(shot.targetX, shot.targetY)
+            .stroke({ color: shot.color, width: 2, alpha: Math.max(0, Math.min(1, flashAlpha)) });
+          // Crosshair at target
+          const warnFrac = shot.warnMs / shot.warnTotal;
+          const crossR = 6 + 4 * warnFrac;
+          sniperWarningDisplay
+            .circle(shot.targetX, shot.targetY, crossR)
+            .stroke({ color: shot.color, width: 1.5, alpha: 0.80 });
+        }
+      }
+
+      // ── Process teleport events (warning display, then teleport + ring) ────
+      for (let i = teleportEvents.length - 1; i >= 0; i--) {
+        const ev = teleportEvents[i];
+        ev.warnMs -= dt;
+        if (ev.warnMs <= 0) {
+          // Move enemy to target X; keep current Y
+          enemyEntity.position.x = ev.targetX;
+          // Brief flash + ring burst
+          flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0x8800cc, alpha: 1 });
+          flashOverlay.alpha = 0.20;
+          phaseFlashTimer = Math.max(phaseFlashTimer, 200);
+          fireRing(16, BULLET_SPEED_MEDIUM, COL_BULLET_RING);
+          core.events.emitSync('camera/shake', { intensity: 6, duration: 200 });
+          core.events.emitSync('particle/emit', {
+            config: {
+              x: ev.targetX, y: enemyEntity.position.y,
+              burst: true, burstCount: 16, speed: 120, speedVariance: 60,
+              spread: 180, lifetime: 400, startAlpha: 1, endAlpha: 0,
+              startScale: 1.2, endScale: 0,
+              startColor: 0xcc44ff, endColor: 0x440066, radius: 5,
+            },
+          });
+          worldLayer.removeChild(ev.display);
+          ev.display.destroy();
+          teleportEvents.splice(i, 1);
+        } else {
+          // Animate pulsing warning circle at destination
+          const pulse = 0.6 + 0.4 * Math.abs(Math.sin(ev.warnMs / 80));
+          ev.display.clear();
+          ev.display.circle(0, 0, 32 * pulse).fill({ color: 0x440077, alpha: 0.18 });
+          ev.display.circle(0, 0, 28 * pulse).stroke({ color: 0xcc44ff, width: 2.5, alpha: 0.85 });
+          ev.display.circle(0, 0, 6).fill({ color: 0xffffff, alpha: 0.55 });
+        }
       }
 
       // ── Pet guardian update (fire + bob + hit-flash) ──────────────────────
@@ -2591,7 +2883,7 @@ async function enter(core: Core): Promise<void> {
           pet.fireTimer -= dt;
           if (pet.fireTimer <= 0) {
             pet.fireTimer = PET_FIRE_INTERVAL;
-            fireAimedFrom(pet.x, pet.display.y, PET_BULLET_WAYS, PET_BULLET_SPREAD, PET_BULLET_SPEED, PET_BULLET_COLOR);
+            fireAimedFrom(pet.x, pet.display.y, PET_BULLET_WAYS, PET_BULLET_SPREAD, PET_BULLET_SPEED, pet.bulletColor);
           }
         }
 
@@ -2669,7 +2961,7 @@ async function enter(core: Core): Promise<void> {
               const barFrac = Math.max(0, pet.hp / pet.maxHp);
               pet.hpBarFill.clear();
               if (barFrac > 0) {
-                pet.hpBarFill.rect(0, 0, PET_BAR_W * barFrac, 7).fill(0xcc44ff);
+                pet.hpBarFill.rect(0, 0, PET_BAR_W * barFrac, 7).fill(pet.barColor);
               }
 
               core.events.emitSync('particle/emit', {
@@ -2679,7 +2971,7 @@ async function enter(core: Core): Promise<void> {
                   burst: true, burstCount: 7, speed: 80, speedVariance: 35,
                   spread: 180, lifetime: 300, startAlpha: 1, endAlpha: 0,
                   startScale: 1, endScale: 0,
-                  startColor: 0xcc44ff, endColor: 0x880088, radius: 4,
+                  startColor: pet.barColor, endColor: 0x000000, radius: 4,
                 },
               });
 
@@ -3836,6 +4128,17 @@ async function enter(core: Core): Promise<void> {
     }
     lasers.length = 0;
 
+    // Clear new attack pending queues and warning displays
+    flamePending.length = 0;
+    slamPending.length = 0;
+    sniperShots.length = 0;
+    sniperWarningDisplay.clear();
+    for (const ev of teleportEvents) {
+      worldLayer.removeChild(ev.display);
+      ev.display.destroy();
+    }
+    teleportEvents.length = 0;
+
     // Destroy all items
     for (const item of items) {
       itemsContainer.removeChild(item.display);
@@ -3856,7 +4159,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar, sniperWarningDisplay);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -3872,6 +4175,7 @@ async function enter(core: Core): Promise<void> {
     trapRing.destroy();
     costumeRing.destroy();
     wizardMagicCircle.destroy();
+    sniperWarningDisplay.destroy();
 
     // Destroy UI
     uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, skillBtnContainer, costumeBtnContainer);

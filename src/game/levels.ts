@@ -12,8 +12,13 @@ import {
   COL_BULLET_LASER,
   COL_BULLET_CURVE,
   COL_BULLET_MECH,
+  COL_BULLET_STORM,
+  COL_BULLET_FLAME,
+  COL_BULLET_SNIPER,
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
+  TELEPORT_WARN_MS,
+  SNIPER_WARN_MS,
 } from '../constants';
 import type { EnemyType } from '../constants';
 
@@ -76,6 +81,37 @@ export interface WavePhaseConfig {
   straightCount: number;     // bullets per volley (spread horizontally)
   straightSpeed: number;     // px/s downward speed
   straightColor: number;
+
+  // ── Flame burst attack (dragon) ──────────────────────────────────────────
+  flameInterval: number;    // ms between flame volleys; 0 = disabled
+  flameWaves: number;       // sequential bursts per volley
+  flameWaveGapMs: number;   // ms between bursts within a volley
+  flameCount: number;       // bullets per burst (fan)
+  flameSpeed: number;       // px/s
+  flameColor: number;
+
+  // ── Ground slam attack (dragon / chaos) ──────────────────────────────────
+  groundSlamInterval: number; // ms between ground slam volleys; 0 = disabled
+  groundSlamRings: number;    // concentric rings per volley
+  groundSlamGapMs: number;    // ms between rings within a volley
+  groundSlamSpeed: number;    // px/s expansion speed
+  groundSlamColor: number;
+
+  // ── Scatter attack (storm / chaos) ──────────────────────────────────────
+  scatterInterval: number;  // ms between scatter volleys; 0 = disabled
+  scatterCount: number;     // bullets per volley
+  scatterSpeedMin: number;  // px/s minimum speed
+  scatterSpeedMax: number;  // px/s maximum speed
+  scatterColor: number;
+
+  // ── Sniper aim attack (mech enhanced / dragon) ────────────────────────────
+  sniperInterval: number;   // ms between sniper shots; 0 = disabled
+  sniperWarnMs: number;     // warning duration before firing
+  sniperSpeed: number;      // px/s bullet speed
+  sniperColor: number;
+
+  // ── Teleport attack (storm phase 3) ──────────────────────────────────────
+  teleportInterval: number; // ms between teleports; 0 = disabled
 }
 
 /** Configuration for one enemy encounter (wave) within a level. */
@@ -91,6 +127,16 @@ export interface WaveConfig {
    * Defaults to false when omitted.
    */
   enemyTracksPlayer?: boolean;
+  /**
+   * When true the enemy oscillates horizontally in a sinusoidal pattern.
+   * Configure the amplitude and period with the fields below.
+   * Defaults to false when omitted.
+   */
+  enemySineMoves?: boolean;
+  /** Horizontal amplitude (px) for sine-wave movement. Default: 120. */
+  enemySineAmplitude?: number;
+  /** Full oscillation period (ms) for sine-wave movement. Default: 2000. */
+  enemySinePeriodMs?: number;
 }
 
 /** Configuration for a complete level. */
@@ -155,6 +201,27 @@ export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
     straightCount: 3,
     straightSpeed: BULLET_SPEED_FAST,
     straightColor: COL_BULLET_MECH,
+    flameInterval: 0,
+    flameWaves: 3,
+    flameWaveGapMs: 200,
+    flameCount: 5,
+    flameSpeed: BULLET_SPEED_MEDIUM,
+    flameColor: COL_BULLET_FLAME,
+    groundSlamInterval: 0,
+    groundSlamRings: 3,
+    groundSlamGapMs: 180,
+    groundSlamSpeed: BULLET_SPEED_SLOW,
+    groundSlamColor: COL_BULLET_RING,
+    scatterInterval: 0,
+    scatterCount: 10,
+    scatterSpeedMin: BULLET_SPEED_SLOW,
+    scatterSpeedMax: BULLET_SPEED_FAST,
+    scatterColor: COL_BULLET_STORM,
+    sniperInterval: 0,
+    sniperWarnMs: SNIPER_WARN_MS,
+    sniperSpeed: BULLET_SPEED_FAST * 2,
+    sniperColor: COL_BULLET_SNIPER,
+    teleportInterval: 0,
     ...overrides,
   };
 }
@@ -744,7 +811,231 @@ const LEVEL_6: LevelConfig = {
 };
 
 
-const LEVELS: LevelConfig[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
+// ─── Level 7 · 暴風試煉 (3 waves, Storm enemy) ────────────────────────────────
+// Wave 1: Sine movement – light spiral + scatter
+// Wave 2: Faster sine + sniper aim added
+// Wave 3: Teleport-mode – dense spiral + scatter + sniper
+const LEVEL_7: LevelConfig = {
+  levelNumber: 7,
+  name: '暴風試煉',
+  enemyType: 'storm',
+  itemDropMult: 0.90,
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 380,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      enemySineMoves: true,
+      enemySineAmplitude: 100,
+      enemySinePeriodMs: 2400,
+      phases: [
+        phase({
+          spiralInterval: 240, spiralWays: 7,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_STORM,
+          aimInterval: 1600,   aimWays: 2,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_STORM,
+          scatterInterval: 3500, scatterCount: 10, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_MEDIUM, scatterColor: COL_BULLET_STORM,
+        }),
+        phase({
+          spiralInterval: 185, spiralWays: 10, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 1100,   aimWays: 3,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P2,
+          scatterInterval: 2600, scatterCount: 14, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+        }),
+        phase({
+          spiralInterval: 120, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 750,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          scatterInterval: 1800, scatterCount: 18, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 480,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      enemySineMoves: true,
+      enemySineAmplitude: 130,
+      enemySinePeriodMs: 1900,
+      phases: [
+        phase({
+          spiralInterval: 210, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_STORM,
+          aimInterval: 1400,   aimWays: 2,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_STORM,
+          scatterInterval: 3000, scatterCount: 12, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_MEDIUM, scatterColor: COL_BULLET_STORM,
+          sniperInterval: 5500, sniperWarnMs: 900, sniperSpeed: 580, sniperColor: COL_BULLET_SNIPER,
+        }),
+        phase({
+          spiralInterval: 160, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
+          aimInterval: 950,    aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P2,
+          scatterInterval: 2200, scatterCount: 16, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+          sniperInterval: 4200, sniperWarnMs: 800, sniperSpeed: 600, sniperColor: COL_BULLET_SNIPER,
+        }),
+        phase({
+          spiralInterval: 105, spiralWays: 15, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 620,    aimWays: 4,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          scatterInterval: 1500, scatterCount: 20, scatterSpeedMin: BULLET_SPEED_MEDIUM, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+          sniperInterval: 3200, sniperWarnMs: 700, sniperSpeed: 640, sniperColor: COL_BULLET_SNIPER,
+        }),
+      ],
+    },
+    {
+      waveNumber: 3,
+      enemyHp: 600,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 200, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_STORM,
+          scatterInterval: 2800, scatterCount: 14, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_MEDIUM, scatterColor: COL_BULLET_STORM,
+          teleportInterval: 5000,
+        }),
+        phase({
+          spiralInterval: 155, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1100,   aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P2,
+          scatterInterval: 2000, scatterCount: 18, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+          sniperInterval: 4500, sniperWarnMs: 800, sniperSpeed: 580, sniperColor: COL_BULLET_SNIPER,
+          teleportInterval: 4000,
+        }),
+        phase({
+          spiralInterval: 100, spiralWays: 16, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 680,    aimWays: 4,     aimSpread: 0.18,                  aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_P3,
+          scatterInterval: 1400, scatterCount: 22, scatterSpeedMin: BULLET_SPEED_MEDIUM, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+          sniperInterval: 3000, sniperWarnMs: 700, sniperSpeed: 640, sniperColor: COL_BULLET_SNIPER,
+          teleportInterval: 3200,
+        }),
+      ],
+    },
+  ],
+};
+
+// ─── Level 8 · 龍王之戰 (4 waves, Dragon enemy) ────────────────────────────────
+// Wave 1: Stationary – flame bursts + spread
+// Wave 2: Flame + ground slam added
+// Wave 3: Horizontal tracking – flame + slam + curve
+// Wave 4 (final): Full arsenal + sniper; Phase 3 summons Dragon Eye guardians
+const LEVEL_8: LevelConfig = {
+  levelNumber: 8,
+  name: '龍王之戰',
+  enemyType: 'dragon',
+  itemDropMult: 0.80,
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 420,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          flameInterval: 3000, flameWaves: 3, flameWaveGapMs: 220, flameCount: 5, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 2200, spreadWays: 5, spreadAngle: 0.28, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_FLAME,
+        }),
+        phase({
+          flameInterval: 2400, flameWaves: 4, flameWaveGapMs: 200, flameCount: 6, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1600, spreadWays: 6, spreadAngle: 0.25, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 1400,   aimWays: 2,   aimSpread: 0.30,    aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_FLAME,
+        }),
+        phase({
+          flameInterval: 1800, flameWaves: 5, flameWaveGapMs: 180, flameCount: 7, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1100, spreadWays: 7, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 900,    aimWays: 3,   aimSpread: 0.25,    aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_FLAME,
+          ringInterval: 4500,  ringCount: 18, ringSpeed: BULLET_SPEED_MEDIUM, ringColor: COL_BULLET_RING,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 560,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          flameInterval: 2800, flameWaves: 3, flameWaveGapMs: 220, flameCount: 5, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 2000, spreadWays: 5, spreadAngle: 0.28, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_FLAME,
+          groundSlamInterval: 6500, groundSlamRings: 3, groundSlamGapMs: 200, groundSlamSpeed: BULLET_SPEED_SLOW, groundSlamColor: COL_BULLET_RING,
+        }),
+        phase({
+          flameInterval: 2200, flameWaves: 4, flameWaveGapMs: 200, flameCount: 6, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1500, spreadWays: 6, spreadAngle: 0.25, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 1200,   aimWays: 3,   aimSpread: 0.28,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          groundSlamInterval: 5000, groundSlamRings: 4, groundSlamGapMs: 180, groundSlamSpeed: BULLET_SPEED_MEDIUM, groundSlamColor: COL_BULLET_RING,
+        }),
+        phase({
+          flameInterval: 1600, flameWaves: 5, flameWaveGapMs: 180, flameCount: 7, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1000, spreadWays: 8, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 750,    aimWays: 4,   aimSpread: 0.22,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          ringInterval: 3600,  ringCount: 22, ringSpeed: BULLET_SPEED_FAST, ringColor: COL_BULLET_RING,
+          groundSlamInterval: 3800, groundSlamRings: 4, groundSlamGapMs: 160, groundSlamSpeed: BULLET_SPEED_MEDIUM, groundSlamColor: COL_BULLET_RING,
+        }),
+      ],
+    },
+    {
+      waveNumber: 3,
+      enemyHp: 700,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      enemyTracksPlayer: true,
+      phases: [
+        phase({
+          flameInterval: 2600, flameWaves: 3, flameWaveGapMs: 220, flameCount: 6, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 2000, spreadWays: 5, spreadAngle: 0.28, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_FLAME,
+          groundSlamInterval: 6000, groundSlamRings: 3, groundSlamGapMs: 200, groundSlamSpeed: BULLET_SPEED_SLOW, groundSlamColor: COL_BULLET_RING,
+          curveInterval: 7000, curveWays: 2, curveSpeed: 155, curveTurnRate: 1.0, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          flameInterval: 2000, flameWaves: 4, flameWaveGapMs: 200, flameCount: 7, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1400, spreadWays: 7, spreadAngle: 0.24, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 1100,   aimWays: 3,   aimSpread: 0.25,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          groundSlamInterval: 4500, groundSlamRings: 4, groundSlamGapMs: 180, groundSlamSpeed: BULLET_SPEED_MEDIUM, groundSlamColor: COL_BULLET_RING,
+          curveInterval: 5500, curveWays: 2, curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          flameInterval: 1500, flameWaves: 5, flameWaveGapMs: 170, flameCount: 8, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 850,  spreadWays: 8, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_FAST, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 700,    aimWays: 4,   aimSpread: 0.20,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          ringInterval: 3200,  ringCount: 26, ringSpeed: BULLET_SPEED_FAST, ringColor: COL_BULLET_RING,
+          groundSlamInterval: 3500, groundSlamRings: 5, groundSlamGapMs: 160, groundSlamSpeed: BULLET_SPEED_MEDIUM, groundSlamColor: COL_BULLET_RING,
+          curveInterval: 4200, curveWays: 3, curveSpeed: 175, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+    {
+      waveNumber: 4,
+      enemyHp: 900,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      enemyTracksPlayer: true,
+      phases: [
+        phase({
+          spiralInterval: 220, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_FLAME,
+          flameInterval: 2400, flameWaves: 4, flameWaveGapMs: 200, flameCount: 6, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1800, spreadWays: 5, spreadAngle: 0.26, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_FLAME,
+          groundSlamInterval: 5500, groundSlamRings: 3, groundSlamGapMs: 200, groundSlamSpeed: BULLET_SPEED_SLOW, groundSlamColor: COL_BULLET_RING,
+          sniperInterval: 6000, sniperWarnMs: 900, sniperSpeed: 560, sniperColor: COL_BULLET_SNIPER,
+        }),
+        phase({
+          spiralInterval: 170, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_FLAME,
+          flameInterval: 1800, flameWaves: 5, flameWaveGapMs: 180, flameCount: 7, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 1300, spreadWays: 7, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_FLAME,
+          aimInterval: 950,    aimWays: 4,   aimSpread: 0.22,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          groundSlamInterval: 4000, groundSlamRings: 4, groundSlamGapMs: 180, groundSlamSpeed: BULLET_SPEED_MEDIUM, groundSlamColor: COL_BULLET_RING,
+          curveInterval: 5000, curveWays: 2, curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
+          sniperInterval: 4500, sniperWarnMs: 800, sniperSpeed: 580, sniperColor: COL_BULLET_SNIPER,
+        }),
+        phase({
+          spiralInterval: 110, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          flameInterval: 1400, flameWaves: 6, flameWaveGapMs: 160, flameCount: 8, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+          spreadInterval: 850,  spreadWays: 8, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_FLAME,
+          aimInterval: 600,    aimWays: 5,   aimSpread: 0.18,    aimSpeed: BULLET_SPEED_FAST, aimColor: COL_BULLET_FLAME,
+          ringInterval: 3000,  ringCount: 28, ringSpeed: BULLET_SPEED_FAST, ringColor: COL_BULLET_RING,
+          groundSlamInterval: 3000, groundSlamRings: 5, groundSlamGapMs: 155, groundSlamSpeed: BULLET_SPEED_FAST, groundSlamColor: COL_BULLET_RING,
+          curveInterval: 3800, curveWays: 3, curveSpeed: 180, curveTurnRate: 1.3, curveColor: COL_BULLET_CURVE,
+          bombInterval: 5500,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          sniperInterval: 3000, sniperWarnMs: 700, sniperSpeed: 620, sniperColor: COL_BULLET_SNIPER,
+        }),
+      ],
+    },
+  ],
+};
+
+const LEVELS: LevelConfig[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8];
 
 /** Total number of defined levels. */
 export const TOTAL_LEVELS = LEVELS.length;

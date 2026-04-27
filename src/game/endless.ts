@@ -8,12 +8,16 @@ import {
   COL_BULLET_RING,
   COL_SHOCKWAVE,
   COL_BUBBLE,
+  COL_BULLET_STORM,
+  COL_BULLET_FLAME,
+  COL_BULLET_SNIPER,
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
   PLAYER_HP_MAX,
   PLAYER_FIRE_INTERVAL,
   INVINCIBLE_MS,
   ITEM_SPAWN_MAX_MS,
+  SNIPER_WARN_MS,
 } from '../constants';
 import type { EnemyType } from '../constants';
 import type { WaveConfig } from './levels';
@@ -326,14 +330,22 @@ export function buffDesc(id: BuffId, currentBuffs: BuffId[], currentHp: number =
 
 /**
  * Returns the enemy type for the given endless wave number.
- * Waves 1-5  → courage
- * Waves 6-10 → phantom
- * Waves 11+  → chaos
+ * Waves 1-5   → courage
+ * Waves 6-10  → phantom
+ * Waves 11-15 → chaos
+ * Waves 16-20 → storm
+ * Waves 21+   → rotating: chaos / storm / dragon
  */
 export function endlessEnemyType(waveNum: number): EnemyType {
   if (waveNum <= 5) return 'courage';
   if (waveNum <= 10) return 'phantom';
-  return 'chaos';
+  if (waveNum <= 15) return 'chaos';
+  if (waveNum <= 20) return 'storm';
+  // Wave 21+: cycle through chaos → storm → dragon every 3 waves
+  const cycle = ((waveNum - 21) % 9);
+  if (cycle < 3) return 'chaos';
+  if (cycle < 6) return 'storm';
+  return 'dragon';
 }
 
 /**
@@ -402,6 +414,30 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const bubCount2 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.2), 4) : 1;
   const bubCount3 = hasBubble ? capAt(2 + Math.floor((waveNum - 6) * 0.25), 5) : 1;
 
+  // Introduce scatter from wave 16.
+  const hasScatter = waveNum >= 16;
+  const sc1 = hasScatter ? Math.max(2000, Math.round(5000 / d)) : 0;
+  const sc2 = hasScatter ? Math.max(1500, Math.round(3800 / d)) : 0;
+  const sc3 = hasScatter ? Math.max(1200, Math.round(2800 / d)) : 0;
+  const scCount1 = hasScatter ? capAt(8 + Math.floor((waveNum - 16) * 0.4), 20) : 8;
+  const scCount2 = hasScatter ? capAt(12 + Math.floor((waveNum - 16) * 0.4), 24) : 12;
+  const scCount3 = hasScatter ? capAt(16 + Math.floor((waveNum - 16) * 0.5), 30) : 16;
+
+  // Introduce flame from wave 21.
+  const hasFlame = waveNum >= 21;
+  const fl1 = hasFlame ? Math.max(2000, Math.round(4500 / d)) : 0;
+  const fl2 = hasFlame ? Math.max(1500, Math.round(3400 / d)) : 0;
+  const fl3 = hasFlame ? Math.max(1200, Math.round(2600 / d)) : 0;
+  const flWaves = hasFlame ? capAt(3 + Math.floor((waveNum - 21) * 0.15), 7) : 3;
+  const flCount = hasFlame ? capAt(5 + Math.floor((waveNum - 21) * 0.2), 10) : 5;
+
+  // Introduce sniper from wave 21.
+  const hasSniper = waveNum >= 21;
+  const sn1 = hasSniper ? Math.max(3500, Math.round(8000 / d)) : 0;
+  const sn2 = hasSniper ? Math.max(2500, Math.round(6000 / d)) : 0;
+  const sn3 = hasSniper ? Math.max(1800, Math.round(4500 / d)) : 0;
+  const snSpeed = capAt(550 + (waveNum - 21) * 10, 900);
+
   return {
     waveNumber: waveNum,
     enemyHp: hp,
@@ -414,6 +450,9 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
         spreadInterval: spread1, spreadWays: aimWays1 + 2, spreadAngle: 0.25, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P1,
         shockwaveInterval: sw1, shockwaveSpeed: swSpeed, shockwaveColor: COL_SHOCKWAVE,
         bubbleInterval: bub1, bubbleCount: bubCount1, bubbleSpeed: bubSpeed, bubbleColor: COL_BUBBLE,
+        scatterInterval: sc1, scatterCount: scCount1, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_MEDIUM, scatterColor: COL_BULLET_STORM,
+        flameInterval: fl1, flameWaves: flWaves, flameWaveGapMs: 200, flameCount: flCount, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+        sniperInterval: sn1, sniperWarnMs: SNIPER_WARN_MS, sniperSpeed: snSpeed, sniperColor: COL_BULLET_SNIPER,
       }),
       makePhase({
         spiralInterval: spiral2, spiralWays: spiralWays2, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
@@ -422,6 +461,9 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
         ringInterval: ring3 + 500, ringCount: ringCount3 - 8, ringSpeed: BULLET_SPEED_MEDIUM, ringColor: COL_BULLET_RING,
         shockwaveInterval: sw2, shockwaveSpeed: swSpeed + 10, shockwaveColor: COL_SHOCKWAVE,
         bubbleInterval: bub2, bubbleCount: bubCount2, bubbleSpeed: bubSpeed, bubbleColor: COL_BUBBLE,
+        scatterInterval: sc2, scatterCount: scCount2, scatterSpeedMin: BULLET_SPEED_SLOW, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+        flameInterval: fl2, flameWaves: flWaves, flameWaveGapMs: 185, flameCount: flCount, flameSpeed: BULLET_SPEED_MEDIUM, flameColor: COL_BULLET_FLAME,
+        sniperInterval: sn2, sniperWarnMs: SNIPER_WARN_MS - 100, sniperSpeed: snSpeed + 30, sniperColor: COL_BULLET_SNIPER,
       }),
       makePhase({
         spiralInterval: spiral3, spiralWays: spiralWays3, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
@@ -430,6 +472,9 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
         ringInterval: ring3,     ringCount: ringCount3,  ringSpeed: BULLET_SPEED_FAST,      ringColor: COL_BULLET_RING,
         shockwaveInterval: sw3, shockwaveSpeed: swSpeed + 20, shockwaveColor: COL_SHOCKWAVE,
         bubbleInterval: bub3, bubbleCount: bubCount3, bubbleSpeed: bubSpeed + 10, bubbleColor: COL_BUBBLE,
+        scatterInterval: sc3, scatterCount: scCount3, scatterSpeedMin: BULLET_SPEED_MEDIUM, scatterSpeedMax: BULLET_SPEED_FAST, scatterColor: COL_BULLET_STORM,
+        flameInterval: fl3, flameWaves: flWaves + 1, flameWaveGapMs: 170, flameCount: flCount, flameSpeed: BULLET_SPEED_FAST, flameColor: COL_BULLET_FLAME,
+        sniperInterval: sn3, sniperWarnMs: Math.max(600, SNIPER_WARN_MS - 200), sniperSpeed: snSpeed + 60, sniperColor: COL_BULLET_SNIPER,
       }),
     ],
   };
