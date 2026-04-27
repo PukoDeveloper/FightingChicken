@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { endlessState, devConfig, voidState } from '../game/store';
+import { endlessState, voidState } from '../game/store';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { saveProgress } from '../game/persistence';
 
@@ -100,8 +100,7 @@ async function enter(core: Core): Promise<void> {
     return c;
   }
 
-  // ── Build buttons (positions depend on whether story mode is on) ─────────
-  const storyEnabled = devConfig.storyModeEnabled;
+  // ── Build buttons ────────────────────────────────────────────────────────
   const allBtns: Container[] = [];
 
   // 關卡模式
@@ -129,31 +128,28 @@ async function enter(core: Core): Promise<void> {
     await core.events.emit('scene/load', { key: 'levelselect' });
   });
 
-  // 故事模式 (conditional)
-  let storyBtn: Container | null = null;
-  if (storyEnabled) {
-    storyBtn = makeModeBtn({
-      label: '📖  故事模式',
-      subLabel: '跟隨小雞展開冒險旅程',
-      fillColor: 0x3d1a00,
-      strokeColor: 0xffaa44,
-      textColor: 0xffcc88,
-      subTextColor: 0xcc9955,
-      w: 260,
-      h: 70,
-    });
-    storyBtn.x = W * 0.5;
-    storyBtn.alpha = 0;
-    uiLayer.addChild(storyBtn);
-    allBtns.push(storyBtn);
+  // 故事模式
+  const storyBtn = makeModeBtn({
+    label: '📖  故事模式',
+    subLabel: '跟隨小雞展開冒險旅程',
+    fillColor: 0x3d1a00,
+    strokeColor: 0xffaa44,
+    textColor: 0xffcc88,
+    subTextColor: 0xcc9955,
+    w: 260,
+    h: 70,
+  });
+  storyBtn.x = W * 0.5;
+  storyBtn.alpha = 0;
+  uiLayer.addChild(storyBtn);
+  allBtns.push(storyBtn);
 
-    storyBtn.on('pointerdown', async () => {
-      if (_transitioning) return;
-      _transitioning = true;
-      sfxMenuClick();
-      await core.events.emit('scene/load', { key: 'story' });
-    });
-  }
+  storyBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    await core.events.emit('scene/load', { key: 'story' });
+  });
 
   // 無盡模式
   const endlessBtn = makeModeBtn({
@@ -214,7 +210,7 @@ async function enter(core: Core): Promise<void> {
   // ── Position all buttons vertically ──────────────────────────────────────
   // Spread them evenly between H*0.22 and H*0.88
   const topY = H * 0.22;
-  const spacing = storyEnabled ? 0.165 : 0.175;
+  const spacing = 0.165;
   allBtns.forEach((b, i) => {
     b.y = topY + i * spacing * H;
   });

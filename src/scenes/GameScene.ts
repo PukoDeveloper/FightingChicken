@@ -20,6 +20,7 @@ import {
   createGiftBoxItem,
   createFireball,
   createGuardChickenDisplay,
+  createWingmanDisplay,
 } from '../game/sprites';
 import {
   PLAYER_HP_MAX,
@@ -78,9 +79,26 @@ import {
   PRINCESS_GUARD_FIRE_INTERVAL_MS,
   PRINCESS_COOLDOWN_MS,
   COL_PRINCESS_GUARD_BULLET,
+  FLAME_BRACER_FIRE_RATE_BONUS,
+  BATTLE_EMBLEM_ATTACK_PER_LEVEL,
+  WINGMAN_OFFSET_X,
+  WINGMAN_GUNNER_INTERVAL_MS,
+  WINGMAN_GUNNER_DMG_PER_LEVEL,
+  WINGMAN_MEDIC_INTERVAL_BASE_MS,
+  WINGMAN_MEDIC_INTERVAL_PER_LEVEL_MS,
+  WINGMAN_HUNTER_INTERVAL_MS,
+  WINGMAN_HUNTER_DMG_PER_LEVEL,
+  WINGMAN_PULSAR_INTERVAL_MS,
+  WINGMAN_PULSAR_DMG_PER_LEVEL,
+  WINGMAN_BOUNCER_INTERVAL_MS,
+  WINGMAN_BOUNCER_DMG_PER_LEVEL,
+  WINGMAN_BOUNCER_VX,
+  WINGMAN_BOUNCER_VY,
+  COL_WINGMAN_BULLET,
 } from '../constants';
-import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
+import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState, wingmanState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
+import { WINGMAN_DEFS } from '../game/wingmen';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
@@ -146,6 +164,14 @@ interface BulletData {
   pooled?: boolean;
   /** When true, this player bullet homes in on the enemy each frame (homing gun weapon mode). */
   homing?: boolean;
+  /**
+   * When true, this bullet will bounce off the top of the screen once.
+   * After bouncing, `homing` is automatically enabled so the bullet tracks the enemy.
+   * Used by the bouncer wingman.
+   */
+  bouncing?: boolean;
+  /** Set to true once the bounce has occurred (prevents repeated bounces). */
+  bounced?: boolean;
 }
 
 // ─── Item (pickup) data ───────────────────────────────────────────────────────
@@ -379,6 +405,15 @@ async function enter(core: Core): Promise<void> {
   });
   const playerEntity = playerOut.entity as Entity;
 
+  // ── Wingman Chicken display (僚雞; created before equipment constant resolution) ──
+  // The wingman Container is added to the worldLayer right away; visibility depends on
+  // whether a wingman is equipped.
+  const wingmanContainer = new Container();
+  wingmanContainer.visible = false; // made visible below when hasWingman is resolved
+  // Sprite is assigned after wingman resolution below, stored in a mutable reference.
+  let _wingmanSprite: Container | null = null;
+  worldLayer.addChild(wingmanContainer);
+
   // ── Enemy entity ─────────────────────────────────────────────────────────
   const enemyDisplay = createEnemyDisplay(enemyTypeForDisplay);
   const enemyHitFlashRadius = enemyTypeForDisplay === 'chaos' ? 48
@@ -447,9 +482,10 @@ async function enter(core: Core): Promise<void> {
   const _eqWeapon    = equipmentState.equippedSlots.weapon;
   const _eqArmor     = equipmentState.equippedSlots.armor;
   const _eqAccessory = equipmentState.equippedSlots.accessory;
-  // 攻擊力: rapid_shot +1/lv
+  // 攻擊力: rapid_shot +1/lv, battle_emblem +2/lv
   const equipAttackBonus  =
-    (_eqWeapon === 'rapid_shot' ? (equipmentState.upgradeLevels['rapid_shot'] ?? 1) * 1 : 0);
+    (_eqWeapon === 'rapid_shot' ? (equipmentState.upgradeLevels['rapid_shot'] ?? 1) * 1 : 0) +
+    (_eqAccessory === 'battle_emblem' ? (equipmentState.upgradeLevels['battle_emblem'] ?? 1) * BATTLE_EMBLEM_ATTACK_PER_LEVEL : 0);
   // 防禦力: iron_shield +1/lv → extra max HP
   const equipDefenseBonus =
     (_eqArmor === 'iron_shield' ? (equipmentState.upgradeLevels['iron_shield'] ?? 1) * 1 : 0);
@@ -495,6 +531,14 @@ async function enter(core: Core): Promise<void> {
   let itemSpawnMaxMs        = _initStats.itemSpawnMaxMs;
   let regenIntervalMs       = _initStats.regenIntervalMs;
 
+  // ── 烈焰腕甲 (flame_bracer) armor: reduces fire interval by 5% per upgrade level ──
+  const equipFlameBracerLv = _eqArmor === 'flame_bracer' ? (equipmentState.upgradeLevels['flame_bracer'] ?? 1) : 0;
+  if (equipFlameBracerLv > 0) {
+    effectiveFireInterval = Math.max(60, Math.round(
+      effectiveFireInterval * (1 - equipFlameBracerLv * FLAME_BRACER_FIRE_RATE_BONUS),
+    ));
+  }
+
   // Crit chance from stardust_necklace (3% per upgrade level, capped at 50%)
   let critChance  = Math.min(equipCritBonus, 0.50);
 
@@ -509,6 +553,28 @@ async function enter(core: Core): Promise<void> {
   const isPulseMode  = weaponAttackMode === 'pulse';
   // Upgrade level of the equipped weapon (used to scale special attack damage).
   const weaponUpgLevel = _eqWeapon !== null ? (equipmentState.upgradeLevels[_eqWeapon] ?? 1) : 1;
+
+  // ── Wingman Chicken (僚雞) companion setup ──────────────────────────────────
+  // Each wingman has its own unique ability key, resolved from the standalone
+  // wingmanState (not from the equipment slot system).
+  const _equippedWingmanId = wingmanState.equipped;
+  const _equippedWingmanDef = _equippedWingmanId
+    ? WINGMAN_DEFS.find((d) => d.id === _equippedWingmanId) ?? null
+    : null;
+  const hasWingman      = _equippedWingmanDef !== null;
+  const wingmanAbility  = _equippedWingmanDef?.abilityKey ?? null;
+  const wingmanLevel    = _equippedWingmanId ? (wingmanState.upgradeLevels[_equippedWingmanId] ?? 1) : 1;
+  // Attach the correct sprite for the equipped wingman
+  if (hasWingman && _equippedWingmanDef) {
+    _wingmanSprite = createWingmanDisplay(_equippedWingmanDef);
+    wingmanContainer.addChild(_wingmanSprite);
+  }
+  // Wingman ability timers
+  let wingmanFireTimer  = 0;  // used by gunner / hunter / bouncer
+  let wingmanHealTimer  = 0;  // used by medic
+  let wingmanPulseTimer = 0;  // used by pulsar
+  // Show/hide wingman display now that hasWingman is resolved
+  wingmanContainer.visible = hasWingman;
 
   // Periodic shield: counts down ms until next activation.
   // Carry over the remaining time from the previous wave (or start fresh at 12 s).
@@ -1446,6 +1512,12 @@ async function enter(core: Core): Promise<void> {
     itemSpawnMinMs        = s.itemSpawnMinMs;
     itemSpawnMaxMs        = s.itemSpawnMaxMs;
     regenIntervalMs       = s.regenIntervalMs;
+    // Re-apply flame_bracer fire rate reduction
+    if (equipFlameBracerLv > 0) {
+      effectiveFireInterval = Math.max(60, Math.round(
+        effectiveFireInterval * (1 - equipFlameBracerLv * FLAME_BRACER_FIRE_RATE_BONUS),
+      ));
+    }
   }
 
   // ── Helper: apply a gift buff received from the moose costume's gift box ────
@@ -2863,6 +2935,86 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Wingman Chicken auto-fire / ability (僚雞) ───────────────────────
+      // The wingman floats to the right of the player and acts independently
+      // according to its ability. Does not benefit from player buffs.
+      if (hasWingman && !waveTransitioning) {
+        // Keep wingman display positioned to the right of the player
+        const wmX = Math.min(W - 22, playerEntity.position.x + WINGMAN_OFFSET_X);
+        const wmY = playerEntity.position.y;
+        wingmanContainer.x = wmX;
+        wingmanContainer.y = wmY;
+
+        /** Returns the effective damage for a wingman attack at the current level. */
+        const wingmanDmg = (perLevelBonus: number): number =>
+          bulletDamage + wingmanLevel * perLevelBonus;
+
+        if (wingmanAbility === 'heal') {
+          // Medic: periodically heal the player 1 HP (interval shrinks with level)
+          wingmanHealTimer -= dt;
+          if (wingmanHealTimer <= 0) {
+            const interval = Math.max(
+              1000,
+              WINGMAN_MEDIC_INTERVAL_BASE_MS - (wingmanLevel - 1) * WINGMAN_MEDIC_INTERVAL_PER_LEVEL_MS,
+            );
+            wingmanHealTimer = interval;
+            if (playerHP < effectiveHpMax) {
+              playerHP = Math.min(effectiveHpMax, playerHP + 1);
+              updateHUD();
+            }
+          }
+        } else if (wingmanAbility === 'homing') {
+          // Hunter: fire homing bullets
+          wingmanFireTimer -= dt;
+          if (wingmanFireTimer <= 0) {
+            wingmanFireTimer = WINGMAN_HUNTER_INTERVAL_MS;
+            spawnHomingBullet(wmX, wmY - 18, wingmanDmg(WINGMAN_HUNTER_DMG_PER_LEVEL));
+          }
+        } else if (wingmanAbility === 'pulse') {
+          // Pulsar: fire expanding shockwave rings
+          wingmanPulseTimer -= dt;
+          if (wingmanPulseTimer <= 0) {
+            wingmanPulseTimer = WINGMAN_PULSAR_INTERVAL_MS;
+            spawnPlayerShockwave(wmX, wmY, wingmanDmg(WINGMAN_PULSAR_DMG_PER_LEVEL));
+          }
+        } else if (wingmanAbility === 'bounce') {
+          // Bouncer: fire diagonal bullets that bounce off the top wall then home
+          wingmanFireTimer -= dt;
+          if (wingmanFireTimer <= 0) {
+            wingmanFireTimer = WINGMAN_BOUNCER_INTERVAL_MS;
+            const dmg = wingmanDmg(WINGMAN_BOUNCER_DMG_PER_LEVEL);
+            // Fire two bullets: one angled left, one angled right
+            for (const vx of [-WINGMAN_BOUNCER_VX, WINGMAN_BOUNCER_VX]) {
+              const bDisp = new Graphics();
+              bDisp.circle(0, 0, PLAYER_BULLET_R + 2).fill({ color: COL_WINGMAN_BULLET, alpha: 0.25 });
+              bDisp.circle(0, 0, PLAYER_BULLET_R).fill(COL_WINGMAN_BULLET);
+              bDisp.x = wmX;
+              bDisp.y = wmY - 18;
+              bDisp.visible = true;
+              playerBulletsContainer.addChild(bDisp);
+              playerBullets.push({
+                display: bDisp, x: wmX, y: wmY - 18,
+                vx, vy: WINGMAN_BOUNCER_VY,
+                damage: dmg, pooled: false,
+                bouncing: true, bounced: false,
+              });
+            }
+          }
+        } else {
+          // Gunner (rapid): default rapid-shot mode
+          wingmanFireTimer -= dt;
+          if (wingmanFireTimer <= 0) {
+            wingmanFireTimer = WINGMAN_GUNNER_INTERVAL_MS;
+            const wmBullet = playerBulletPool.acquire();
+            wmBullet.x = wmX;
+            wmBullet.y = wmY - 18;
+            wmBullet.visible = true;
+            playerBulletsContainer.addChild(wmBullet);
+            playerBullets.push({ display: wmBullet, x: wmX, y: wmY - 18, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: wingmanDmg(WINGMAN_GUNNER_DMG_PER_LEVEL) });
+          }
+        }
+      }
+
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
       // Boss does not attack while pet guardians are active.
       if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive) {
@@ -3139,6 +3291,15 @@ async function enter(core: Core): Promise<void> {
       for (let i = playerBullets.length - 1; i >= 0; i--) {
         const b = playerBullets[i];
 
+        // Bouncing bullets: when they reach the top edge, reverse vertical velocity
+        // and enable homing so they track the enemy on the way back down.
+        if (b.bouncing && !b.bounced && b.y <= 5) {
+          b.bounced = true;
+          b.vy = Math.abs(b.vy); // now flying downward
+          b.vx = 0;              // let homing take over lateral movement
+          b.homing = true;
+        }
+
         // Homing bullets steer toward the enemy each frame before moving.
         if (b.homing && !waveTransitioning) {
           let ex: number;
@@ -3176,8 +3337,9 @@ async function enter(core: Core): Promise<void> {
         b.y += b.vy * (dt / 1000);
         b.display.y = b.y;
 
-        // Off-screen (extended check to cover homing bullets that can drift sideways)
-        if (b.y < -20 || b.x < -20 || b.x > W + 20) {
+        // Off-screen (extended check to cover homing bullets that can drift sideways).
+        // Bouncing bullets that haven't bounced yet are allowed through the top edge.
+        if ((b.y < -20 && !(b.bouncing && !b.bounced)) || b.x < -20 || b.x > W + 20) {
           removeBullet(playerBullets, i, playerBulletsContainer, true);
           continue;
         }

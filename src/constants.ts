@@ -161,6 +161,54 @@ export const TELEPORT_WARN_MS = 800;
 /** Warning duration (ms) before a sniper bullet fires (default; can be overridden per phase). */
 export const SNIPER_WARN_MS = 900;
 
+// ─── Flame Bracer (烈焰腕甲) armor equipment ─────────────────────────────────
+/** Fire interval reduction per upgrade level (fraction, e.g. 0.05 = 5%). */
+export const FLAME_BRACER_FIRE_RATE_BONUS = 0.05;
+
+// ─── Battle Emblem (戰鬥紋章) accessory equipment ─────────────────────────────
+/** Extra attack damage per upgrade level for the battle emblem. */
+export const BATTLE_EMBLEM_ATTACK_PER_LEVEL = 2;
+
+// ─── Wingman Chicken (僚雞) companion ─────────────────────────────────────────
+/** Horizontal offset (px) of the wingman from the player's centre (positive = right side). */
+export const WINGMAN_OFFSET_X = 52;
+/** Colour used for wingman-fired bullets when no per-wingman colour applies. */
+export const COL_WINGMAN_BULLET = 0x44ccff;
+
+// Gunner wingman (射手僚雞)
+/** Fire interval (ms) between rapid shots fired by the gunner wingman. */
+export const WINGMAN_GUNNER_INTERVAL_MS = 400;
+/** Attack bonus per level for the gunner wingman. */
+export const WINGMAN_GUNNER_DMG_PER_LEVEL = 1;
+
+// Medic wingman (醫護僚雞)
+/** Base interval (ms) between healing pulses from the medic wingman. */
+export const WINGMAN_MEDIC_INTERVAL_BASE_MS = 8000;
+/** Amount by which the heal interval is reduced per upgrade level (ms). */
+export const WINGMAN_MEDIC_INTERVAL_PER_LEVEL_MS = 800;
+
+// Hunter wingman (獵人僚雞)
+/** Fire interval (ms) between homing shots fired by the hunter wingman. */
+export const WINGMAN_HUNTER_INTERVAL_MS = 520;
+/** Attack bonus per level for the hunter wingman. */
+export const WINGMAN_HUNTER_DMG_PER_LEVEL = 1;
+
+// Pulsar wingman (脈衝僚雞)
+/** Fire interval (ms) between pulse-wave bursts from the pulsar wingman. */
+export const WINGMAN_PULSAR_INTERVAL_MS = 2000;
+/** Extra damage per level for the pulsar wingman. */
+export const WINGMAN_PULSAR_DMG_PER_LEVEL = 2;
+
+// Bouncer wingman (彈射僚雞)
+/** Fire interval (ms) between bouncing-bullet shots from the bouncer wingman. */
+export const WINGMAN_BOUNCER_INTERVAL_MS = 700;
+/** Attack bonus per level for the bouncer wingman. */
+export const WINGMAN_BOUNCER_DMG_PER_LEVEL = 1;
+/** Absolute horizontal speed component of bouncer bullets (px/s). Fired in pairs: ±x. */
+export const WINGMAN_BOUNCER_VX = 110;
+/** Vertical speed component of bouncer bullets when first fired (px/s, negative = upward). */
+export const WINGMAN_BOUNCER_VY = -440;
+
 // ─── Princess Chicken (公主小雞) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
 export const PRINCESS_HP_COST = 1;

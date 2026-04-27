@@ -56,6 +56,68 @@ export function createChickenDisplay(): Container {
   return c;
 }
 
+// ─── Wingman Chicken (僚雞) ───────────────────────────────────────────────────
+import type { WingmanDef } from './wingmen';
+
+/**
+ * Build a Container for a wingman companion chicken with a colour scheme
+ * determined by the wingman's bodyColor and accentColor.
+ * The container's local origin (0,0) is the chicken's centre.
+ */
+export function createWingmanDisplay(def: WingmanDef): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 22, 14, 4).fill({ color: 0x000000, alpha: 0.20 });
+
+  // Left wing (each channel darkened independently from body colour)
+  const wR = Math.max(0, ((def.bodyColor >> 16) & 0xff) - 0x22);
+  const wG = Math.max(0, ((def.bodyColor >> 8)  & 0xff) - 0x33);
+  const wB = Math.max(0, ( def.bodyColor        & 0xff) - 0x44);
+  const wingColor = (wR << 16) | (wG << 8) | wB;
+  g.ellipse(-14, 4, 8, 6).fill(wingColor);
+
+  // Body
+  g.circle(0, 0, 18).fill(def.bodyColor);
+
+  // Belly highlight (lightened blend towards white)
+  const bellyR = Math.min(255, ((def.bodyColor >> 16) & 0xff) + 60);
+  const bellyG = Math.min(255, ((def.bodyColor >> 8)  & 0xff) + 60);
+  const bellyB = Math.min(255,  (def.bodyColor        & 0xff) + 80);
+  const bellyColor = (bellyR << 16) | (bellyG << 8) | bellyB;
+  g.ellipse(3, 5, 9, 7).fill(bellyColor);
+
+  // Comb (accent colour)
+  g.moveTo(-6, -16).lineTo(-2, -26).lineTo(1, -17)
+    .lineTo(4, -25).lineTo(7, -17).lineTo(10, -16)
+    .closePath().fill(def.accentColor);
+
+  // Right wing (same darker shade)
+  g.ellipse(15, 4, 8, 6).fill(wingColor);
+
+  // Beak
+  g.moveTo(14, -2).lineTo(22, 2).lineTo(14, 6).closePath().fill(0xff8800);
+
+  // Eye white
+  g.circle(10, -6, 5).fill(0xffffff);
+  // Pupil
+  g.circle(11, -5, 2.5).fill(0x111111);
+  // Eye glint
+  g.circle(12, -7, 1).fill(0xffffff);
+
+  // Left foot
+  g.rect(-7, 18, 2.5, 8).fill(0xff8800);
+  g.rect(-11, 25, 9, 2.5).fill(0xff8800);
+
+  // Right foot
+  g.rect(5, 18, 2.5, 8).fill(0xff8800);
+  g.rect(2, 25, 9, 2.5).fill(0xff8800);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Courage Boss (勇氣) ──────────────────────────────────────────────────────
 /**
  * Build a Container for the Courage boss character.
