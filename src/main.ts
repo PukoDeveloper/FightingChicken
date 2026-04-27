@@ -30,6 +30,8 @@ import { StoryChapter2Scene } from './scenes/StoryChapter2Scene';
 import { StoryChapter2EndScene } from './scenes/StoryChapter2EndScene';
 import { StoryChapter3Scene } from './scenes/StoryChapter3Scene';
 import { StoryChapter3EndScene } from './scenes/StoryChapter3EndScene';
+import { StoryChapter4Scene } from './scenes/StoryChapter4Scene';
+import { StoryChapter4EndScene } from './scenes/StoryChapter4EndScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { EncyclopediaScene } from './scenes/EncyclopediaScene';
 import { EquipmentScene } from './scenes/EquipmentScene';
@@ -187,6 +189,8 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: StoryChapter2EndScene });
           c.events.emitSync('scene/register', { scene: StoryChapter3Scene });
           c.events.emitSync('scene/register', { scene: StoryChapter3EndScene });
+          c.events.emitSync('scene/register', { scene: StoryChapter4Scene });
+          c.events.emitSync('scene/register', { scene: StoryChapter4EndScene });
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
           c.events.emitSync('scene/register', { scene: EncyclopediaScene });
           c.events.emitSync('scene/register', { scene: EquipmentScene });

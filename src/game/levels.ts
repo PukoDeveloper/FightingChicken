@@ -1200,11 +1200,135 @@ const STORY_CH3_LEVEL: LevelConfig = {
   ],
 };
 
+/** Story Chapter 4 battle – three-wave fight vs 混沌 (Chaos); difficulty between story ch3 and normal level 5. */
+const STORY_CH4_LEVEL: LevelConfig = {
+  levelNumber: 4,
+  name: '混沌的降臨',
+  enemyType: 'chaos',
+  waves: [
+    {
+      waveNumber: 1,
+      enemyHp: 220,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 210, spiralWays: 7,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
+          aimInterval: 1300,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
+          spreadInterval: 1900, spreadWays: 5, spreadAngle: 0.24, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
+          bombInterval: 8000,  bombCount: 1, bombFuseMs: 2400, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 7000, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+        }),
+        phase({
+          spiralInterval: 170, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 950,    aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 1450, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
+          ringInterval: 4200,   ringCount: 20, ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
+          shockwaveInterval: 5800, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
+          bombInterval: 6500,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 5500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+        }),
+        phase({
+          spiralInterval: 125, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 660,    aimWays: 5,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 950,  spreadWays: 7, spreadAngle: 0.17, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 2700,  ringCount: 26,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 4000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 40,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 5000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,       bubbleColor: COL_BUBBLE,
+          bombInterval: 5200,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 4200, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 4500, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+    {
+      waveNumber: 2,
+      enemyHp: 240,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 195, spiralWays: 8,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1150,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
+          spreadInterval: 1700, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
+          shockwaveInterval: 6200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
+          bombInterval: 7500,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 6200, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+        }),
+        phase({
+          spiralInterval: 155, spiralWays: 10, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 850,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 1250, spreadWays: 6, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 3600,  ringCount: 24,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 4800, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 40,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 6000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10,  bubbleColor: COL_BUBBLE,
+          bombInterval: 6000,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 5000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 5500, curveWays: 2,  curveSpeed: 168, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          spiralInterval: 110, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 570,    aimWays: 5,     aimSpread: 0.17,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 790,  spreadWays: 8, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 2400,  ringCount: 30,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 3600, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 60,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 4200, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 18,  bubbleColor: COL_BUBBLE,
+          bombInterval: 4800,  bombCount: 2, bombFuseMs: 1800, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 3800, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 3800, curveWays: 2,  curveSpeed: 178, curveTurnRate: 1.4, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+    {
+      waveNumber: 3,
+      enemyHp: 260,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      phases: [
+        phase({
+          spiralInterval: 185, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
+          aimInterval: 1050,   aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
+          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P2,
+          ringInterval: 4400,   ringCount: 20, ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 5600, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 30,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 7000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,       bubbleColor: COL_BUBBLE,
+          bombInterval: 7000,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 5800, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 6500, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          spiralInterval: 145, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 780,    aimWays: 5,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 1100, spreadWays: 7, spreadAngle: 0.16, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 2900,  ringCount: 28,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 4200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 55,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 5000, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 15,  bubbleColor: COL_BUBBLE,
+          bombInterval: 5500,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 4500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 4800, curveWays: 2,  curveSpeed: 175, curveTurnRate: 1.3, curveColor: COL_BULLET_CURVE,
+        }),
+        phase({
+          spiralInterval: 100, spiralWays: 15, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
+          aimInterval: 520,    aimWays: 5,     aimSpread: 0.15,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
+          spreadInterval: 720,  spreadWays: 9, spreadAngle: 0.12, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
+          ringInterval: 2100,  ringCount: 35,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
+          shockwaveInterval: 3200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 75,  shockwaveColor: COL_SHOCKWAVE,
+          bubbleInterval: 3500, bubbleCount: 4, bubbleSpeed: BUBBLE_SPEED + 25,  bubbleColor: COL_BUBBLE,
+          bombInterval: 4500,  bombCount: 2, bombFuseMs: 1700, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
+          laserInterval: 3400, laserCount: 7, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
+          curveInterval: 3400, curveWays: 2,  curveSpeed: 185, curveTurnRate: 1.6, curveColor: COL_BULLET_CURVE,
+        }),
+      ],
+    },
+  ],
+};
+
 /** Story-mode level map keyed by 1-based chapter number. */
 const STORY_LEVELS: Record<number, LevelConfig> = {
   1: STORY_CH1_LEVEL,
   2: STORY_CH2_LEVEL,
   3: STORY_CH3_LEVEL,
+  4: STORY_CH4_LEVEL,
 };
 
 /**
