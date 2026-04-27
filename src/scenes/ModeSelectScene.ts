@@ -11,6 +11,8 @@ let _transitioning = false;
 
 async function enter(core: Core): Promise<void> {
   _transitioning = false;
+  voidState.active = false;
+  endlessState.active = false;
   const W = core.app.screen.width;
   const H = core.app.screen.height;
 
