@@ -1216,7 +1216,7 @@ export function createWizardChickenDisplay(): Container {
   return c;
 }
 
-// ─── Princess Chicken (公主小姐) ──────────────────────────────────────────────
+// ─── Princess Chicken (公主小雞) ──────────────────────────────────────────────
 /**
  * A regal pink chicken wearing a tiara with a flowing cape.
  * Origin at centre of the body.

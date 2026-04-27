@@ -97,7 +97,7 @@ export const COSTUMES: CostumeConfig[] = [
   },
   {
     id: 'princess',
-    name: '公主小姐',
+    name: '公主小雞',
     description: '高貴優雅、號令四方的皇家小雞',
     ability: '主動：消耗 1 點最大生命值，召喚 1 隻護衛小雞（最多 6 隻）協助攻擊（冷卻 20 秒）',
     unlockHint: '預設解鎖',
