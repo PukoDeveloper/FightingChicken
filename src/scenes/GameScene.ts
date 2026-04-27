@@ -3142,8 +3142,24 @@ async function enter(core: Core): Promise<void> {
 
         // Homing bullets steer toward the enemy each frame before moving.
         if (b.homing && !waveTransitioning) {
-          const ex = enemyEntity.position.x;
-          const ey = enemyEntity.position.y;
+          let ex: number;
+          let ey: number;
+          if (petPhaseActive && pets.length > 0) {
+            // During pet phase, home toward the nearest pet guardian instead of the boss.
+            let nearestDist2 = Infinity;
+            let nearestPet = pets[0];
+            for (const pet of pets) {
+              const pdx = pet.x - b.x;
+              const pdy = pet.y - b.y;
+              const d2 = pdx * pdx + pdy * pdy;
+              if (d2 < nearestDist2) { nearestDist2 = d2; nearestPet = pet; }
+            }
+            ex = nearestPet.x;
+            ey = nearestPet.y;
+          } else {
+            ex = enemyEntity.position.x;
+            ey = enemyEntity.position.y;
+          }
           const targetAngle = Math.atan2(ey - b.y, ex - b.x);
           let diff = targetAngle - Math.atan2(b.vy, b.vx);
           while (diff > Math.PI)  diff -= 2 * Math.PI;
