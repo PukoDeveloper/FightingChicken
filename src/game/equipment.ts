@@ -40,10 +40,10 @@ export const EQUIPMENT_DEFS: EquipmentDef[] = [
   { id: 'iron_shield',       name: '鐵製盾牌',    icon: '🛡️',  stat: '防禦力 +1/升',    slot: 'armor'     },
   { id: 'jade_ring',         name: '翡翠戒指',    icon: '💍',  stat: '速度 +8/升',      slot: 'accessory' },
   { id: 'stardust_necklace', name: '星塵項鍊',    icon: '🌟',  stat: '暴擊 +3%/升',     slot: 'accessory' },
-  { id: 'frost_gem',         name: '霜雪寶石',    icon: '❄️',  stat: '防禦力 +1/升',    slot: 'armor'     },
+  { id: 'frost_gem',         name: '霜雪寶石',    icon: '❄️',  stat: '無敵延長 +150ms/升', slot: 'armor'     },
   { id: 'thunder_boots',     name: '雷光靴子',    icon: '⚡',  stat: '速度 +15/升',     slot: 'accessory' },
   { id: 'moon_cape',         name: '月影斗篷',    icon: '🌙',  stat: '閃躲 +1%/升',     slot: 'armor'     },
-  { id: 'beam_cannon',       name: '蓄力光束砲',  icon: '🔵',  stat: '光束傷害 +3/升',  slot: 'weapon',   attackMode: 'beam'   },
+  { id: 'beam_cannon',       name: '蓄力光束砲',  icon: '🔵',  stat: '光束傷害 +6/升',  slot: 'weapon',   attackMode: 'beam'   },
   { id: 'homing_gun',        name: '追蹤型子彈',  icon: '🎯',  stat: '追蹤傷害 +1/升',  slot: 'weapon',   attackMode: 'homing' },
   { id: 'pulse_emitter',     name: '近身波發射器', icon: '💫',  stat: '脈衝傷害 +2/升',  slot: 'weapon',   attackMode: 'pulse'  },
 ];

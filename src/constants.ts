@@ -116,11 +116,15 @@ export const ADVENTURE_PROXIMITY_MAX_MULT = 4;
 
 // ─── Weapon equipment attack modes ──────────────────────────────────────────
 
+// Frost gem (霜雪寶石)
+/** Extra post-hit invincibility duration (ms) added per upgrade level for the frost gem */
+export const FROST_GEM_INVINCIBLE_BONUS = 150;
+
 // Beam cannon (蓄力光束砲)
 /** Milliseconds needed to fully charge one beam shot */
 export const BEAM_CHARGE_MAX_MS = 1800;
 /** Extra damage added per upgrade level for the beam cannon */
-export const BEAM_DAMAGE_PER_LEVEL = 3;
+export const BEAM_DAMAGE_PER_LEVEL = 6;
 /** Visual and collision radius of the beam projectile (px) */
 export const BEAM_BULLET_R = 12;
 /** Travel speed of a fired beam bolt (px/s) */
