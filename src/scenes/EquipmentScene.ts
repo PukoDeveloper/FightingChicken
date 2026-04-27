@@ -817,10 +817,20 @@ async function enter(core: Core): Promise<void> {
         buildEquipPanel(c);
         const obtained = [...equipmentState.obtained];
         const SLOT_H = 50, SLOT_GAP = 8, LIST_H = 44, LIST_GAP = 6;
+        const SECTION_HEADER_H = 24, SECTION_GAP = 10;
         const listStartY = PANEL_Y + 38 + EQUIP_SLOT_DEFS.length * (SLOT_H + SLOT_GAP) + 12;
-        const contentBottom = obtained.length === 0
-          ? listStartY + 30
-          : listStartY + 20 + obtained.length * (LIST_H + LIST_GAP) + 16;
+        let contentBottom: number;
+        if (obtained.length === 0) {
+          contentBottom = listStartY + 30;
+        } else {
+          const numSections = EQUIP_SLOT_DEFS.filter((slotDef) =>
+            obtained.some((id) => EQUIPMENT_DEFS.find((d) => d.id === id)?.slot === slotDef.id)
+          ).length;
+          contentBottom = listStartY + 20
+            + numSections * (SECTION_HEADER_H + 4 + SECTION_GAP)
+            + obtained.length * (LIST_H + LIST_GAP)
+            + 16;
+        }
         uiLayer.addChild(c);
         setupScroll(c, contentBottom);
         break;
