@@ -2945,6 +2945,10 @@ async function enter(core: Core): Promise<void> {
         wingmanContainer.x = wmX;
         wingmanContainer.y = wmY;
 
+        /** Returns the effective damage for a wingman attack at the current level. */
+        const wingmanDmg = (perLevelBonus: number): number =>
+          bulletDamage + wingmanLevel * perLevelBonus;
+
         if (wingmanAbility === 'heal') {
           // Medic: periodically heal the player 1 HP (interval shrinks with level)
           wingmanHealTimer -= dt;
@@ -2964,23 +2968,21 @@ async function enter(core: Core): Promise<void> {
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_HUNTER_INTERVAL_MS;
-            const wmDmg = bulletDamage + wingmanLevel * WINGMAN_HUNTER_DMG_PER_LEVEL;
-            spawnHomingBullet(wmX, wmY - 18, wmDmg);
+            spawnHomingBullet(wmX, wmY - 18, wingmanDmg(WINGMAN_HUNTER_DMG_PER_LEVEL));
           }
         } else if (wingmanAbility === 'pulse') {
           // Pulsar: fire expanding shockwave rings
           wingmanPulseTimer -= dt;
           if (wingmanPulseTimer <= 0) {
             wingmanPulseTimer = WINGMAN_PULSAR_INTERVAL_MS;
-            const wmDmg = bulletDamage + wingmanLevel * WINGMAN_PULSAR_DMG_PER_LEVEL;
-            spawnPlayerShockwave(wmX, wmY, wmDmg);
+            spawnPlayerShockwave(wmX, wmY, wingmanDmg(WINGMAN_PULSAR_DMG_PER_LEVEL));
           }
         } else if (wingmanAbility === 'bounce') {
           // Bouncer: fire diagonal bullets that bounce off the top wall then home
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_BOUNCER_INTERVAL_MS;
-            const wmDmg = bulletDamage + wingmanLevel * WINGMAN_BOUNCER_DMG_PER_LEVEL;
+            const dmg = wingmanDmg(WINGMAN_BOUNCER_DMG_PER_LEVEL);
             // Fire two bullets: one angled left, one angled right
             for (const vx of [-WINGMAN_BOUNCER_VX, WINGMAN_BOUNCER_VX]) {
               const bDisp = new Graphics();
@@ -2993,7 +2995,7 @@ async function enter(core: Core): Promise<void> {
               playerBullets.push({
                 display: bDisp, x: wmX, y: wmY - 18,
                 vx, vy: WINGMAN_BOUNCER_VY,
-                damage: wmDmg, pooled: false,
+                damage: dmg, pooled: false,
                 bouncing: true, bounced: false,
               });
             }
@@ -3003,13 +3005,12 @@ async function enter(core: Core): Promise<void> {
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_GUNNER_INTERVAL_MS;
-            const wmDmg = bulletDamage + wingmanLevel * WINGMAN_GUNNER_DMG_PER_LEVEL;
             const wmBullet = playerBulletPool.acquire();
             wmBullet.x = wmX;
             wmBullet.y = wmY - 18;
             wmBullet.visible = true;
             playerBulletsContainer.addChild(wmBullet);
-            playerBullets.push({ display: wmBullet, x: wmX, y: wmY - 18, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: wmDmg });
+            playerBullets.push({ display: wmBullet, x: wmX, y: wmY - 18, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: wingmanDmg(WINGMAN_GUNNER_DMG_PER_LEVEL) });
           }
         }
       }

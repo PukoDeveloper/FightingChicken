@@ -71,8 +71,11 @@ export function createWingmanDisplay(def: WingmanDef): Container {
   // Shadow
   g.ellipse(0, 22, 14, 4).fill({ color: 0x000000, alpha: 0.20 });
 
-  // Left wing (darker shade of body)
-  const wingColor = Math.max(0, def.bodyColor - 0x223344);
+  // Left wing (each channel darkened independently from body colour)
+  const wR = Math.max(0, ((def.bodyColor >> 16) & 0xff) - 0x22);
+  const wG = Math.max(0, ((def.bodyColor >> 8)  & 0xff) - 0x33);
+  const wB = Math.max(0, ( def.bodyColor        & 0xff) - 0x44);
+  const wingColor = (wR << 16) | (wG << 8) | wB;
   g.ellipse(-14, 4, 8, 6).fill(wingColor);
 
   // Body
