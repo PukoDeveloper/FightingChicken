@@ -1161,12 +1161,12 @@ async function enter(core: Core): Promise<void> {
   }
 
   // ── Helper: spawn a player shockwave pulse (pulse emitter weapon mode) ────
-  function spawnPlayerShockwave(x: number, y: number, damage: number): void {
+  function spawnPlayerShockwave(x: number, y: number, damage: number, initialRadius: number = 0): void {
     const display = new Graphics();
     display.x = x;
     display.y = y;
     playerShockwavesContainer.addChild(display);
-    playerShockwaves.push({ display, x, y, radius: 0, speed: PULSE_SPEED, color: COL_PULSE, damage, hitDealt: false });
+    playerShockwaves.push({ display, x, y, radius: initialRadius, speed: PULSE_SPEED, color: COL_PULSE, damage, hitDealt: false });
   }
 
   // ── Helper: remove pickup item ────────────────────────────────────────────
@@ -2413,10 +2413,11 @@ async function enter(core: Core): Promise<void> {
           }
           // Crit is applied at hit time (in the pulse shockwave hit path) — do not pre-apply here.
 
-          // Spawn pulse ring(s) — triple_shot fires additional simultaneous rings
+          // Spawn pulse ring(s) — triple_shot fires additional rings offset by 15 px in starting radius
+          // so each ring visually expands at a different distance and hits the enemy at a different time.
           const pulseCount = 1 + buffTripleCount;
           for (let pk = 0; pk < pulseCount; pk++) {
-            spawnPlayerShockwave(playerEntity.position.x, playerEntity.position.y, pulseDmg);
+            spawnPlayerShockwave(playerEntity.position.x, playerEntity.position.y, pulseDmg, pk * 15);
           }
           sfxShoot();
         }
