@@ -65,6 +65,7 @@ import {
   PULSE_DAMAGE_PER_LEVEL,
   PULSE_SPEED,
   COL_PULSE,
+  FROST_GEM_INVINCIBLE_BONUS,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
@@ -376,10 +377,12 @@ async function enter(core: Core): Promise<void> {
   // 攻擊力: rapid_shot +1/lv
   const equipAttackBonus  =
     (_eqWeapon === 'rapid_shot' ? (equipmentState.upgradeLevels['rapid_shot'] ?? 1) * 1 : 0);
-  // 防禦力: iron_shield +1/lv, frost_gem +1/lv  → extra max HP
+  // 防禦力: iron_shield +1/lv → extra max HP
   const equipDefenseBonus =
-    (_eqArmor === 'iron_shield' ? (equipmentState.upgradeLevels['iron_shield'] ?? 1) * 1 : 0) +
-    (_eqArmor === 'frost_gem'   ? (equipmentState.upgradeLevels['frost_gem']   ?? 1) * 1 : 0);
+    (_eqArmor === 'iron_shield' ? (equipmentState.upgradeLevels['iron_shield'] ?? 1) * 1 : 0);
+  // 無敵延長: frost_gem +150 ms/lv
+  const equipInvincibleBonus =
+    (_eqArmor === 'frost_gem' ? (equipmentState.upgradeLevels['frost_gem'] ?? 1) * FROST_GEM_INVINCIBLE_BONUS : 0);
   // 速度: jade_ring +8 px/s per lv, thunder_boots +15 px/s per lv
   const equipSpeedBonus   =
     (_eqAccessory === 'jade_ring'      ? (equipmentState.upgradeLevels['jade_ring']     ?? 1) * 8  : 0) +
@@ -443,6 +446,7 @@ async function enter(core: Core): Promise<void> {
   bulletDamage   += equipAttackBonus;
   effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
   evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
+  effectiveInvincibleMs += equipInvincibleBonus;
   // Crit chance from stardust_necklace (3% per upgrade level, capped at 50%)
   let critChance  = Math.min(equipCritBonus, 0.50);
 
@@ -1323,6 +1327,7 @@ async function enter(core: Core): Promise<void> {
     bulletDamage   += equipAttackBonus;
     effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
     evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
+    effectiveInvincibleMs += equipInvincibleBonus;
   }
 
   // ── Helper: apply a gift buff received from the moose costume's gift box ────
@@ -2323,6 +2328,7 @@ async function enter(core: Core): Promise<void> {
         if (beamChargeMs >= BEAM_CHARGE_MAX_MS) {
           beamChargeMs = 0;
           // Calculate damage (hero charged override → adventure proximity → base + upgrade)
+          // Beam replaces two wing bullets, so bulletDamage is doubled as the base.
           let beamDmg: number;
           if (heroChargedDamage > 0) {
             beamDmg = heroChargedDamage;
@@ -2336,28 +2342,32 @@ async function enter(core: Core): Promise<void> {
               (adDist - ADVENTURE_PROXIMITY_MIN_DIST) / (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
             ));
             beamDmg = Math.max(1, Math.round(
-              (bulletDamage + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL) * (1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT),
+              (bulletDamage * 2 + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL) * (1 + (ADVENTURE_PROXIMITY_MAX_MULT - 1) * adT),
             ));
           } else {
-            beamDmg = bulletDamage + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL;
+            beamDmg = bulletDamage * 2 + weaponUpgLevel * BEAM_DAMAGE_PER_LEVEL;
           }
-          if (critChance > 0 && Math.random() < critChance) beamDmg *= 2;
+          // Crit is applied at hit time (in the playerBullets hit path) — do not pre-apply here.
 
-          // Spawn beam bolt
-          const beamDisplay = new Graphics();
-          beamDisplay.circle(0, 0, BEAM_BULLET_R + 6).fill({ color: COL_BEAM, alpha: 0.20 });
-          beamDisplay.circle(0, 0, BEAM_BULLET_R).fill({ color: COL_BEAM, alpha: 0.85 });
-          beamDisplay.circle(0, 0, BEAM_BULLET_R - 4).fill({ color: 0xffffff, alpha: 0.90 });
-          beamDisplay.x = playerEntity.position.x;
-          beamDisplay.y = playerEntity.position.y - 20;
-          beamDisplay.visible = true;
-          playerBulletsContainer.addChild(beamDisplay);
-          playerBullets.push({
-            display: beamDisplay,
-            x: playerEntity.position.x, y: playerEntity.position.y - 20,
-            vx: 0, vy: -BEAM_SPEED,
-            damage: beamDmg, radius: BEAM_BULLET_R, pooled: false,
-          });
+          // Spawn beam bolt(s) — triple_shot fires additional side bolts (12 px apart)
+          const beamCount = 1 + buffTripleCount;
+          for (let bk = 0; bk < beamCount; bk++) {
+            const beamOffsetX = (bk - (beamCount - 1) / 2) * 12;
+            const beamDisplay = new Graphics();
+            beamDisplay.circle(0, 0, BEAM_BULLET_R + 6).fill({ color: COL_BEAM, alpha: 0.20 });
+            beamDisplay.circle(0, 0, BEAM_BULLET_R).fill({ color: COL_BEAM, alpha: 0.85 });
+            beamDisplay.circle(0, 0, BEAM_BULLET_R - 4).fill({ color: 0xffffff, alpha: 0.90 });
+            beamDisplay.x = playerEntity.position.x + beamOffsetX;
+            beamDisplay.y = playerEntity.position.y - 20;
+            beamDisplay.visible = true;
+            playerBulletsContainer.addChild(beamDisplay);
+            playerBullets.push({
+              display: beamDisplay,
+              x: playerEntity.position.x + beamOffsetX, y: playerEntity.position.y - 20,
+              vx: 0, vy: -BEAM_SPEED,
+              damage: beamDmg, radius: BEAM_BULLET_R, pooled: false,
+            });
+          }
           sfxShoot();
           core.events.emitSync('particle/emit', {
             config: {
@@ -2401,9 +2411,13 @@ async function enter(core: Core): Promise<void> {
           } else {
             pulseDmg = bulletDamage + weaponUpgLevel * PULSE_DAMAGE_PER_LEVEL;
           }
-          if (critChance > 0 && Math.random() < critChance) pulseDmg *= 2;
+          // Crit is applied at hit time (in the pulse shockwave hit path) — do not pre-apply here.
 
-          spawnPlayerShockwave(playerEntity.position.x, playerEntity.position.y, pulseDmg);
+          // Spawn pulse ring(s) — triple_shot fires additional simultaneous rings
+          const pulseCount = 1 + buffTripleCount;
+          for (let pk = 0; pk < pulseCount; pk++) {
+            spawnPlayerShockwave(playerEntity.position.x, playerEntity.position.y, pulseDmg);
+          }
           sfxShoot();
         }
       } else {
@@ -2446,8 +2460,8 @@ async function enter(core: Core): Promise<void> {
           if (isHomingMode) {
             // Homing gun: fire a tracking bullet toward the enemy.
             // Extra homing bullets from power-up (1) or triple_shot buff mirror normal-fire centre bullets.
-            let homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
-            if (critChance > 0 && Math.random() < critChance) homingDmg *= 2;
+            // Crit is applied at hit time (in the playerBullets hit path) — do not pre-apply here.
+            const homingDmg = (spawnDamage ?? bulletDamage) + weaponUpgLevel * HOMING_DAMAGE_PER_LEVEL;
             spawnHomingBullet(playerEntity.position.x, playerEntity.position.y - 18, homingDmg);
             const extraHoming = (powerUpTimer > 0 ? 1 : 0) + buffTripleCount;
             for (let k = 0; k < extraHoming; k++) {
@@ -3022,11 +3036,14 @@ async function enter(core: Core): Promise<void> {
             hitFlashTimer = 80;
             sfxEnemyHit();
 
+            // Apply crit at hit time (consistent with all other player attack paths)
+            const pulseHitDmg = critChance > 0 && Math.random() < critChance ? sw.damage * 2 : sw.damage;
+
             if (isVoid) {
-              totalDamage += sw.damage;
+              totalDamage += pulseHitDmg;
             } else {
-              enemyHP = Math.max(0, enemyHP - sw.damage);
-              score += SCORE_PER_HIT * sw.damage;
+              enemyHP = Math.max(0, enemyHP - pulseHitDmg);
+              score += SCORE_PER_HIT * pulseHitDmg;
 
               // Score milestone achievements
               if (!score1000Notified && score >= 1000) {
