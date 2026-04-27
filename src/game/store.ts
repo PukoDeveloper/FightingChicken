@@ -92,6 +92,6 @@ export const equipmentState = {
   /** Upgrade level for each obtained equipment piece (1 = base, max 5). */
   upgradeLevels: {} as Record<EquipmentId, number>,
   /** The equipment currently equipped in each slot (null = empty). */
-  equippedSlots: { weapon: null, armor: null, accessory: null } as Record<EquipSlotId, EquipmentId | null>,
+  equippedSlots: { weapon: null, armor: null, accessory: null, wingman: null } as Record<EquipSlotId, EquipmentId | null>,
 };
 

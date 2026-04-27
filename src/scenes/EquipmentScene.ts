@@ -310,10 +310,11 @@ async function enter(core: Core): Promise<void> {
   }
 
   // ── Equipment slot definitions ────────────────────────────────────────────
-  const EQUIP_SLOT_DEFS: { id: EquipSlotId; name: string; icon: string }[] = [
-    { id: 'weapon',    name: '武器', icon: '⚔️' },
-    { id: 'armor',     name: '防具', icon: '🛡️' },
-    { id: 'accessory', name: '飾品', icon: '💍' },
+  const EQUIP_SLOT_DEFS: { id: EquipSlotId; name: string; icon: string; acceptsWeaponItems?: boolean }[] = [
+    { id: 'weapon',    name: '武器',   icon: '⚔️' },
+    { id: 'armor',     name: '防具',   icon: '🛡️' },
+    { id: 'accessory', name: '飾品',   icon: '💍' },
+    { id: 'wingman',   name: '僚雞武器', icon: '🐔', acceptsWeaponItems: true },
   ];
 
   // ── Panel builder ─────────────────────────────────────────────────────────
@@ -418,7 +419,12 @@ async function enter(core: Core): Promise<void> {
     const SECTION_HEADER_H = 24, SECTION_GAP = 10;
     let cursorY = listStartY + 20;
 
+    // Show weapon items once with two equip buttons: 「武器」slot and 「僚雞」slot.
+    // Other slots (armor, accessory) show normally without a wingman button.
     EQUIP_SLOT_DEFS.forEach((slotDef) => {
+      // For the wingman row we skip: it is handled inline in the weapon section below.
+      if (slotDef.id === 'wingman') return;
+
       const slotItems = obtained.filter((id) => {
         const d = EQUIPMENT_DEFS.find((e) => e.id === id);
         return d?.slot === slotDef.id;
@@ -452,11 +458,14 @@ async function enter(core: Core): Promise<void> {
         const def = EQUIPMENT_DEFS.find((d) => d.id === id);
         if (!def) return;
         const ly = cursorY;
+        // For weapon items: show both a main-weapon button AND a wingman button.
+        const isWeaponItem = def.slot === 'weapon';
+        const rowH = isWeaponItem ? LIST_H + 4 : LIST_H;
 
         const listBg = new Graphics();
-        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, rowH, 8)
           .fill({ color: 0x0d1122, alpha: 0.9 });
-        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, rowH, 8)
           .stroke({ color: 0x333366, width: 1.2 });
         parent.addChild(listBg);
 
@@ -471,7 +480,7 @@ async function enter(core: Core): Promise<void> {
           }),
         });
         itemNameTxt.x = PANEL_X + 28;
-        itemNameTxt.y = ly + LIST_H / 2 - 8;
+        itemNameTxt.y = ly + (isWeaponItem ? LIST_H / 2 - 10 : LIST_H / 2 - 8);
         parent.addChild(itemNameTxt);
 
         const statTxt = new Text({
@@ -483,9 +492,10 @@ async function enter(core: Core): Promise<void> {
           }),
         });
         statTxt.x = PANEL_X + 28;
-        statTxt.y = ly + LIST_H / 2 + 7;
+        statTxt.y = ly + (isWeaponItem ? LIST_H / 2 + 2 : LIST_H / 2 + 7);
         parent.addChild(statTxt);
 
+        // ── Main-weapon equip button ─────────────────────────────────────
         const isEquipped = equipmentState.equippedSlots[def.slot] === id;
         const bW = 56, bH = 28;
         const equipBtn = new Container();
@@ -498,7 +508,7 @@ async function enter(core: Core): Promise<void> {
           .stroke({ color: isEquipped ? 0x55cc55 : 0x6688ff, width: 1.5 });
         equipBtn.addChild(equipBg);
         const equipBtnTxt = new Text({
-          text: isEquipped ? '已裝備' : '裝備',
+          text: isEquipped ? '已裝備' : '武器',
           style: new TextStyle({
             fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
             fontSize: 12,
@@ -508,8 +518,10 @@ async function enter(core: Core): Promise<void> {
         });
         equipBtnTxt.anchor.set(0.5);
         equipBtn.addChild(equipBtnTxt);
-        equipBtn.x = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
-        equipBtn.y = ly + LIST_H / 2;
+        // Position: right edge of the row, top half for weapon items, centre otherwise
+        const btnRightX = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
+        equipBtn.x = btnRightX;
+        equipBtn.y = ly + (isWeaponItem ? LIST_H / 2 - 8 : LIST_H / 2);
 
         if (!isEquipped) {
           equipBtn.on('pointerdown', async () => {
@@ -522,7 +534,48 @@ async function enter(core: Core): Promise<void> {
           equipBtn.on('pointerout',  () => equipBtn.scale.set(1.0));
         }
         parent.addChild(equipBtn);
-        cursorY += LIST_H + LIST_GAP;
+
+        // ── Wingman equip button (weapon items only) ─────────────────────
+        if (isWeaponItem) {
+          const isWingmanEquipped = equipmentState.equippedSlots['wingman'] === id;
+          const wgW = 56, wgH = 26;
+          const wingmanBtn = new Container();
+          wingmanBtn.eventMode = 'static';
+          wingmanBtn.cursor = isWingmanEquipped ? 'default' : 'pointer';
+          const wgBg = new Graphics();
+          wgBg.roundRect(-wgW / 2, -wgH / 2, wgW, wgH, 7)
+            .fill({ color: isWingmanEquipped ? 0x003311 : 0x224422, alpha: 0.9 });
+          wgBg.roundRect(-wgW / 2, -wgH / 2, wgW, wgH, 7)
+            .stroke({ color: isWingmanEquipped ? 0x44cc88 : 0x44cc66, width: 1.5 });
+          wingmanBtn.addChild(wgBg);
+          const wgTxt = new Text({
+            text: isWingmanEquipped ? '僚雞中' : '僚雞',
+            style: new TextStyle({
+              fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+              fontSize: 12,
+              fontWeight: 'bold',
+              fill: isWingmanEquipped ? 0x88ffcc : 0x88ff88,
+            }),
+          });
+          wgTxt.anchor.set(0.5);
+          wingmanBtn.addChild(wgTxt);
+          wingmanBtn.x = btnRightX;
+          wingmanBtn.y = ly + LIST_H / 2 + 14;
+
+          if (!isWingmanEquipped) {
+            wingmanBtn.on('pointerdown', async () => {
+              sfxMenuClick();
+              equipmentState.equippedSlots['wingman'] = id;
+              await saveProgress();
+              rebuildPanel();
+            });
+            wingmanBtn.on('pointerover', () => wingmanBtn.scale.set(1.06));
+            wingmanBtn.on('pointerout',  () => wingmanBtn.scale.set(1.0));
+          }
+          parent.addChild(wingmanBtn);
+        }
+
+        cursorY += rowH + LIST_GAP;
       });
 
       cursorY += SECTION_GAP;

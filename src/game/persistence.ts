@@ -137,10 +137,12 @@ export async function loadProgress(): Promise<void> {
 
     if (data.equippedSlots && typeof data.equippedSlots === 'object') {
       const slots = data.equippedSlots as Record<string, unknown>;
-      for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
+      for (const slotId of ['weapon', 'armor', 'accessory', 'wingman'] as EquipSlotId[]) {
         const val = slots[slotId];
         const def = typeof val === 'string' ? EQUIPMENT_DEFS.find((d) => d.id === val) : undefined;
-        if (def && def.slot === slotId && equipmentState.obtained.has(val as EquipmentId)) {
+        // wingman slot accepts weapon-slot items; all other slots require an exact slot match.
+        const slotOk = def && (def.slot === slotId || (slotId === 'wingman' && def.slot === 'weapon'));
+        if (slotOk && equipmentState.obtained.has(val as EquipmentId)) {
           equipmentState.equippedSlots[slotId] = val as EquipmentId;
         } else {
           equipmentState.equippedSlots[slotId] = null;
@@ -209,7 +211,7 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
     equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
-    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null };
+    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null, wingman: null };
 
     if (data.levelHighScores && typeof data.levelHighScores === 'object') {
       for (const [key, val] of Object.entries(data.levelHighScores as Record<string, unknown>)) {
@@ -266,10 +268,11 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
 
     if (data.equippedSlots && typeof data.equippedSlots === 'object') {
       const slots = data.equippedSlots as Record<string, unknown>;
-      for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
+      for (const slotId of ['weapon', 'armor', 'accessory', 'wingman'] as EquipSlotId[]) {
         const val = slots[slotId];
         const def = typeof val === 'string' ? EQUIPMENT_DEFS.find((d) => d.id === val) : undefined;
-        if (def && def.slot === slotId && equipmentState.obtained.has(val as EquipmentId)) {
+        const slotOk = def && (def.slot === slotId || (slotId === 'wingman' && def.slot === 'weapon'));
+        if (slotOk && equipmentState.obtained.has(val as EquipmentId)) {
           equipmentState.equippedSlots[slotId] = val as EquipmentId;
         } else {
           equipmentState.equippedSlots[slotId] = null;
@@ -332,7 +335,7 @@ export async function clearProgress(): Promise<void> {
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
     equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
-    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null };
+    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null, wingman: null };
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {
@@ -347,7 +350,7 @@ export async function clearProgress(): Promise<void> {
         cosmicAsh: 0,
         obtainedEquipment: [],
         equipmentUpgradeLevels: {},
-        equippedSlots: { weapon: null, armor: null, accessory: null },
+        equippedSlots: { weapon: null, armor: null, accessory: null, wingman: null },
         _achievements: { data: {} },
       },
     });

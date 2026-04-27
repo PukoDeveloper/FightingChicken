@@ -56,6 +56,59 @@ export function createChickenDisplay(): Container {
   return c;
 }
 
+// ─── Wingman Chicken (僚雞) ───────────────────────────────────────────────────
+/**
+ * Build a Container for the wingman companion chicken.
+ * Visually similar to the player chicken but with a sky-blue colour scheme
+ * so players can easily distinguish it from the main character.
+ * The container's local origin (0,0) is the chicken's centre.
+ */
+export function createWingmanChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Shadow
+  g.ellipse(0, 22, 14, 4).fill({ color: 0x000000, alpha: 0.20 });
+
+  // Left wing
+  g.ellipse(-14, 4, 8, 6).fill(0x2299cc);
+
+  // Body (sky-blue instead of gold)
+  g.circle(0, 0, 18).fill(0x44bbee);
+
+  // Belly highlight
+  g.ellipse(3, 5, 9, 7).fill(0x88ddff);
+
+  // Comb (cyan tint)
+  g.moveTo(-6, -16).lineTo(-2, -26).lineTo(1, -17)
+    .lineTo(4, -25).lineTo(7, -17).lineTo(10, -16)
+    .closePath().fill(0x00cccc);
+
+  // Right wing
+  g.ellipse(15, 4, 8, 6).fill(0x2299cc);
+
+  // Beak
+  g.moveTo(14, -2).lineTo(22, 2).lineTo(14, 6).closePath().fill(0xff8800);
+
+  // Eye white
+  g.circle(10, -6, 5).fill(0xffffff);
+  // Pupil
+  g.circle(11, -5, 2.5).fill(0x111111);
+  // Eye glint
+  g.circle(12, -7, 1).fill(0xffffff);
+
+  // Left foot
+  g.rect(-7, 18, 2.5, 8).fill(0xff8800);
+  g.rect(-11, 25, 9, 2.5).fill(0xff8800);
+
+  // Right foot
+  g.rect(5, 18, 2.5, 8).fill(0xff8800);
+  g.rect(2, 25, 9, 2.5).fill(0xff8800);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Courage Boss (勇氣) ──────────────────────────────────────────────────────
 /**
  * Build a Container for the Courage boss character.

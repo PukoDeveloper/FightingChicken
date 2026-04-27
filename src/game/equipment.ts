@@ -8,10 +8,12 @@ export type EquipmentId =
   | 'moon_cape'
   | 'beam_cannon'
   | 'homing_gun'
-  | 'pulse_emitter';
+  | 'pulse_emitter'
+  | 'flame_bracer'
+  | 'battle_emblem';
 
-/** The three equipment slot categories. */
-export type EquipSlotId = 'weapon' | 'armor' | 'accessory';
+/** The equipment slot categories. */
+export type EquipSlotId = 'weapon' | 'armor' | 'accessory' | 'wingman';
 
 /**
  * Identifies which special attack mode a weapon-slot equipment piece provides.
@@ -46,6 +48,8 @@ export const EQUIPMENT_DEFS: EquipmentDef[] = [
   { id: 'beam_cannon',       name: '蓄力光束砲',  icon: '🔵',  stat: '光束傷害 +6/升',  slot: 'weapon',   attackMode: 'beam'   },
   { id: 'homing_gun',        name: '追蹤型子彈',  icon: '🎯',  stat: '追蹤傷害 +1/升',  slot: 'weapon',   attackMode: 'homing' },
   { id: 'pulse_emitter',     name: '近身波發射器', icon: '💫',  stat: '脈衝傷害 +2/升',  slot: 'weapon',   attackMode: 'pulse'  },
+  { id: 'flame_bracer',      name: '烈焰腕甲',    icon: '🔥',  stat: '射速 +5%/升',     slot: 'armor'     },
+  { id: 'battle_emblem',     name: '戰鬥紋章',    icon: '🎖️',  stat: '攻擊力 +2/升',   slot: 'accessory' },
 ];
 
 /** Maximum upgrade level for any single equipment piece. */

@@ -161,6 +161,28 @@ export const TELEPORT_WARN_MS = 800;
 /** Warning duration (ms) before a sniper bullet fires (default; can be overridden per phase). */
 export const SNIPER_WARN_MS = 900;
 
+// ─── Flame Bracer (烈焰腕甲) armor equipment ─────────────────────────────────
+/** Fire interval reduction per upgrade level (fraction, e.g. 0.05 = 5%). */
+export const FLAME_BRACER_FIRE_RATE_BONUS = 0.05;
+
+// ─── Battle Emblem (戰鬥紋章) accessory equipment ─────────────────────────────
+/** Extra attack damage per upgrade level for the battle emblem. */
+export const BATTLE_EMBLEM_ATTACK_PER_LEVEL = 2;
+
+// ─── Wingman Chicken (僚雞) companion ─────────────────────────────────────────
+/** Horizontal offset (px) of the wingman from the player's centre (positive = right side). */
+export const WINGMAN_OFFSET_X = 52;
+/** Fire interval (ms) for the wingman using rapid-shot mode. */
+export const WINGMAN_RAPID_INTERVAL_MS = 420;
+/** Charge duration (ms) for the wingman beam cannon to fully charge. */
+export const WINGMAN_BEAM_CHARGE_MAX_MS = 2600;
+/** Fire interval (ms) for the wingman homing gun. */
+export const WINGMAN_HOMING_INTERVAL_MS = 540;
+/** Fire interval (ms) for the wingman pulse emitter. */
+export const WINGMAN_PULSE_INTERVAL_MS = 2200;
+/** Colour of the wingman chicken's bullet (sky blue). */
+export const COL_WINGMAN_BULLET = 0x44ccff;
+
 // ─── Princess Chicken (公主小雞) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
 export const PRINCESS_HP_COST = 1;
