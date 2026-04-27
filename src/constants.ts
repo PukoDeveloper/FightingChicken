@@ -51,8 +51,7 @@ export const ITEM_SPAWN_MIN_MS = 8000;
 export const ITEM_SPAWN_MAX_MS = 16000;
 /** Duration of the damage power-up (ms) */
 export const POWER_UP_DURATION_MS = 8000;
-/** Fire interval while damage power-up is active (ms) */
-export const POWER_FIRE_INTERVAL = 140;
+
 /** Probability (0–1) that a spawned pickup is a health item vs a power item */
 export const HEALTH_ITEM_PROB = 0.7;
 /** Fixed interval (ms) between moose-costume gift-box spawns (independent of normal item spawns) */
@@ -202,12 +201,11 @@ export const WINGMAN_PULSAR_DMG_PER_LEVEL = 2;
 // Bouncer wingman (彈射僚雞)
 /** Fire interval (ms) between bouncing-bullet shots from the bouncer wingman. */
 export const WINGMAN_BOUNCER_INTERVAL_MS = 700;
-/** Attack bonus per level for the bouncer wingman. */
-export const WINGMAN_BOUNCER_DMG_PER_LEVEL = 1;
-/** Absolute horizontal speed component of bouncer bullets (px/s). Fired in pairs: ±x. */
-export const WINGMAN_BOUNCER_VX = 110;
-/** Vertical speed component of bouncer bullets when first fired (px/s, negative = upward). */
-export const WINGMAN_BOUNCER_VY = -440;
+
+/** Base repel radius for the bouncer wingman's deflect ability (px). */
+export const WINGMAN_BOUNCER_REPEL_RADIUS_BASE = 180;
+/** Repel radius increase per upgrade level for the bouncer wingman (px). */
+export const WINGMAN_BOUNCER_REPEL_PER_LEVEL = 20;
 
 // ─── Princess Chicken (公主小雞) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
