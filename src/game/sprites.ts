@@ -174,6 +174,8 @@ export function createEnemyDisplay(type: EnemyType): Container {
     case 'chaos':     return createChaosDisplay();
     case 'blackhole': return createBlackHoleDisplay();
     case 'mech':      return createMechDisplay();
+    case 'storm':     return createStormDisplay();
+    case 'dragon':    return createDragonDisplay();
     default:          return createCourageDisplay();
   }
 }
@@ -1230,4 +1232,234 @@ export function createPlayerChicken(costume: CostumeId): Container {
     case 'boss':      return createBossChickenDisplay();
     default:          return createChickenDisplay();
   }
+}
+
+// ─── Storm Boss (暴風魔) ───────────────────────────────────────────────────────
+/**
+ * Build a Container for the Storm boss.
+ * A crackling black sphere wreathed in violet lightning arcs.
+ * Origin at centre.
+ */
+export function createStormDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer electric aura
+  g.circle(0, 0, 62).fill({ color: 0x330055, alpha: 0.10 });
+  g.circle(0, 0, 54).fill({ color: 0x8800cc, alpha: 0.08 });
+
+  // Lightning arc halo (8-point star, sharp spikes)
+  const arcs = 8;
+  const arcOuter = 52;
+  const arcInner = 38;
+  const arcPts: number[] = [];
+  for (let i = 0; i < arcs * 2; i++) {
+    const r = i % 2 === 0 ? arcOuter : arcInner;
+    const a = (i / (arcs * 2)) * Math.PI * 2 - Math.PI / 2;
+    arcPts.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.poly(arcPts).fill({ color: 0x7700bb, alpha: 0.35 });
+
+  // Main body – deep black with a faint violet tint
+  g.circle(0, 0, 44).fill(0x0a000f);
+  g.circle(0, 0, 40).fill(0x14001f);
+
+  // Inner swirling energy gradient
+  g.ellipse(8, -6, 20, 16).fill({ color: 0x8800cc, alpha: 0.22 });
+  g.ellipse(-10, 8, 16, 12).fill({ color: 0x5500aa, alpha: 0.18 });
+
+  // Lightning bolts (4 jagged streaks)
+  const boltDefs: Array<[number, number, number]> = [
+    [-14, -30, -30],   // angle ~ up-left
+    [14, -30, 30],     // up-right
+    [-26, 5, 90],      // left
+    [26, 5, -90],      // right
+  ];
+  for (const [bx, by, rot] of boltDefs) {
+    const radRot = (rot * Math.PI) / 180;
+    // Jagged bolt – 5 points zigzag
+    const bw = 3, bh = 18;
+    const pts = [
+      bx, by,
+      bx + Math.cos(radRot + Math.PI / 2) * bw + Math.cos(radRot) * (bh * 0.33),
+      by + Math.sin(radRot + Math.PI / 2) * bw + Math.sin(radRot) * (bh * 0.33),
+      bx - Math.cos(radRot + Math.PI / 2) * bw * 0.5 + Math.cos(radRot) * (bh * 0.66),
+      by - Math.sin(radRot + Math.PI / 2) * bw * 0.5 + Math.sin(radRot) * (bh * 0.66),
+      bx + Math.cos(radRot) * bh,
+      by + Math.sin(radRot) * bh,
+    ];
+    g.poly(pts).fill({ color: 0xdd88ff, alpha: 0.70 });
+  }
+
+  // Central core – bright electric nucleus
+  g.circle(0, 0, 14).fill({ color: 0xaa44ff, alpha: 0.55 });
+  g.circle(0, 0, 9).fill(0x220033);
+  g.circle(0, 0, 5).fill({ color: 0xee99ff, alpha: 0.80 });
+  g.circle(0, 0, 2).fill(0xffffff);
+
+  // Glowing eyes (two horizontal slits)
+  g.ellipse(-11, -6, 8, 4).fill({ color: 0xffffff, alpha: 0.15 });
+  g.ellipse(-11, -6, 5, 2.5).fill(0xffeecc);
+  g.ellipse(-11, -6, 2.5, 1.5).fill(0x110022);
+  g.ellipse(11, -6, 8, 4).fill({ color: 0xffffff, alpha: 0.15 });
+  g.ellipse(11, -6, 5, 2.5).fill(0xffeecc);
+  g.ellipse(11, -6, 2.5, 1.5).fill(0x110022);
+
+  // Outer ring sparks (6 dots)
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    g.circle(Math.cos(a) * 48, Math.sin(a) * 48, 3).fill({ color: 0xee66ff, alpha: 0.55 });
+  }
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Dragon Boss (龍王) ────────────────────────────────────────────────────────
+/**
+ * Build a Container for the Dragon boss.
+ * An imposing dragon head with curved horns, golden scales, and slit red eyes.
+ * Origin at centre.
+ */
+export function createDragonDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer aura (deep red-gold glow)
+  g.circle(0, 0, 66).fill({ color: 0x440000, alpha: 0.10 });
+  g.circle(0, 0, 58).fill({ color: 0xff4400, alpha: 0.07 });
+
+  // Crown spikes (5 spines)
+  const crownSpikes = 5;
+  for (let i = 0; i < crownSpikes; i++) {
+    const t = (i / (crownSpikes - 1)) - 0.5;
+    const bx = t * 46;
+    const by = -40;
+    const tipY = by - 20 - Math.abs(t) * 10;
+    g.poly([bx - 6, by, bx, tipY, bx + 6, by]).fill(0xcc2200);
+    g.poly([bx - 6, by, bx, tipY, bx + 6, by]).stroke({ color: 0xff8800, width: 1, alpha: 0.6 });
+  }
+
+  // Main head shape (hexagonal plate)
+  g.poly([
+    -44, 10,
+    -36, -38,
+    -16, -46,
+    16, -46,
+    36, -38,
+    44, 10,
+    28, 28,
+    0, 34,
+    -28, 28,
+  ]).fill(0x6b0000);
+
+  // Scale-plate overlay (lighter inner face)
+  g.poly([
+    -34, 8,
+    -26, -32,
+    -10, -40,
+    10, -40,
+    26, -32,
+    34, 8,
+    20, 22,
+    0, 28,
+    -20, 22,
+  ]).fill(0x8b1500);
+
+  // Golden scale highlights (diamond grid)
+  const scalePositions: Array<[number, number]> = [
+    [-14, -22], [0, -28], [14, -22],
+    [-20, -8],  [0, -10], [20, -8],
+    [-12, 6],   [0, 8],   [12, 6],
+  ];
+  for (const [sx, sy] of scalePositions) {
+    g.poly([sx, sy - 7, sx + 6, sy, sx, sy + 5, sx - 6, sy]).fill({ color: 0xffcc00, alpha: 0.30 });
+  }
+
+  // Left horn (curved, thick at base)
+  g.poly([-32, -34, -52, -62, -44, -68, -26, -38, -18, -34]).fill(0xff6600);
+  g.poly([-32, -34, -52, -62, -44, -68, -26, -38, -18, -34]).stroke({ color: 0xffcc00, width: 1, alpha: 0.5 });
+  // Right horn
+  g.poly([32, -34, 52, -62, 44, -68, 26, -38, 18, -34]).fill(0xff6600);
+  g.poly([32, -34, 52, -62, 44, -68, 26, -38, 18, -34]).stroke({ color: 0xffcc00, width: 1, alpha: 0.5 });
+
+  // Brow ridges (angry)
+  g.poly([-36, -22, -18, -32, -14, -26, -32, -16]).fill(0x550000);
+  g.poly([36, -22, 18, -32, 14, -26, 32, -16]).fill(0x550000);
+
+  // Left eye socket
+  g.ellipse(-18, -14, 14, 9).fill(0x220000);
+  // Left eye glow
+  g.ellipse(-18, -14, 11, 7).fill({ color: 0xff4400, alpha: 0.60 });
+  // Left eye slit pupil
+  g.ellipse(-18, -14, 4, 8).fill(0xff8800);
+  g.ellipse(-18, -14, 2, 5).fill(0x000000);
+  g.circle(-15, -17, 2).fill(0xffffff);
+
+  // Right eye socket
+  g.ellipse(18, -14, 14, 9).fill(0x220000);
+  // Right eye glow
+  g.ellipse(18, -14, 11, 7).fill({ color: 0xff4400, alpha: 0.60 });
+  // Right eye slit pupil
+  g.ellipse(18, -14, 4, 8).fill(0xff8800);
+  g.ellipse(18, -14, 2, 5).fill(0x000000);
+  g.circle(21, -17, 2).fill(0xffffff);
+
+  // Nostrils
+  g.ellipse(-8, 10, 4, 3).fill({ color: 0xcc0000, alpha: 0.7 });
+  g.ellipse(8, 10, 4, 3).fill({ color: 0xcc0000, alpha: 0.7 });
+
+  // Maw / fang outline
+  g.poly([-22, 16, -14, 12, -6, 18, 0, 12, 6, 18, 14, 12, 22, 16, 20, 28, 0, 32, -20, 28]).fill(0x110000);
+  // Fangs (two white triangles)
+  g.poly([-12, 16, -8, 22, -4, 16]).fill(0xeeeecc);
+  g.poly([4, 16, 8, 22, 12, 16]).fill(0xeeeecc);
+
+  // Chin flame glow
+  g.ellipse(0, 28, 18, 8).fill({ color: 0xff4400, alpha: 0.25 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Dragon Eye Pet (龍眼護衛) ────────────────────────────────────────────────
+/**
+ * A compact floating dragon eye — used as the Level 8 pet guardian.
+ * Smaller than the dragon boss; origin at centre.
+ */
+export function createDragonEyeDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Outer glow
+  g.circle(0, 0, 28).fill({ color: 0xcc2200, alpha: 0.14 });
+
+  // Wing-like flame petals
+  g.ellipse(-20, 4, 12, 6).fill({ color: 0xaa2200, alpha: 0.88 });
+  g.ellipse(20, 4, 12, 6).fill({ color: 0xaa2200, alpha: 0.88 });
+
+  // Body outer ring
+  g.circle(0, 0, 18).fill(0x200400);
+  // Body inner
+  g.circle(0, 0, 14).fill(0x3c0800);
+  // Swirl highlight
+  g.ellipse(5, -3, 7, 5).fill({ color: 0xff4400, alpha: 0.30 });
+
+  // Central slit eye
+  g.circle(0, 0, 10).fill({ color: 0xff6600, alpha: 0.55 });
+  g.ellipse(0, 0, 4, 9).fill(0xff8800);
+  g.ellipse(0, 0, 2, 5).fill(0x000000);
+  g.circle(2, -2, 1.5).fill(0xffffff);
+
+  // Flame corona dots
+  const flameDots: Array<[number, number]> = [[-16, -6], [16, -6], [-13, 10], [13, 10], [0, -17]];
+  for (const [fx, fy] of flameDots) {
+    g.circle(fx, fy, 3).fill({ color: 0xff8800, alpha: 0.50 });
+  }
+
+  // Tiny jagged maw
+  g.poly([-7, 12, -4, 9, -1, 12, 2, 9, 5, 12, 7, 9, 7, 14, -7, 14]).fill(0x110000);
+
+  c.addChild(g);
+  return c;
 }

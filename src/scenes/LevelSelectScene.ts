@@ -40,8 +40,8 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(titleLabel);
 
   // ── Level buttons ─────────────────────────────────────────────────────────
-  const levelColors = [0x226622, 0xcc7700, 0x880088, 0x005588, 0x660000, 0x111a2a];
-  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444, 0x44aaff];
+  const levelColors = [0x226622, 0xcc7700, 0x880088, 0x005588, 0x660000, 0x111a2a, 0x1a0a2a, 0x3a0a00];
+  const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444, 0x44aaff, 0xcc44ff, 0xff6600];
   const btnW = 260, btnH = 68;
   const levelBtns: Container[] = [];
 
