@@ -280,6 +280,7 @@ interface SniperShotData {
   targetY: number;  // locked-in target Y
   speed: number;
   color: number;
+  damage: number;   // HP damage dealt to the player on hit
 }
 
 // ─── Teleport event data (warning → teleport + ring) ─────────────────────────
@@ -1161,13 +1162,45 @@ async function enter(core: Core): Promise<void> {
 
   if (hasActiveCostumeAbility) redrawCostumeBtn();
 
-  // eagle_eye skill: enemy bullet speed multiplier
+  // ── Endless mode exit button (top-left corner) ───────────────────────────
+  // A small "✕" button visible only in endless mode. Tapping it ends the current
+  // run (same as dying) and goes to the game-over screen.
+  const EXIT_BTN_X = 22;
+  const EXIT_BTN_Y = 22;
+  const EXIT_BTN_R = 18;
+  const endlessExitBtnContainer = new Container();
+  endlessExitBtnContainer.visible = isEndless;
+  const endlessExitBtnBg = new Graphics();
+  endlessExitBtnBg
+    .circle(0, 0, EXIT_BTN_R)
+    .fill({ color: 0x220000, alpha: 0.85 })
+    .circle(0, 0, EXIT_BTN_R)
+    .stroke({ color: 0xff4444, width: 1.5 });
+  const endlessExitBtnLabel = new Text({
+    text: '✕',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 14,
+      fill: 0xff6666,
+      fontWeight: 'bold',
+    }),
+  });
+  endlessExitBtnLabel.anchor.set(0.5);
+  endlessExitBtnContainer.addChild(endlessExitBtnBg, endlessExitBtnLabel);
+  endlessExitBtnContainer.x = EXIT_BTN_X;
+  endlessExitBtnContainer.y = EXIT_BTN_Y;
+  uiLayer.addChild(endlessExitBtnContainer);
+
+  function isOverEndlessExitBtn(canvasX: number, canvasY: number): boolean {
+    return isEndless && Math.hypot(canvasX - EXIT_BTN_X, canvasY - EXIT_BTN_Y) <= EXIT_BTN_R + 10;
+  }
   const eagleEyeSpeedMult = skillState.selected === 'eagle_eye' ? 0.80 : 1.0;
 
   function spawnEnemyBullet(
     x: number, y: number,
     vx: number, vy: number,
-    color: number
+    color: number,
+    damage?: number,
   ): void {
     const display = enemyBulletPool.acquire();
     display.clear();
@@ -1186,6 +1219,7 @@ async function enter(core: Core): Promise<void> {
       vx: vx * eagleEyeSpeedMult * (deflected ? -1 : 1),
       vy: vy * eagleEyeSpeedMult * (deflected ? -1 : 1),
       deflected,
+      damage,
     });
   }
 
@@ -1746,6 +1780,7 @@ async function enter(core: Core): Promise<void> {
       targetX: playerEntity.position.x,
       targetY: playerEntity.position.y,
       speed, color,
+      damage: 2,
     });
   }
 
@@ -2199,6 +2234,10 @@ async function enter(core: Core): Promise<void> {
   // When both buttons are in hit-test range (their expanded zones overlap), activate
   // the one whose centre is closest to the tap so neither button steals the other's tap.
   function handleBtnTap(canvasX: number, canvasY: number): boolean {
+    if (isOverEndlessExitBtn(canvasX, canvasY)) {
+      endGame(false);
+      return true;
+    }
     const inCostume = isOverCostumeBtn(canvasX, canvasY);
     const inSkill   = isOverSkillBtn(canvasX, canvasY);
     if (!inCostume && !inSkill) return false;
@@ -2995,7 +3034,7 @@ async function enter(core: Core): Promise<void> {
           const dx = shot.targetX - ex;
           const dy = shot.targetY - ey;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          spawnEnemyBullet(ex, ey, (dx / dist) * shot.speed, (dy / dist) * shot.speed, shot.color);
+          spawnEnemyBullet(ex, ey, (dx / dist) * shot.speed, (dy / dist) * shot.speed, shot.color, shot.damage);
           sniperShots.splice(i, 1);
         } else {
           // Draw warning line from current enemy position to locked target
@@ -3395,7 +3434,7 @@ async function enter(core: Core): Promise<void> {
             continue;
           }
 
-          playerHP = Math.max(0, playerHP - 1);
+          playerHP = Math.max(0, playerHP - (b.damage ?? 1));
           invincibleMs = effectiveInvincibleMs;
           playerHitThisRun = true;
 
@@ -4420,7 +4459,7 @@ async function enter(core: Core): Promise<void> {
     sniperWarningDisplay.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, princessTimerText, skillBtnContainer, costumeBtnContainer);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, princessTimerText, skillBtnContainer, costumeBtnContainer, endlessExitBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -4441,6 +4480,7 @@ async function enter(core: Core): Promise<void> {
     princessTimerText.destroy();
     skillBtnContainer.destroy({ children: true });
     costumeBtnContainer.destroy({ children: true });
+    endlessExitBtnContainer.destroy({ children: true });
 
     sysLayer.removeChild(flashOverlay);
     flashOverlay.destroy();
