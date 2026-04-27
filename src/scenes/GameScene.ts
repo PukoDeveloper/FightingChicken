@@ -19,6 +19,7 @@ import {
   createPowerItem,
   createGiftBoxItem,
   createFireball,
+  createGuardChickenDisplay,
 } from '../game/sprites';
 import {
   PLAYER_HP_MAX,
@@ -70,6 +71,13 @@ import {
   TELEPORT_WARN_MS,
   COL_BULLET_RING,
   BULLET_SPEED_MEDIUM,
+  PRINCESS_HP_COST,
+  PRINCESS_GUARD_COUNT,
+  PRINCESS_GUARD_HP,
+  PRINCESS_GUARD_ORBIT_R,
+  PRINCESS_GUARD_FIRE_INTERVAL_MS,
+  PRINCESS_COOLDOWN_MS,
+  COL_PRINCESS_GUARD_BULLET,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
@@ -232,6 +240,21 @@ interface PetData {
   bulletColor: number;
 }
 
+// ─── Princess Guard Chicken data ──────────────────────────────────────────────
+interface GuardData {
+  display: Container;
+  hitFlash: Graphics;
+  hpBarContainer: Container;
+  hpBarFill: Graphics;
+  hp: number;
+  maxHp: number;
+  orbitAngle: number; // current orbit angle around the player (radians)
+  x: number;         // world position (updated each frame)
+  y: number;
+  fireTimer: number;
+  hitFlashMs: number;
+}
+
 // ─── Flame wave pending (sequential burst queue) ──────────────────────────────
 interface FlameWavePending {
   delayMs: number;   // ms until this burst fires
@@ -339,10 +362,11 @@ async function enter(core: Core): Promise<void> {
   const bubblesContainer = new Container();
   const lasersContainer = new Container();
   const petsContainer = new Container();
+  const guardsContainer = new Container();
   const playerShockwavesContainer = new Container(); // pulse emitter weapon
   // Warning display for sniper aim lines and teleport destination circles
   const sniperWarningDisplay = new Graphics();
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer, sniperWarningDisplay);
+  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer, sniperWarningDisplay);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -711,6 +735,20 @@ async function enter(core: Core): Promise<void> {
   // Passive: bullet damage scales with proximity to the enemy (1× at max distance, up to 3× when close).
   const isAdventureCostume = costumeState.selected === 'adventure';
 
+  // ── Princess costume active state ─────────────────────────────────────────
+  // Active ability: 給我過來 – consumes PRINCESS_HP_COST max HP and summons
+  // PRINCESS_GUARD_COUNT guard chickens that orbit the player, fire at the enemy,
+  // and intercept incoming enemy bullets (absorbing them at the cost of their own HP).
+  // Guard HP is low; they are destroyed when reduced to 0.
+  const isPrincessCostume = costumeState.selected === 'princess';
+  let princessCooldownMs = 0;
+  // Active guard chickens (summoned by the princess ability).
+  const guards: GuardData[] = [];
+  // Width of the per-guard HP bar (px).
+  const GUARD_BAR_W = 36;
+  // Hitbox radius for guard-chicken bullet interception (px).
+  const GUARD_HITBOX_R = 14;
+
   // ── HUD ──────────────────────────────────────────────────────────────────
   // HP hearts
   const heartsContainer = new Container();
@@ -887,6 +925,13 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     dropShadow: { color: 0x882200, distance: 2, alpha: 0.8, blur: 2 },
   });
+  const princessTimerStyle = new TextStyle({
+    fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+    fontSize: 14,
+    fill: 0xff88dd,
+    fontWeight: 'bold',
+    dropShadow: { color: 0x660044, distance: 2, alpha: 0.8, blur: 2 },
+  });
   const weaponTimerStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
     fontSize: 14,
@@ -904,7 +949,8 @@ async function enter(core: Core): Promise<void> {
   const heroTimerText     = new Text({ text: '', style: heroTimerStyle });
   const heroChargeText    = new Text({ text: '', style: heroChargeStyle });
   const weaponTimerText   = new Text({ text: '', style: weaponTimerStyle });
-  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText].forEach(t => {
+  const princessTimerText = new Text({ text: '', style: princessTimerStyle });
+  [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, princessTimerText].forEach(t => {
     t.anchor.set(0, 1);
     t.x = 10;
     t.y = H - 38;
@@ -991,7 +1037,7 @@ async function enter(core: Core): Promise<void> {
   if (isActiveSkill) redrawSkillBtn();
 
   // ── Costume ability button (elegant & wizard costumes) ────────────────────
-  const hasActiveCostumeAbility = isElegantCostume || isWizardCostume || isHeroCostume;
+  const hasActiveCostumeAbility = isElegantCostume || isWizardCostume || isHeroCostume || isPrincessCostume;
   const costumeBtnContainer = new Container();
   costumeBtnContainer.visible = hasActiveCostumeAbility;
   const costumeBtnBg = new Graphics();
@@ -1102,6 +1148,35 @@ async function enter(core: Core): Promise<void> {
         costumeBtnLabel.style.fill = 0x888888;
       } else {
         costumeBtnLabel.text = '英雄';
+        costumeBtnLabel.style.fill = 0xffffff;
+      }
+    } else if (isPrincessCostume) {
+      const onCooldown = princessCooldownMs > 0;
+      const hasGuards  = guards.length > 0;
+      // ready when: no cooldown and below max guard count
+      const ready = !onCooldown;
+      const borderColor = hasGuards ? 0xff88dd : ready ? 0xff44aa : 0x555566;
+      const fillColor   = hasGuards ? 0x1a0014 : ready ? 0x1a000e : 0x111122;
+      costumeBtnBg.clear();
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).fill({ color: fillColor, alpha: 0.9 });
+      costumeBtnBg.circle(0, 0, COSTUME_BTN_R).stroke({ color: borderColor, width: (ready || hasGuards) ? 2 : 1 });
+      costumeBtnCooldownArc.clear();
+      if (onCooldown) {
+        const frac = princessCooldownMs / PRINCESS_COOLDOWN_MS;
+        costumeBtnCooldownArc
+          .moveTo(0, 0)
+          .arc(0, 0, COSTUME_BTN_R - 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2)
+          .closePath()
+          .fill({ color: 0x000000, alpha: 0.55 });
+      }
+      if (hasGuards) {
+        costumeBtnLabel.text = `護衛\n×${guards.length}`;
+        costumeBtnLabel.style.fill = 0xff88dd;
+      } else if (onCooldown) {
+        costumeBtnLabel.text = `${Math.ceil(princessCooldownMs / 1000)}s`;
+        costumeBtnLabel.style.fill = 0x888888;
+      } else {
+        costumeBtnLabel.text = '給我\n過來';
         costumeBtnLabel.style.fill = 0xffffff;
       }
     }
@@ -1308,6 +1383,11 @@ async function enter(core: Core): Promise<void> {
     if (heroActiveMs > 0) timerEntries.push([heroTimerText, `🛡 英雄無敵 ${Math.ceil(heroActiveMs / 1000)}s`]);
     // hero costume: show charged damage ready to fire
     if (heroChargedDamage > 0) timerEntries.push([heroChargeText, `⚔ 充能攻擊 ${heroChargedDamage}`]);
+    // princess costume: show guard count while any are active / cooldown
+    if (isPrincessCostume) {
+      if (guards.length > 0) timerEntries.push([princessTimerText, `👑 護衛 ×${guards.length}`]);
+      else if (princessCooldownMs > 0) timerEntries.push([princessTimerText, `👑 給我過來 ${Math.ceil(princessCooldownMs / 1000)}s`]);
+    }
     // beam cannon weapon: show charge progress
     if (isBeamMode) {
       const chargePct = Math.round((beamChargeMs / BEAM_CHARGE_MAX_MS) * 100);
@@ -1320,7 +1400,7 @@ async function enter(core: Core): Promise<void> {
 
     const timerBaseY = H - 38;
     const timerLineH = 18;
-    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText].forEach(t => {
+    [powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, princessTimerText].forEach(t => {
       t.text = '';
       t.visible = false;
     });
@@ -2050,10 +2130,116 @@ async function enter(core: Core): Promise<void> {
     return Math.sqrt(dx * dx + dy * dy) <= COSTUME_BTN_R + 10;
   }
 
+  // ── Princess costume: summon guard chickens ──────────────────────────────
+  function tryActivatePrincess(): boolean {
+    // Require: no active cooldown, and max HP must be > 1 so cost can't reduce it to 0.
+    if (!isPrincessCostume || gameEnded || princessCooldownMs > 0) return false;
+    if (effectiveHpMax <= 1) return false; // cannot afford the HP cost safely
+
+    // Deduct HP cost from max HP — guards are "bought" with the player's life force.
+    effectiveHpMax -= PRINCESS_HP_COST;
+    // Current HP must not exceed the new lower maximum.
+    playerHP = Math.min(playerHP, effectiveHpMax);
+    // Ensure current HP never drops below 1.
+    playerHP = Math.max(1, playerHP);
+
+    princessCooldownMs = PRINCESS_COOLDOWN_MS;
+
+    // Remove any existing guards (calling again replaces old guards with fresh ones).
+    for (let gi = guards.length - 1; gi >= 0; gi--) {
+      removeGuard(gi);
+    }
+
+    // Spawn PRINCESS_GUARD_COUNT guards evenly around the player.
+    for (let k = 0; k < PRINCESS_GUARD_COUNT; k++) {
+      const angle = (k / PRINCESS_GUARD_COUNT) * Math.PI * 2;
+      const gx = playerEntity.position.x + Math.cos(angle) * PRINCESS_GUARD_ORBIT_R;
+      const gy = playerEntity.position.y + Math.sin(angle) * PRINCESS_GUARD_ORBIT_R;
+
+      const display = createGuardChickenDisplay();
+      display.x = gx;
+      display.y = gy;
+      guardsContainer.addChild(display);
+
+      const hitFlash = createEnemyHitFlash(14);
+      display.addChild(hitFlash);
+
+      // HP bar
+      const hpBarContainer = new Container();
+      const hpBarBg = new Graphics();
+      hpBarBg.roundRect(0, 0, GUARD_BAR_W, 5, 2).fill({ color: 0x220011, alpha: 0.85 });
+      hpBarContainer.addChild(hpBarBg);
+      const hpBarFill = new Graphics();
+      hpBarFill.rect(0, 0, GUARD_BAR_W, 5).fill(0xff88dd);
+      hpBarContainer.addChild(hpBarFill);
+      const hpBarBorder = new Graphics();
+      hpBarBorder.roundRect(0, 0, GUARD_BAR_W, 5, 2).stroke({ color: 0xff44aa, width: 1 });
+      hpBarContainer.addChild(hpBarBorder);
+      hpBarContainer.x = gx - GUARD_BAR_W / 2;
+      hpBarContainer.y = gy - 26;
+      guardsContainer.addChild(hpBarContainer);
+
+      guards.push({
+        display,
+        hitFlash,
+        hpBarContainer,
+        hpBarFill,
+        hp: PRINCESS_GUARD_HP,
+        maxHp: PRINCESS_GUARD_HP,
+        orbitAngle: angle,
+        x: gx,
+        y: gy,
+        fireTimer: 400 + k * 300, // stagger first shots
+        hitFlashMs: 0,
+      });
+    }
+
+    // HUD: update hearts to reflect new max HP.
+    updateHUD();
+
+    // Feedback flash + particles
+    flashOverlay.clear().rect(0, 0, W, H).fill({ color: 0xff88dd, alpha: 1 });
+    flashOverlay.alpha = 0.22;
+    phaseFlashTimer = Math.max(phaseFlashTimer, 300);
+    core.events.emitSync('camera/shake', { intensity: 5, duration: 200 });
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: playerEntity.position.x, y: playerEntity.position.y,
+        burst: true, burstCount: 24, speed: 140, speedVariance: 60,
+        spread: 180, lifetime: 550, startAlpha: 1, endAlpha: 0,
+        startScale: 1.3, endScale: 0,
+        startColor: 0xff88dd, endColor: 0xffffff, radius: 5,
+      },
+    });
+    redrawCostumeBtn();
+    return true;
+  }
+
+  // ── Helper: remove a guard chicken at index gi ────────────────────────────
+  function removeGuard(gi: number): void {
+    const guard = guards[gi];
+    // Death particles
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: guard.x, y: guard.y,
+        burst: true, burstCount: 14, speed: 110, speedVariance: 55,
+        spread: 180, lifetime: 500, startAlpha: 1, endAlpha: 0,
+        startScale: 1.2, endScale: 0,
+        startColor: 0xff88dd, endColor: 0x000000, radius: 5,
+      },
+    });
+    guardsContainer.removeChild(guard.display);
+    guardsContainer.removeChild(guard.hpBarContainer);
+    guard.display.destroy();
+    guards.splice(gi, 1);
+    redrawCostumeBtn();
+  }
+
   function tryActivateCostumeAbility(): boolean {
     if (isElegantCostume) return tryActivateDeflect();
     if (isWizardCostume)  return tryActivateWizard();
     if (isHeroCostume)    return tryActivateHero();
+    if (isPrincessCostume) return tryActivatePrincess();
     return false;
   }
 
@@ -2450,6 +2636,63 @@ async function enter(core: Core): Promise<void> {
                 startScale: 1.6, endScale: 0,
                 startColor: 0xffee00, endColor: 0xff6600, radius: 7,
               },
+            });
+          }
+        }
+      }
+
+      // ── Princess costume: cooldown + guard chicken update ────────────────
+      if (isPrincessCostume) {
+        if (princessCooldownMs > 0) {
+          princessCooldownMs = Math.max(0, princessCooldownMs - dt);
+          redrawCostumeBtn();
+        }
+
+        // Update guard chickens: orbit player, fire at enemy, animate hit-flash.
+        const GUARD_ORBIT_SPEED = 0.8; // radians per second
+        for (let gi = guards.length - 1; gi >= 0; gi--) {
+          const guard = guards[gi];
+
+          // Advance orbit angle
+          guard.orbitAngle += GUARD_ORBIT_SPEED * (dt / 1000);
+          guard.x = playerEntity.position.x + Math.cos(guard.orbitAngle) * PRINCESS_GUARD_ORBIT_R;
+          guard.y = playerEntity.position.y + Math.sin(guard.orbitAngle) * PRINCESS_GUARD_ORBIT_R;
+          guard.display.x = guard.x;
+          guard.display.y = guard.y;
+          guard.hpBarContainer.x = guard.x - GUARD_BAR_W / 2;
+          guard.hpBarContainer.y = guard.y - 26;
+
+          // Hit-flash fade
+          if (guard.hitFlashMs > 0) {
+            guard.hitFlashMs = Math.max(0, guard.hitFlashMs - dt);
+            guard.hitFlash.visible = true;
+            guard.hitFlash.alpha = guard.hitFlashMs / 80;
+            if (guard.hitFlashMs <= 0) guard.hitFlash.visible = false;
+          }
+
+          // Auto-fire at the enemy
+          guard.fireTimer -= dt;
+          if (guard.fireTimer <= 0 && !waveTransitioning) {
+            guard.fireTimer = PRINCESS_GUARD_FIRE_INTERVAL_MS;
+            // Spawn a player bullet from the guard toward the enemy
+            const ex = enemyEntity.position.x;
+            const ey = enemyEntity.position.y;
+            const dist = Math.sqrt(
+              (ex - guard.x) * (ex - guard.x) + (ey - guard.y) * (ey - guard.y),
+            ) || 1;
+            const gBullet = playerBulletPool.acquire();
+            gBullet.clear();
+            gBullet.circle(0, 0, 7).fill({ color: COL_PRINCESS_GUARD_BULLET, alpha: 0.30 });
+            gBullet.circle(0, 0, 5).fill(COL_PRINCESS_GUARD_BULLET);
+            gBullet.x = guard.x;
+            gBullet.y = guard.y;
+            gBullet.visible = true;
+            playerBulletsContainer.addChild(gBullet);
+            playerBullets.push({
+              display: gBullet, x: guard.x, y: guard.y,
+              vx: (ex - guard.x) / dist * PLAYER_BULLET_SPEED,
+              vy: (ey - guard.y) / dist * PLAYER_BULLET_SPEED,
+              damage: 1,
             });
           }
         }
@@ -3142,6 +3385,46 @@ async function enter(core: Core): Promise<void> {
             }
           }
           continue;
+        }
+
+        // Princess guards: check whether this bullet hits a guard before the player.
+        if (isPrincessCostume && guards.length > 0) {
+          let intercepted = false;
+          for (let gi = guards.length - 1; gi >= 0; gi--) {
+            const guard = guards[gi];
+            const gdx = b.x - guard.x;
+            const gdy = b.y - guard.y;
+            if (Math.sqrt(gdx * gdx + gdy * gdy) < ENEMY_BULLET_R + GUARD_HITBOX_R) {
+              removeBullet(enemyBullets, i, enemyBulletsContainer, false);
+              guard.hp = Math.max(0, guard.hp - 1);
+              guard.hitFlashMs = 80;
+
+              // Update guard HP bar
+              const barFrac = Math.max(0, guard.hp / guard.maxHp);
+              guard.hpBarFill.clear();
+              if (barFrac > 0) {
+                guard.hpBarFill.rect(0, 0, GUARD_BAR_W * barFrac, 5).fill(0xff88dd);
+              }
+
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: guard.x + (Math.random() - 0.5) * 16,
+                  y: guard.y + (Math.random() - 0.5) * 16,
+                  burst: true, burstCount: 5, speed: 70, speedVariance: 30,
+                  spread: 180, lifetime: 280, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.9, endScale: 0,
+                  startColor: 0xff88dd, endColor: 0xffffff, radius: 3,
+                },
+              });
+
+              if (guard.hp <= 0) {
+                removeGuard(gi);
+              }
+              intercepted = true;
+              break;
+            }
+          }
+          if (intercepted) continue;
         }
 
         // Hit player
@@ -3871,6 +4154,10 @@ async function enter(core: Core): Promise<void> {
     petBannerTimer = 0;
     waveBannerText.alpha = 0;
 
+    // Clear any princess guard chickens between waves (player keeps their orbit guards)
+    // Guards persist across waves so the princess player retains them.
+    // (No cleanup needed here — guards survive wave transitions intentionally.)
+
     // Show wave-clear banner (1-based wave number for display)
     waveBannerText.text = `第 ${nextWaveIdx + 1} 波！`;
     waveBannerText.alpha = 1;
@@ -4154,12 +4441,20 @@ async function enter(core: Core): Promise<void> {
     }
     pets.length = 0;
 
+    // Destroy all princess guard chickens
+    for (const guard of guards) {
+      guardsContainer.removeChild(guard.display);
+      guardsContainer.removeChild(guard.hpBarContainer);
+      guard.display.destroy();
+    }
+    guards.length = 0;
+
     // Destroy entities
     core.events.emitSync('entity/destroy', { id: 'player' });
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar, sniperWarningDisplay);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar, sniperWarningDisplay);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -4170,6 +4465,7 @@ async function enter(core: Core): Promise<void> {
     bubblesContainer.destroy({ children: true });
     lasersContainer.destroy({ children: true });
     petsContainer.destroy({ children: true });
+    guardsContainer.destroy({ children: true });
     playerShockwavesContainer.destroy({ children: true });
     beamChargeBar.destroy();
     trapRing.destroy();
@@ -4178,7 +4474,7 @@ async function enter(core: Core): Promise<void> {
     sniperWarningDisplay.destroy();
 
     // Destroy UI
-    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, skillBtnContainer, costumeBtnContainer);
+    uiLayer.removeChild(heartsContainer, hpBarContainer, bossLabel, scoreText, phaseText, levelWaveText, waveBannerText, powerUpText, trappedTimerText, shieldTimerText, regenTimerText, skillTimerText, deflectTimerText, wizardTimerText, heroTimerText, heroChargeText, weaponTimerText, princessTimerText, skillBtnContainer, costumeBtnContainer);
     heartsContainer.destroy({ children: true });
     hpBarContainer.destroy({ children: true });
     bossLabel.destroy();
@@ -4196,6 +4492,7 @@ async function enter(core: Core): Promise<void> {
     heroTimerText.destroy();
     heroChargeText.destroy();
     weaponTimerText.destroy();
+    princessTimerText.destroy();
     skillBtnContainer.destroy({ children: true });
     costumeBtnContainer.destroy({ children: true });
 

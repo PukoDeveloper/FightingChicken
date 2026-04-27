@@ -1216,6 +1216,129 @@ export function createWizardChickenDisplay(): Container {
   return c;
 }
 
+// ─── Princess Chicken (公主小姐) ──────────────────────────────────────────────
+/**
+ * A regal pink chicken wearing a tiara with a flowing cape.
+ * Origin at centre of the body.
+ */
+export function createPrincessChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Royal aura
+  g.circle(0, 0, 30).fill({ color: 0xff66cc, alpha: 0.12 });
+
+  // Shadow
+  g.ellipse(0, 26, 18, 5).fill({ color: 0x000000, alpha: 0.20 });
+
+  // Cape (drawn behind body)
+  g.moveTo(-22, 2).lineTo(-28, 28).lineTo(28, 28).lineTo(22, 2).closePath()
+    .fill({ color: 0xcc44aa, alpha: 0.90 });
+  // Cape inner lining
+  g.moveTo(-18, 4).lineTo(-22, 26).lineTo(22, 26).lineTo(18, 4).closePath()
+    .fill({ color: 0xff99dd, alpha: 0.60 });
+
+  // Left wing
+  g.ellipse(-18, 6, 10, 7).fill(0xffccee);
+
+  // Body (bright pink)
+  g.circle(0, 0, 22).fill(0xff88bb);
+
+  // Belly highlight
+  g.ellipse(4, 6, 11, 9).fill(0xffccee);
+
+  // Tiara base band
+  g.rect(-12, -22, 24, 5).fill(0xffd700);
+  // Tiara centre gem (ruby)
+  g.circle(0, -26, 5).fill(0xff2244);
+  g.circle(0, -26, 3).fill({ color: 0xffffff, alpha: 0.55 });
+  // Tiara side gems
+  g.circle(-7, -24, 3).fill(0xffd700);
+  g.circle(7, -24, 3).fill(0xffd700);
+
+  // Comb (small, pink tufts under tiara)
+  g.moveTo(-4, -18).lineTo(0, -24).lineTo(4, -18).closePath().fill(0xff4488);
+
+  // Right wing
+  g.ellipse(19, 6, 10, 7).fill(0xffccee);
+
+  // Beak (soft pink)
+  g.moveTo(18, -2).lineTo(27, 2).lineTo(18, 7).closePath().fill(0xffaacc);
+
+  // Eye white
+  g.circle(12, -7, 6).fill(0xffffff);
+  // Iris (violet)
+  g.circle(13, -6, 3.5).fill(0x8833cc);
+  // Pupil
+  g.circle(13, -6, 1.8).fill(0x110022);
+  // Eye glint
+  g.circle(15, -8, 1.2).fill(0xffffff);
+  // Lashes
+  g.moveTo(8, -12).lineTo(9, -15).lineTo(10, -12).fill(0x111111);
+  g.moveTo(12, -13).lineTo(13, -16).lineTo(14, -13).fill(0x111111);
+  g.moveTo(16, -12).lineTo(17, -15).lineTo(18, -12).fill(0x111111);
+
+  // Left foot
+  g.rect(-9, 22, 3, 10).fill(0xffaacc);
+  g.rect(-14, 31, 11, 3).fill(0xffaacc);
+
+  // Right foot
+  g.rect(6, 22, 3, 10).fill(0xffaacc);
+  g.rect(3, 31, 11, 3).fill(0xffaacc);
+
+  // Hitbox dot
+  g.circle(0, 0, 3).fill({ color: 0xff0000, alpha: 0.75 });
+
+  c.addChild(g);
+  return c;
+}
+
+// ─── Guard Chicken (護衛小雞) ─────────────────────────────────────────────────
+/**
+ * A small pink bodyguard chicken summoned by the princess active ability.
+ * Scaled-down and simpler than the main princess sprite.
+ * Origin at centre of the body.
+ */
+export function createGuardChickenDisplay(): Container {
+  const c = new Container();
+  const g = new Graphics();
+
+  // Tiny aura
+  g.circle(0, 0, 18).fill({ color: 0xff88cc, alpha: 0.15 });
+
+  // Body (light pink, smaller)
+  g.circle(0, 0, 14).fill(0xffaad4);
+
+  // Belly
+  g.ellipse(2, 4, 7, 6).fill(0xffdde9);
+
+  // Mini tiara
+  g.rect(-7, -13, 14, 3).fill(0xffd700);
+  g.circle(0, -15, 3).fill(0xff2244);
+
+  // Wings
+  g.ellipse(-11, 3, 6, 4).fill(0xffbbdd);
+  g.ellipse(11, 3, 6, 4).fill(0xffbbdd);
+
+  // Beak
+  g.moveTo(11, -1).lineTo(17, 1).lineTo(11, 4).closePath().fill(0xffaacc);
+
+  // Eye
+  g.circle(7, -4, 4).fill(0xffffff);
+  g.circle(8, -3, 2.2).fill(0x8833cc);
+  g.circle(8, -3, 1).fill(0x110022);
+  g.circle(9, -4, 0.8).fill(0xffffff);
+
+  // Feet
+  g.rect(-5, 14, 2, 6).fill(0xffaacc);
+  g.rect(-8, 19, 7, 2).fill(0xffaacc);
+  g.rect(4, 14, 2, 6).fill(0xffaacc);
+  g.rect(2, 19, 7, 2).fill(0xffaacc);
+
+  c.addChild(g);
+  return c;
+}
+
 // ─── Player chicken factory ───────────────────────────────────────────────────
 /**
  * Returns the correct player chicken Container for the given costume ID.
@@ -1230,6 +1353,7 @@ export function createPlayerChicken(costume: CostumeId): Container {
     case 'adventure': return createAdventureChickenDisplay();
     case 'hero':      return createHeroChickenDisplay();
     case 'boss':      return createBossChickenDisplay();
+    case 'princess':  return createPrincessChickenDisplay();
     default:          return createChickenDisplay();
   }
 }
