@@ -2138,10 +2138,8 @@ async function enter(core: Core): Promise<void> {
 
     // Deduct HP cost from max HP — guards are "bought" with the player's life force.
     effectiveHpMax -= PRINCESS_HP_COST;
-    // Current HP must not exceed the new lower maximum.
-    playerHP = Math.min(playerHP, effectiveHpMax);
-    // Ensure current HP never drops below 1.
-    playerHP = Math.max(1, playerHP);
+    // Current HP must not exceed the new lower maximum, and must stay at least 1.
+    playerHP = Math.max(1, Math.min(playerHP, effectiveHpMax));
 
     princessCooldownMs = PRINCESS_COOLDOWN_MS;
 
