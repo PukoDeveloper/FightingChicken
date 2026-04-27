@@ -112,7 +112,7 @@ export const ADVENTURE_PROXIMITY_MIN_DIST = 60;
 /** Distance (px) at or beyond which the adventure costume grants no extra damage (1×) */
 export const ADVENTURE_PROXIMITY_MAX_DIST = 350;
 /** Maximum damage multiplier when the player is at ADVENTURE_PROXIMITY_MIN_DIST or closer */
-export const ADVENTURE_PROXIMITY_MAX_MULT = 3;
+export const ADVENTURE_PROXIMITY_MAX_MULT = 4;
 
 // ─── Weapon equipment attack modes ──────────────────────────────────────────
 
@@ -120,7 +120,7 @@ export const ADVENTURE_PROXIMITY_MAX_MULT = 3;
 /** Milliseconds needed to fully charge one beam shot */
 export const BEAM_CHARGE_MAX_MS = 1800;
 /** Extra damage added per upgrade level for the beam cannon */
-export const BEAM_DAMAGE_PER_LEVEL = 5;
+export const BEAM_DAMAGE_PER_LEVEL = 3;
 /** Visual and collision radius of the beam projectile (px) */
 export const BEAM_BULLET_R = 12;
 /** Travel speed of a fired beam bolt (px/s) */
@@ -132,7 +132,7 @@ export const COL_BEAM = 0x00ccff;
 /** Steering rate of homing player bullets (radians/s) toward the enemy */
 export const HOMING_TURN_RATE = 4.0;
 /** Extra damage added per upgrade level for the homing gun */
-export const HOMING_DAMAGE_PER_LEVEL = 2;
+export const HOMING_DAMAGE_PER_LEVEL = 1;
 /** Travel speed of homing player bullets (px/s) */
 export const HOMING_SPEED = 380;
 /** Homing bullet colour (teal-green) */
@@ -142,7 +142,7 @@ export const COL_HOMING = 0x44ffaa;
 /** Base milliseconds between pulse wave bursts */
 export const PULSE_INTERVAL_MS = 1800;
 /** Extra damage added per upgrade level for the pulse emitter */
-export const PULSE_DAMAGE_PER_LEVEL = 3;
+export const PULSE_DAMAGE_PER_LEVEL = 2;
 /** Expansion speed of player-fired pulse wave rings (px/s) */
 export const PULSE_SPEED = 260;
 /** Pulse wave ring colour (golden) */
