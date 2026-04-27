@@ -83,8 +83,8 @@ import { gameResult, devConfig, endlessState, costumeState, skillState, currency
 import { EQUIPMENT_DEFS } from '../game/equipment';
 import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
-import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs } from '../game/endless';
-import type { BuffId } from '../game/endless';
+import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
+import type { BuffId, StatContext } from '../game/endless';
 import { createVoidWaveConfig } from '../game/void';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
@@ -466,59 +466,34 @@ async function enter(core: Core): Promise<void> {
   const equipEvasionBonus =
     _eqArmor === 'moon_cape' ? (equipmentState.upgradeLevels['moon_cape'] ?? 1) * 0.01 : 0;
 
-  // Effective max HP: base + hp_up stacks − blood_price stacks (min 1, max 10)
-  // iron_will skill: +1 max HP
+  // ── Build initial effective stats via the shared computeEffectiveStats helper ──
   const skillIronWill = skillState.selected === 'iron_will';
-  let effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
-  // Effective base fire interval (reduced by 10% per fire_rate_up stack, floored at 60 ms)
-  let effectiveFireInterval = Math.max(
-    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)),
-    60,
-  );
-  // Bullet damage per hit (1 base + blood_price bonus + bullet_power bonus)
-  let bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
-  // Evasion chance: 10% per stack, capped at 30%
-  let evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
-  // Effective invincibility duration: base + 600 ms per long_invincible stack
-  let effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
-  // Effective item spawn interval: reduced 25% per stack (capped at 75% reduction, floor 2 s / 4 s)
-  // Level itemDropMult further scales the intervals (< 1 = more frequent drops for hard levels)
   const levelItemDropMult = levelConfig?.itemDropMult ?? 1.0;
-  let itemSpawnMinMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
-    : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
-  let itemSpawnMaxMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
-    : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
-  // Regen: 15 s base interval on first stack, each additional stack subtracts 3 s more (min 6 s)
-  let regenIntervalMs = buffRegenCount > 0
-    ? Math.max(15000 - buffRegenCount * 3000, 6000)
-    : 0;
 
-  // ── Boss costume: apply +50% to all derived stats ─────────────────────────
-  // NOTE: isBossCostume is declared later after wizard state; we read costumeState.selected directly here.
-  if (costumeState.selected === 'boss') {
-    effectiveHpMax        = Math.min(Math.round(effectiveHpMax * 1.5), 10);
-    effectiveFireInterval = Math.max(Math.round(effectiveFireInterval / 1.5), 60);
-    bulletDamage          = Math.round(bulletDamage * 1.5);
-    effectiveInvincibleMs = Math.round(effectiveInvincibleMs * 1.5);
-    evasionChance         = Math.min(evasionChance * 1.5, 0.30);
-    itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / 1.5), 2000);
-    itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / 1.5), 4000);
-    regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / 1.5), 6000) : 0;
-  }
+  // Context captures all external bonuses so that computeEffectiveStats produces
+  // the same numbers as the buff-preview descriptions in EndlessBuffScene.
+  const buildStatContext = (): StatContext => ({
+    equipAttackBonus,
+    equipDefenseBonus,
+    equipInvincibleBonus,
+    equipEvasionBonus,
+    isBossCostume: costumeState.selected === 'boss',
+    isFoxCostume:  costumeState.selected === 'fox',
+    skillIronWill,
+    levelItemDropMult,
+  });
 
-  // ── Fox costume: reduce item spawn intervals by 30% (more frequent drops) ──
-  if (costumeState.selected === 'fox') {
-    itemSpawnMinMs = Math.max(Math.round(itemSpawnMinMs * 0.7), 2000);
-    itemSpawnMaxMs = Math.max(Math.round(itemSpawnMaxMs * 0.7), 4000);
-  }
+  const _initBuffs = [...(isEndless ? endlessState.buffs : []), ...giftBuffs];
+  const _initStats = computeEffectiveStats(_initBuffs, buildStatContext());
+  let effectiveHpMax        = _initStats.effectiveHpMax;
+  let effectiveFireInterval = _initStats.effectiveFireInterval;
+  let bulletDamage          = _initStats.bulletDamage;
+  let evasionChance         = _initStats.evasionChance;
+  let effectiveInvincibleMs = _initStats.effectiveInvincibleMs;
+  let itemSpawnMinMs        = _initStats.itemSpawnMinMs;
+  let itemSpawnMaxMs        = _initStats.itemSpawnMaxMs;
+  let regenIntervalMs       = _initStats.regenIntervalMs;
 
-  // ── Apply flat equipment bonuses (on top of buff/costume derived stats) ────
-  bulletDamage   += equipAttackBonus;
-  effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
-  evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
-  effectiveInvincibleMs += equipInvincibleBonus;
   // Crit chance from stardust_necklace (3% per upgrade level, capped at 50%)
   let critChance  = Math.min(equipCritBonus, 0.50);
 
@@ -729,7 +704,6 @@ async function enter(core: Core): Promise<void> {
   // ── Boss costume passive state ────────────────────────────────────────────
   // Passive: all derived stats × 1.5 (HP max, fire rate, bullet damage, invincible duration, etc.)
   const isBossCostume = costumeState.selected === 'boss';
-  const BOSS_STAT_MULT = 1.5;
 
   // ── Adventure costume passive state ──────────────────────────────────────
   // Passive: bullet damage scales with proximity to the enemy (1× at max distance, up to 3× when close).
@@ -1428,45 +1402,16 @@ async function enter(core: Core): Promise<void> {
     hasBerserker      = (isEndless && endlessState.buffs.includes('berserker'))       || giftBuffs.includes('berserker');
     hasPeriodicShield = (isEndless && endlessState.buffs.includes('periodic_shield')) || giftBuffs.includes('periodic_shield');
 
-    effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (skillIronWill ? 1 : 0), 1), 10);
-    effectiveFireInterval = Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)), 60);
-    bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
-    evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
-    effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
-    itemSpawnMinMs = buffItemDropCount > 0
-      ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
-      : Math.round(ITEM_SPAWN_MIN_MS * levelItemDropMult);
-    itemSpawnMaxMs = buffItemDropCount > 0
-      ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
-      : Math.round(ITEM_SPAWN_MAX_MS * levelItemDropMult);
-    regenIntervalMs = buffRegenCount > 0 ? Math.max(15000 - buffRegenCount * 3000, 6000) : 0;
-
-    // Boss costume: re-apply +50% multiplier after buff recomputation
-    if (isBossCostume) {
-      effectiveHpMax        = Math.min(Math.round(effectiveHpMax * BOSS_STAT_MULT), 10);
-      effectiveFireInterval = Math.max(Math.round(effectiveFireInterval / BOSS_STAT_MULT), 60);
-      bulletDamage          = Math.round(bulletDamage * BOSS_STAT_MULT);
-      effectiveInvincibleMs = Math.round(effectiveInvincibleMs * BOSS_STAT_MULT);
-      evasionChance         = Math.min(evasionChance * BOSS_STAT_MULT, 0.30);
-      itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / BOSS_STAT_MULT), 2000);
-      itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / BOSS_STAT_MULT), 4000);
-      regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / BOSS_STAT_MULT), 6000) : 0;
-    }
-
-    // Fox costume: re-apply 30% item spawn interval reduction after buff recomputation
-    if (isFoxCostume) {
-      itemSpawnMinMs = Math.max(Math.round(itemSpawnMinMs * 0.7), 2000);
-      itemSpawnMaxMs = Math.max(Math.round(itemSpawnMaxMs * 0.7), 4000);
-    }
-
-    // Re-apply flat equipment bonuses after every recomputation.
-    // This is safe because effectiveHpMax, bulletDamage, and evasionChance
-    // are fully reset from buff counts above (lines 1102-1105), so adding
-    // equipment bonuses here does not double-stack with the initial calc.
-    bulletDamage   += equipAttackBonus;
-    effectiveHpMax  = Math.min(effectiveHpMax + equipDefenseBonus, 10);
-    evasionChance   = Math.min(evasionChance + equipEvasionBonus, 0.30);
-    effectiveInvincibleMs += equipInvincibleBonus;
+    const allBuffs = [...(isEndless ? endlessState.buffs : []), ...giftBuffs];
+    const s = computeEffectiveStats(allBuffs, buildStatContext());
+    effectiveHpMax        = s.effectiveHpMax;
+    effectiveFireInterval = s.effectiveFireInterval;
+    bulletDamage          = s.bulletDamage;
+    evasionChance         = s.evasionChance;
+    effectiveInvincibleMs = s.effectiveInvincibleMs;
+    itemSpawnMinMs        = s.itemSpawnMinMs;
+    itemSpawnMaxMs        = s.itemSpawnMaxMs;
+    regenIntervalMs       = s.regenIntervalMs;
   }
 
   // ── Helper: apply a gift buff received from the moose costume's gift box ────
