@@ -1,7 +1,7 @@
 import { TOTAL_LEVELS } from './levels';
 
 // ─── Costume IDs ─────────────────────────────────────────────────────────────
-export type CostumeId = 'default' | 'elegant' | 'adventure' | 'hero' | 'boss' | 'moose' | 'fox' | 'wizard';
+export type CostumeId = 'default' | 'elegant' | 'adventure' | 'hero' | 'boss' | 'moose' | 'fox' | 'wizard' | 'princess';
 
 // ─── Stat modifiers (reserved for future use) ────────────────────────────────
 /** Multipliers / additive bonuses applied to player stats when a costume is equipped. */
@@ -95,6 +95,14 @@ export const COSTUMES: CostumeConfig[] = [
     unlockHint: '無盡模式通關 20 關解鎖',
     stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
   },
+  {
+    id: 'princess',
+    name: '公主小姐',
+    description: '高貴優雅、號令四方的皇家小雞',
+    ability: '主動：消耗 1 點最大生命值，召喚 2 隻護衛小雞協助攻擊（冷卻 20 秒）',
+    unlockHint: '預設解鎖',
+    stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
+  },
 ];
 
 // ─── Unlock helper ────────────────────────────────────────────────────────────
@@ -118,6 +126,7 @@ export function isCostumeUnlocked(
     case 'adventure': return cleared.has(1);
     case 'hero':      return cleared.size >= TOTAL_LEVELS;
     case 'boss':      return bestWave >= 20;
+    case 'princess':  return true;
     default:          return false;
   }
 }
