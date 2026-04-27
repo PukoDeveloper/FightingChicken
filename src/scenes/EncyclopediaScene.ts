@@ -7,8 +7,11 @@ import {
   createPhantomDisplay,
   createChaosDisplay,
   createMechDisplay,
+  createStormDisplay,
+  createDragonDisplay,
   createPetDisplay,
   createBlackHoleDisplay,
+  createDragonEyeDisplay,
 } from '../game/sprites';
 
 // ─── Encyclopedia (圖鑑) overlay ─────────────────────────────────────────────
@@ -122,6 +125,32 @@ const BOSSES: BossEntry[] = [
       '第三階段同時啟動所有系統，子彈密度極高，並透過衝擊波與延遲炸彈壓縮閃躲空間。',
     weakness: '直落彈幕規律且成欄，橫向在兩欄之間穿梭可有效規避；追蹤彈以大圓弧甩開後趁機輸出。',
   },
+  {
+    name: '暴風',
+    subtitle: 'Storm',
+    color: '#0f0020',
+    borderColor: '#8833ff',
+    levels: '第 7 關',
+    hp: '600',
+    description:
+      '紫電環繞的神秘能量體，以高密度螺旋彈、散射彈與瞄準彈為主要武器，' +
+      '移動時以正弦波形橫掃畫面令子彈彈道更難預測。' +
+      '進入第三階段後開啟傳送模式，可瞬間出現在隨機位置，並加入狙擊彈精準打擊。',
+    weakness: '暴風傳送後先確認相對位置再閃躲；散射彈從扇形邊緣穿越；傳送瞬間暫停移動以免走入新彈道。',
+  },
+  {
+    name: '龍王',
+    subtitle: 'Dragon King',
+    color: '#1a0000',
+    borderColor: '#ff4400',
+    levels: '第 8 關',
+    hp: '900',
+    description:
+      '擁有金色鱗甲與彎角的巨龍頭顱，融合螺旋彈、烈焰彈幕、地震衝擊、' +
+      '散射彈、環形彈、追蹤彈、狙擊彈與延遲炸彈的終極武裝。' +
+      '第三波起開始橫向追蹤玩家，最終波第三階段召喚龍眼護衛協同作戰，彈幕密度達到頂點。',
+    weakness: '烈焰彈幕從兩翼空隙穿越；地震衝擊前迅速遠離龍王正下方；最終波優先擊滅龍眼護衛以減壓。',
+  },
 ];
 
 const ATTACKS: AttackEntry[] = [
@@ -188,6 +217,34 @@ const ATTACKS: AttackEntry[] = [
     description: '粉色子彈持續轉向追蹤玩家，轉彎速度有限，大幅繞行可甩開追蹤。',
     tip: '以大圓弧繞行讓追蹤彈失去慣性，射擊時需預留閃躲空間。',
   },
+  {
+    name: '烈焰彈幕',
+    icon: '🔥',
+    color: '#ff6600',
+    description: '龍王以扇形連續噴射多波橙色火焰子彈，每波之間有短暫間隔。隨階段提升，波數增多、密度加大，靠近時難以完整穿越。',
+    tip: '保持橫向移動，從扇形兩翼的空隙穿越；等一波消散後再貼近輸出。',
+  },
+  {
+    name: '地震衝擊',
+    icon: '💢',
+    color: '#ff8833',
+    description: '龍王發動地震，從下方發出多圈向外擴張的衝擊環，各圈之間有短暫時差。多圈連發時形成密集壓迫，難以一次全部跨越。',
+    tip: '衝擊環擴張速度固定，提早遠離龍王正下方；在環與環之間的短暫縫隙中穿越。',
+  },
+  {
+    name: '狙擊彈',
+    icon: '🎆',
+    color: '#ff2255',
+    description: '先出現短暫的瞄準警告指示，隨後以極高速精準射向玩家位置。警告結束後幾乎沒有反應時間，必須提前預判移動方向。',
+    tip: '看到警告指示後立刻橫向位移；持續微幅移動避免被靜止位置精準鎖定。',
+  },
+  {
+    name: '瞬間傳送',
+    icon: '✨',
+    color: '#aa44ff',
+    description: '暴風在第三階段進入傳送模式，可瞬間移位至畫面隨機位置，使既有彈道突然失效，並從新位置繼續發射密集彈幕。',
+    tip: '傳送後先找到暴風的新位置再調整閃躲路線；傳送瞬間短暫停頓以免誤走入新彈道。',
+  },
 ];
 
 const ENTITIES: EntityEntry[] = [
@@ -212,6 +269,17 @@ const ENTITIES: EntityEntry[] = [
       '持續發射螺旋彈、瞄準彈、衝擊波與陷阱泡泡，在 60 秒計時結束前不斷施壓。' +
       '目標是在限時內對黑洞造成盡可能多的傷害，以刷新最高傷害紀錄。',
     tip: '黑洞無法擊倒——專注閃避並持續輸出。善用技能在安全窗口中衝刺高傷害。',
+  },
+  {
+    name: '龍眼護衛',
+    color: '#1a0400',
+    borderColor: '#ff4400',
+    appearsIn: '第 8 關（龍王）— 最終波第三階段',
+    description:
+      '龍王在最終波第三階段召喚的橙紅色漂浮眼球護衛。' +
+      '擁有火焰冠狀光環與垂直縫隙瞳孔，能獨立射擊子彈，' +
+      '與龍王的密集彈幕疊加，使全螢幕子彈密度急劇攀升。',
+    tip: '優先集中火力擊滅龍眼護衛以降低子彈密度；龍眼護衛 HP 較低，數發即可清除。',
   },
 ];
 
@@ -313,10 +381,13 @@ async function enter(core: Core): Promise<void> {
     spriteToDataUrl(renderer as Renderer, createPhantomDisplay, 130),
     spriteToDataUrl(renderer as Renderer, createChaosDisplay, 140),
     spriteToDataUrl(renderer as Renderer, createMechDisplay, 140),
+    spriteToDataUrl(renderer as Renderer, createStormDisplay, 140),
+    spriteToDataUrl(renderer as Renderer, createDragonDisplay, 160),
   ];
   const entityImgs = [
     spriteToDataUrl(renderer as Renderer, createPetDisplay, 72),
     spriteToDataUrl(renderer as Renderer, createBlackHoleDisplay, 140),
+    spriteToDataUrl(renderer as Renderer, createDragonEyeDisplay, 72),
   ];
 
   const overlay = document.createElement('div');

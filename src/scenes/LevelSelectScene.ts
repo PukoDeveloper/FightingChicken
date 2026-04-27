@@ -154,6 +154,11 @@ async function enter(core: Core): Promise<void> {
   // Maximum upward offset (negative y shift on listContent)
   const maxScroll = Math.max(0, contentH - scrollViewH);
 
+  // Guard against tap-through: ignore button taps that arrive within the first
+  // 350 ms after the scene enters (the pointerup from the ModeSelectScene tap
+  // fires in this scene before the user has a chance to lift their finger).
+  const enteredAt = Date.now();
+
   // ── Drag-scroll state ─────────────────────────────────────────────────────
   let dragging = false;
   let dragStartY = 0;
@@ -207,7 +212,7 @@ async function enter(core: Core): Promise<void> {
     });
 
     btn.on('pointerup', async () => {
-      const wasTap = totalDragDist < DRAG_THRESHOLD;
+      const wasTap = totalDragDist < DRAG_THRESHOLD && Date.now() - enteredAt >= 350;
       dragging = false;
       totalDragDist = 0;
       if (wasTap) {
