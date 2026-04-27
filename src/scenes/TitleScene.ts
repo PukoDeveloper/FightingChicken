@@ -10,6 +10,7 @@ import {
   createAdventureChickenDisplay,
   createHeroChickenDisplay,
   createBossChickenDisplay,
+  createPrincessChickenDisplay,
   createCourageDisplay,
   createStarfield,
 } from '../game/sprites';
@@ -32,6 +33,7 @@ function buildCostumePreview(id: CostumeId): Container {
     case 'adventure': return createAdventureChickenDisplay();
     case 'hero':      return createHeroChickenDisplay();
     case 'boss':      return createBossChickenDisplay();
+    case 'princess':  return createPrincessChickenDisplay();
     default:          return createChickenDisplay();
   }
 }
