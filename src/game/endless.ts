@@ -148,12 +148,21 @@ const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
 /**
  * Pick `count` unique random buffs from the full pool,
  * filtering out non-stackable buffs already acquired and buffs at max stacks.
+ *
+ * @param count        Number of buffs to pick.
+ * @param currentBuffs Buffs already held by the player.
+ * @param ctx          Optional stat context (equipment / costume / skill bonuses).
+ *                     When provided, the hp_up ceiling check uses `computeEffectiveStats`
+ *                     so that iron_shield, boss costume, and iron_will bonuses are factored in.
  */
-export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): BuffDef[] {
-  // Compute effective max HP so we can hide berserker when it would be trivially permanent.
-  const hpUp         = currentBuffs.filter(b => b === 'hp_up').length;
-  const bloodPrice   = currentBuffs.filter(b => b === 'blood_price').length;
-  const effectiveHpMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bloodPrice, 1), 10);
+export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = [], ctx?: StatContext): BuffDef[] {
+  // Compute effective max HP so we can hide irrelevant buffs.
+  // When a StatContext is available we use the canonical computeEffectiveStats formula
+  // so that equipment / costume / skill bonuses are correctly reflected; otherwise we
+  // fall back to the simplified buff-only formula.
+  const effectiveHpMax = ctx
+    ? computeEffectiveStats(currentBuffs, ctx).effectiveHpMax
+    : Math.min(Math.max(PLAYER_HP_MAX + currentBuffs.filter(b => b === 'hp_up').length - currentBuffs.filter(b => b === 'blood_price').length, 1), 10);
 
   // Pre-compute fire_rate_up floor check: once the interval can no longer decrease,
   // further stacks provide no benefit and should be hidden.

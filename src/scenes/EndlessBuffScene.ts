@@ -76,10 +76,10 @@ async function enter(core: Core): Promise<void> {
   uiLayer.addChild(waveInfoText);
 
   // ── Buff cards ────────────────────────────────────────────────────────────
-  const buffs: BuffDef[] = pickRandomBuffs(3, endlessState.buffs);
-
   // Build the stat context from the current equipment / costume / skill state so
-  // that buff descriptions show the actual in-game values rather than raw buff math.
+  // that buff descriptions show the actual in-game values rather than raw buff math,
+  // and so that the pool correctly excludes buffs that are already at their effective
+  // maximum (e.g. hp_up when iron_shield + boss costume already caps max HP at 10).
   const _eqWeapon    = equipmentState.equippedSlots.weapon;
   const _eqArmor     = equipmentState.equippedSlots.armor;
   const _eqAccessory = equipmentState.equippedSlots.accessory;
@@ -93,6 +93,7 @@ async function enter(core: Core): Promise<void> {
     skillIronWill: skillState.selected   === 'iron_will',
     levelItemDropMult: 1.0, // endless mode has no per-level drop multiplier
   };
+  const buffs: BuffDef[] = pickRandomBuffs(3, endlessState.buffs, statCtx);
   const cardW = W * 0.78;
   const cardH = 110;
   const cardGap = 16;
