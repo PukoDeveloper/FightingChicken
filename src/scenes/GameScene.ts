@@ -3194,7 +3194,8 @@ async function enter(core: Core): Promise<void> {
             const pdy = b.y - pet.display.y;
             if (Math.sqrt(pdx * pdx + pdy * pdy) < PET_HITBOX_R + (b.radius ?? PLAYER_BULLET_R)) {
               removeBullet(playerBullets, i, playerBulletsContainer, true);
-              const petDmg = critChance > 0 && Math.random() < critChance ? bulletDamage * 2 : bulletDamage;
+              const petBaseDmg = b.damage ?? bulletDamage;
+              const petDmg = critChance > 0 && Math.random() < critChance ? petBaseDmg * 2 : petBaseDmg;
               pet.hp = Math.max(0, pet.hp - petDmg);
               pet.hitFlashMs = 80;
               score += SCORE_PER_HIT * petDmg;
@@ -3769,7 +3770,7 @@ async function enter(core: Core): Promise<void> {
               continue;
             }
 
-            playerHP = Math.max(0, playerHP - bulletDamage);
+            playerHP = Math.max(0, playerHP - 1);
             invincibleMs = effectiveInvincibleMs;
             playerHitThisRun = true;
             sfxPlayerHit();
@@ -3841,7 +3842,7 @@ async function enter(core: Core): Promise<void> {
               continue;
             }
 
-            playerHP = Math.max(0, playerHP - bulletDamage);
+            playerHP = Math.max(0, playerHP - 1);
             invincibleMs = effectiveInvincibleMs;
             playerHitThisRun = true;
             sfxPlayerHit();

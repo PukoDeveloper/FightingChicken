@@ -94,7 +94,7 @@ const BOSSES: BossEntry[] = [
     color: '#06061e',
     borderColor: '#3355dd',
     levels: '第 4 關',
-    hp: '210',
+    hp: '255',
     description:
       '幽靈般的藍紫色實體，擅長以散射彈覆蓋大範圍，' +
       '並釋放陷阱泡泡大幅降低移動速度，使玩家難以閃避後續攻擊。',
