@@ -161,7 +161,7 @@ export const TELEPORT_WARN_MS = 800;
 /** Warning duration (ms) before a sniper bullet fires (default; can be overridden per phase). */
 export const SNIPER_WARN_MS = 900;
 
-// ─── Princess Chicken (公主小姐) active ability ───────────────────────────────
+// ─── Princess Chicken (公主小雞) active ability ───────────────────────────────
 /** Max HP consumed (deducted from effectiveHpMax) each time the ability is activated. */
 export const PRINCESS_HP_COST = 1;
 /** Maximum number of guard chickens that can be active simultaneously. */

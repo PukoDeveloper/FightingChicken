@@ -403,7 +403,7 @@ async function enter(core: Core): Promise<void> {
       }
     });
 
-    // ── Obtained equipment list ────────────────────────────────────────────
+    // ── Obtained equipment list grouped by type ───────────────────────────
     const obtained = [...equipmentState.obtained];
     const listStartY = slotsStartY + EQUIP_SLOT_DEFS.length * (SLOT_H + SLOT_GAP) + 12;
 
@@ -415,81 +415,117 @@ async function enter(core: Core): Promise<void> {
     parent.addChild(makeLabel('已獲得裝備（點擊「裝備」按鈕換裝）', cx, listStartY, 13, 0xaaddff));
 
     const LIST_H = 44, LIST_GAP = 6;
-    obtained.forEach((id, idx) => {
-      const def = EQUIPMENT_DEFS.find((d) => d.id === id);
-      if (!def) return;
-      const ly = listStartY + 20 + idx * (LIST_H + LIST_GAP);
+    const SECTION_HEADER_H = 24, SECTION_GAP = 10;
+    let cursorY = listStartY + 20;
 
-      const listBg = new Graphics();
-      listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
-        .fill({ color: 0x0d1122, alpha: 0.9 });
-      listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
-        .stroke({ color: 0x333366, width: 1.2 });
-      parent.addChild(listBg);
+    EQUIP_SLOT_DEFS.forEach((slotDef) => {
+      const slotItems = obtained.filter((id) => {
+        const d = EQUIPMENT_DEFS.find((e) => e.id === id);
+        return d?.slot === slotDef.id;
+      });
+      if (slotItems.length === 0) return;
 
-      const itemLvl = equipmentState.upgradeLevels[id] ?? 1;
-      const itemNameTxt = new Text({
-        text: `${def.icon} ${def.name}  Lv.${itemLvl}`,
+      // Section header
+      const headerBg = new Graphics();
+      headerBg.roundRect(PANEL_X + 14, cursorY, SLOT_W, SECTION_HEADER_H, 6)
+        .fill({ color: 0x1a1a3a, alpha: 0.95 });
+      headerBg.roundRect(PANEL_X + 14, cursorY, SLOT_W, SECTION_HEADER_H, 6)
+        .stroke({ color: 0x4455aa, width: 1 });
+      parent.addChild(headerBg);
+
+      const headerTxt = new Text({
+        text: `${slotDef.icon} ${slotDef.name}`,
         style: new TextStyle({
           fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
           fontSize: 13,
           fontWeight: 'bold',
-          fill: 0xddddee,
+          fill: 0xaaccff,
         }),
       });
-      itemNameTxt.x = PANEL_X + 28;
-      itemNameTxt.y = ly + LIST_H / 2 - 8;
-      parent.addChild(itemNameTxt);
+      headerTxt.anchor.set(0, 0.5);
+      headerTxt.x = PANEL_X + 28;
+      headerTxt.y = cursorY + SECTION_HEADER_H / 2;
+      parent.addChild(headerTxt);
+      cursorY += SECTION_HEADER_H + 4;
 
-      const slotInfo = EQUIP_SLOT_DEFS.find((s) => s.id === def.slot);
-      const slotTagTxt = new Text({
-        text: slotInfo ? `${slotInfo.icon} ${slotInfo.name}` : '',
-        style: new TextStyle({
-          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 11,
-          fill: 0x7799bb,
-        }),
-      });
-      slotTagTxt.x = PANEL_X + 28;
-      slotTagTxt.y = ly + LIST_H / 2 + 7;
-      parent.addChild(slotTagTxt);
+      slotItems.forEach((id) => {
+        const def = EQUIPMENT_DEFS.find((d) => d.id === id);
+        if (!def) return;
+        const ly = cursorY;
 
-      const isEquipped = equipmentState.equippedSlots[def.slot] === id;
-      const bW = 56, bH = 28;
-      const equipBtn = new Container();
-      equipBtn.eventMode = 'static';
-      equipBtn.cursor = isEquipped ? 'default' : 'pointer';
-      const equipBg = new Graphics();
-      equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
-        .fill({ color: isEquipped ? 0x115511 : 0x224488, alpha: 0.9 });
-      equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
-        .stroke({ color: isEquipped ? 0x55cc55 : 0x6688ff, width: 1.5 });
-      equipBtn.addChild(equipBg);
-      const equipBtnTxt = new Text({
-        text: isEquipped ? '已裝備' : '裝備',
-        style: new TextStyle({
-          fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
-          fontSize: 12,
-          fontWeight: 'bold',
-          fill: isEquipped ? 0x88ee88 : 0xffffff,
-        }),
-      });
-      equipBtnTxt.anchor.set(0.5);
-      equipBtn.addChild(equipBtnTxt);
-      equipBtn.x = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
-      equipBtn.y = ly + LIST_H / 2;
+        const listBg = new Graphics();
+        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+          .fill({ color: 0x0d1122, alpha: 0.9 });
+        listBg.roundRect(PANEL_X + 14, ly, SLOT_W, LIST_H, 8)
+          .stroke({ color: 0x333366, width: 1.2 });
+        parent.addChild(listBg);
 
-      if (!isEquipped) {
-        equipBtn.on('pointerdown', async () => {
-          sfxMenuClick();
-          equipmentState.equippedSlots[def.slot] = id;
-          await saveProgress();
-          rebuildPanel();
+        const itemLvl = equipmentState.upgradeLevels[id] ?? 1;
+        const itemNameTxt = new Text({
+          text: `${def.icon} ${def.name}  Lv.${itemLvl}`,
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 13,
+            fontWeight: 'bold',
+            fill: 0xddddee,
+          }),
         });
-        equipBtn.on('pointerover', () => equipBtn.scale.set(1.06));
-        equipBtn.on('pointerout',  () => equipBtn.scale.set(1.0));
-      }
-      parent.addChild(equipBtn);
+        itemNameTxt.x = PANEL_X + 28;
+        itemNameTxt.y = ly + LIST_H / 2 - 8;
+        parent.addChild(itemNameTxt);
+
+        const statTxt = new Text({
+          text: def.stat,
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 11,
+            fill: 0x7799bb,
+          }),
+        });
+        statTxt.x = PANEL_X + 28;
+        statTxt.y = ly + LIST_H / 2 + 7;
+        parent.addChild(statTxt);
+
+        const isEquipped = equipmentState.equippedSlots[def.slot] === id;
+        const bW = 56, bH = 28;
+        const equipBtn = new Container();
+        equipBtn.eventMode = 'static';
+        equipBtn.cursor = isEquipped ? 'default' : 'pointer';
+        const equipBg = new Graphics();
+        equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+          .fill({ color: isEquipped ? 0x115511 : 0x224488, alpha: 0.9 });
+        equipBg.roundRect(-bW / 2, -bH / 2, bW, bH, 7)
+          .stroke({ color: isEquipped ? 0x55cc55 : 0x6688ff, width: 1.5 });
+        equipBtn.addChild(equipBg);
+        const equipBtnTxt = new Text({
+          text: isEquipped ? '已裝備' : '裝備',
+          style: new TextStyle({
+            fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: isEquipped ? 0x88ee88 : 0xffffff,
+          }),
+        });
+        equipBtnTxt.anchor.set(0.5);
+        equipBtn.addChild(equipBtnTxt);
+        equipBtn.x = PANEL_X + 14 + SLOT_W - bW / 2 - 8;
+        equipBtn.y = ly + LIST_H / 2;
+
+        if (!isEquipped) {
+          equipBtn.on('pointerdown', async () => {
+            sfxMenuClick();
+            equipmentState.equippedSlots[def.slot] = id;
+            await saveProgress();
+            rebuildPanel();
+          });
+          equipBtn.on('pointerover', () => equipBtn.scale.set(1.06));
+          equipBtn.on('pointerout',  () => equipBtn.scale.set(1.0));
+        }
+        parent.addChild(equipBtn);
+        cursorY += LIST_H + LIST_GAP;
+      });
+
+      cursorY += SECTION_GAP;
     });
   }
 
