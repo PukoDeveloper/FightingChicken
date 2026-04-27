@@ -90,6 +90,7 @@ async function enter(core: Core): Promise<void> {
   ];
 
   let activeTab: TabId = 'equip';
+  const tabScrollY: Partial<Record<TabId, number>> = {};
   const TAB_W = 84, TAB_H = 38;
   const TAB_GAP = 6;
   const TAB_TOTAL_W = tabDefs.length * TAB_W + (tabDefs.length - 1) * TAB_GAP;
@@ -194,7 +195,7 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
-  function setupScroll(c: Container, contentBottom: number): void {
+  function setupScroll(c: Container, contentBottom: number, initialScrollY = 0): void {
     const PANEL_BOTTOM_PADDING = 8;
     const MIN_SCROLLBAR_THUMB_HEIGHT = 24;
     const SCROLLBAR_VERTICAL_PADDING = 8;
@@ -236,6 +237,11 @@ async function enter(core: Core): Promise<void> {
       scrollY = Math.max(0, Math.min(maxScroll, newY));
       c.y = -scrollY;
       drawScrollbar(scrollY);
+      tabScrollY[activeTab] = scrollY;
+    }
+
+    if (initialScrollY > 0) {
+      applyScroll(initialScrollY);
     }
 
     // Mouse wheel
@@ -1034,7 +1040,7 @@ async function enter(core: Core): Promise<void> {
       h: 52,
     });
     summonBtn.x = cx;
-    summonBtn.y = RES_Y + RES_H + 44;
+    summonBtn.y = RES_Y + RES_H + 64;
     parent.addChild(summonBtn);
 
     summonBtn.on('pointerdown', async () => {
@@ -1103,6 +1109,7 @@ async function enter(core: Core): Promise<void> {
     clearPanel();
     const c = new Container();
     panelContent = c;
+    const savedScroll = tabScrollY[activeTab] ?? 0;
 
     switch (activeTab) {
       case 'equip': {
@@ -1124,7 +1131,7 @@ async function enter(core: Core): Promise<void> {
             + 16;
         }
         uiLayer.addChild(c);
-        setupScroll(c, contentBottom);
+        setupScroll(c, contentBottom, savedScroll);
         break;
       }
       case 'upgrade': {
@@ -1133,7 +1140,7 @@ async function enter(core: Core): Promise<void> {
         const ITEM_H = 58, ITEM_GAP = 8;
         const contentBottom = PANEL_Y + 72 + obtained.length * (ITEM_H + ITEM_GAP) + 16;
         uiLayer.addChild(c);
-        setupScroll(c, contentBottom);
+        setupScroll(c, contentBottom, savedScroll);
         break;
       }
       case 'gacha':
@@ -1148,9 +1155,10 @@ async function enter(core: Core): Promise<void> {
         const gachaOffsetY = obtained.length === 0
           ? listStartY + 60
           : listStartY + 22 + obtained.length * (ITEM_H + ITEM_GAP) + 12;
-        const contentBottom = gachaOffsetY + 72 + 16 + 52 + 24;
+        // RES_Y = gachaOffsetY + 38, RES_H = 72, summonBtn center at RES_Y + RES_H + 64, btn h = 52
+        const contentBottom = gachaOffsetY + 38 + 72 + 64 + 26 + 24;
         uiLayer.addChild(c);
-        setupScroll(c, contentBottom);
+        setupScroll(c, contentBottom, savedScroll);
         break;
       }
     }
