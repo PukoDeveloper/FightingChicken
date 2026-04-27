@@ -417,7 +417,7 @@ export function buffDesc(
       if (n === 0)
         return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（每次縮短 25%，最多疊加 4 次）`;
       const nxtReductionPct = Math.round((1 - Math.pow(0.75, n + 1)) * 100);
-      return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（已疊加 ${n} 次，累計縮短 ${nxtReductionPct}%）`;
+      return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（已疊加 ${n + 1} 次，累計縮短 ${nxtReductionPct}%）`;
     }
 
     case 'hp_up': {
