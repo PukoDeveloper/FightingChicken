@@ -57,35 +57,41 @@ export function createChickenDisplay(): Container {
 }
 
 // ─── Wingman Chicken (僚雞) ───────────────────────────────────────────────────
+import type { WingmanDef } from './wingmen';
+
 /**
- * Build a Container for the wingman companion chicken.
- * Visually similar to the player chicken but with a sky-blue colour scheme
- * so players can easily distinguish it from the main character.
+ * Build a Container for a wingman companion chicken with a colour scheme
+ * determined by the wingman's bodyColor and accentColor.
  * The container's local origin (0,0) is the chicken's centre.
  */
-export function createWingmanChickenDisplay(): Container {
+export function createWingmanDisplay(def: WingmanDef): Container {
   const c = new Container();
   const g = new Graphics();
 
   // Shadow
   g.ellipse(0, 22, 14, 4).fill({ color: 0x000000, alpha: 0.20 });
 
-  // Left wing
-  g.ellipse(-14, 4, 8, 6).fill(0x2299cc);
+  // Left wing (darker shade of body)
+  const wingColor = Math.max(0, def.bodyColor - 0x223344);
+  g.ellipse(-14, 4, 8, 6).fill(wingColor);
 
-  // Body (sky-blue instead of gold)
-  g.circle(0, 0, 18).fill(0x44bbee);
+  // Body
+  g.circle(0, 0, 18).fill(def.bodyColor);
 
-  // Belly highlight
-  g.ellipse(3, 5, 9, 7).fill(0x88ddff);
+  // Belly highlight (lightened blend towards white)
+  const bellyR = Math.min(255, ((def.bodyColor >> 16) & 0xff) + 60);
+  const bellyG = Math.min(255, ((def.bodyColor >> 8)  & 0xff) + 60);
+  const bellyB = Math.min(255,  (def.bodyColor        & 0xff) + 80);
+  const bellyColor = (bellyR << 16) | (bellyG << 8) | bellyB;
+  g.ellipse(3, 5, 9, 7).fill(bellyColor);
 
-  // Comb (cyan tint)
+  // Comb (accent colour)
   g.moveTo(-6, -16).lineTo(-2, -26).lineTo(1, -17)
     .lineTo(4, -25).lineTo(7, -17).lineTo(10, -16)
-    .closePath().fill(0x00cccc);
+    .closePath().fill(def.accentColor);
 
-  // Right wing
-  g.ellipse(15, 4, 8, 6).fill(0x2299cc);
+  // Right wing (same darker shade)
+  g.ellipse(15, 4, 8, 6).fill(wingColor);
 
   // Beak
   g.moveTo(14, -2).lineTo(22, 2).lineTo(14, 6).closePath().fill(0xff8800);

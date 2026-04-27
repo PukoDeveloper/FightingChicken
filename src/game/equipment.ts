@@ -13,7 +13,7 @@ export type EquipmentId =
   | 'battle_emblem';
 
 /** The equipment slot categories. */
-export type EquipSlotId = 'weapon' | 'armor' | 'accessory' | 'wingman';
+export type EquipSlotId = 'weapon' | 'armor' | 'accessory';
 
 /**
  * Identifies which special attack mode a weapon-slot equipment piece provides.

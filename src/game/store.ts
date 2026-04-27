@@ -3,6 +3,7 @@ import type { BuffId } from './endless';
 import type { CostumeId } from './costumes';
 import type { SkillId } from './skills';
 import type { EquipmentId, EquipSlotId } from './equipment';
+import type { WingmanId } from './wingmen';
 
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
@@ -92,6 +93,19 @@ export const equipmentState = {
   /** Upgrade level for each obtained equipment piece (1 = base, max 5). */
   upgradeLevels: {} as Record<EquipmentId, number>,
   /** The equipment currently equipped in each slot (null = empty). */
-  equippedSlots: { weapon: null, armor: null, accessory: null, wingman: null } as Record<EquipSlotId, EquipmentId | null>,
+  equippedSlots: { weapon: null, armor: null, accessory: null } as Record<EquipSlotId, EquipmentId | null>,
+};
+
+/** Persistent wingman (僚雞) companion state. */
+export const wingmanState = {
+  /** IDs of wingmen the player has obtained. */
+  obtained: new Set<WingmanId>(),
+  /**
+   * Upgrade level for each obtained wingman (starts at 1, increases by 1 each
+   * time a duplicate is drawn, up to WINGMAN_MAX_LEVEL).
+   */
+  upgradeLevels: {} as Record<WingmanId, number>,
+  /** The wingman currently deployed alongside the player (null = none). */
+  equipped: null as WingmanId | null,
 };
 

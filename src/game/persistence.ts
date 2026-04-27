@@ -1,8 +1,10 @@
 import type { Core } from '@inkshot/engine';
-import { gameResult, endlessState, costumeState, currencyState, equipmentState, voidState } from './store';
+import { gameResult, endlessState, costumeState, currencyState, equipmentState, voidState, wingmanState } from './store';
 import type { CostumeId } from './costumes';
 import type { EquipmentId, EquipSlotId } from './equipment';
 import { EQUIPMENT_DEFS } from './equipment';
+import type { WingmanId } from './wingmen';
+import { WINGMAN_DEFS } from './wingmen';
 
 /** Convenience type alias for the upgrade-levels record. */
 type UpgradeLevelsRecord = Record<EquipmentId, number>;
@@ -58,6 +60,9 @@ export async function saveProgress(): Promise<void> {
         obtainedEquipment: [...equipmentState.obtained],
         equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
         equippedSlots: { ...equipmentState.equippedSlots },
+        obtainedWingmen: [...wingmanState.obtained],
+        wingmanUpgradeLevels: { ...wingmanState.upgradeLevels },
+        equippedWingman: wingmanState.equipped,
         voidHighScore: voidState.highScore,
         _achievements: achievementsSnapshot,
       },
@@ -137,16 +142,37 @@ export async function loadProgress(): Promise<void> {
 
     if (data.equippedSlots && typeof data.equippedSlots === 'object') {
       const slots = data.equippedSlots as Record<string, unknown>;
-      for (const slotId of ['weapon', 'armor', 'accessory', 'wingman'] as EquipSlotId[]) {
+      for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
         const val = slots[slotId];
         const def = typeof val === 'string' ? EQUIPMENT_DEFS.find((d) => d.id === val) : undefined;
-        // wingman slot accepts weapon-slot items; all other slots require an exact slot match.
-        const slotOk = def && (def.slot === slotId || (slotId === 'wingman' && def.slot === 'weapon'));
-        if (slotOk && equipmentState.obtained.has(val as EquipmentId)) {
+        if (def && def.slot === slotId && equipmentState.obtained.has(val as EquipmentId)) {
           equipmentState.equippedSlots[slotId] = val as EquipmentId;
         } else {
           equipmentState.equippedSlots[slotId] = null;
         }
+      }
+    }
+
+    if (Array.isArray(data.obtainedWingmen)) {
+      for (const id of data.obtainedWingmen) {
+        if (typeof id === 'string' && WINGMAN_DEFS.some((d) => d.id === id)) {
+          wingmanState.obtained.add(id as WingmanId);
+        }
+      }
+    }
+
+    if (data.wingmanUpgradeLevels && typeof data.wingmanUpgradeLevels === 'object') {
+      for (const [id, lvl] of Object.entries(data.wingmanUpgradeLevels as Record<string, unknown>)) {
+        if (typeof lvl === 'number' && Number.isFinite(lvl) && WINGMAN_DEFS.some((d) => d.id === id)) {
+          wingmanState.upgradeLevels[id as WingmanId] = lvl;
+        }
+      }
+    }
+
+    if (typeof data.equippedWingman === 'string') {
+      const def = WINGMAN_DEFS.find((d) => d.id === data.equippedWingman);
+      if (def && wingmanState.obtained.has(data.equippedWingman as WingmanId)) {
+        wingmanState.equipped = data.equippedWingman as WingmanId;
       }
     }
   } catch {
@@ -178,6 +204,9 @@ export function exportProgress(): void {
       obtainedEquipment: [...equipmentState.obtained],
       equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
       equippedSlots: { ...equipmentState.equippedSlots },
+      obtainedWingmen: [...wingmanState.obtained],
+      wingmanUpgradeLevels: { ...wingmanState.upgradeLevels },
+      equippedWingman: wingmanState.equipped,
       _achievements: { data: achievementsSnapshot },
     };
 
@@ -211,7 +240,10 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
     equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
-    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null, wingman: null };
+    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null };
+    wingmanState.obtained = new Set();
+    wingmanState.upgradeLevels = {} as Record<WingmanId, number>;
+    wingmanState.equipped = null;
 
     if (data.levelHighScores && typeof data.levelHighScores === 'object') {
       for (const [key, val] of Object.entries(data.levelHighScores as Record<string, unknown>)) {
@@ -268,15 +300,37 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
 
     if (data.equippedSlots && typeof data.equippedSlots === 'object') {
       const slots = data.equippedSlots as Record<string, unknown>;
-      for (const slotId of ['weapon', 'armor', 'accessory', 'wingman'] as EquipSlotId[]) {
+      for (const slotId of ['weapon', 'armor', 'accessory'] as EquipSlotId[]) {
         const val = slots[slotId];
         const def = typeof val === 'string' ? EQUIPMENT_DEFS.find((d) => d.id === val) : undefined;
-        const slotOk = def && (def.slot === slotId || (slotId === 'wingman' && def.slot === 'weapon'));
-        if (slotOk && equipmentState.obtained.has(val as EquipmentId)) {
+        if (def && def.slot === slotId && equipmentState.obtained.has(val as EquipmentId)) {
           equipmentState.equippedSlots[slotId] = val as EquipmentId;
         } else {
           equipmentState.equippedSlots[slotId] = null;
         }
+      }
+    }
+
+    if (Array.isArray(data.obtainedWingmen)) {
+      for (const id of data.obtainedWingmen) {
+        if (typeof id === 'string' && WINGMAN_DEFS.some((d) => d.id === id)) {
+          wingmanState.obtained.add(id as WingmanId);
+        }
+      }
+    }
+
+    if (data.wingmanUpgradeLevels && typeof data.wingmanUpgradeLevels === 'object') {
+      for (const [id, lvl] of Object.entries(data.wingmanUpgradeLevels as Record<string, unknown>)) {
+        if (typeof lvl === 'number' && Number.isFinite(lvl) && WINGMAN_DEFS.some((d) => d.id === id)) {
+          wingmanState.upgradeLevels[id as WingmanId] = lvl;
+        }
+      }
+    }
+
+    if (typeof data.equippedWingman === 'string') {
+      const wmDef = WINGMAN_DEFS.find((d) => d.id === data.equippedWingman);
+      if (wmDef && wingmanState.obtained.has(data.equippedWingman as WingmanId)) {
+        wingmanState.equipped = data.equippedWingman as WingmanId;
       }
     }
 
@@ -309,6 +363,9 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
         obtainedEquipment: [...equipmentState.obtained],
         equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
         equippedSlots: { ...equipmentState.equippedSlots },
+        obtainedWingmen: [...wingmanState.obtained],
+        wingmanUpgradeLevels: { ...wingmanState.upgradeLevels },
+        equippedWingman: wingmanState.equipped,
         _achievements: { data: achData ?? {} },
       },
     });
@@ -335,7 +392,10 @@ export async function clearProgress(): Promise<void> {
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
     equipmentState.upgradeLevels = {} as UpgradeLevelsRecord;
-    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null, wingman: null };
+    equipmentState.equippedSlots = { weapon: null, armor: null, accessory: null };
+    wingmanState.obtained = new Set();
+    wingmanState.upgradeLevels = {} as Record<WingmanId, number>;
+    wingmanState.equipped = null;
 
     // Overwrite the save slot with blank data so the cleared state is persisted.
     _core.events.emitSync('save/slot:set', {
@@ -350,7 +410,10 @@ export async function clearProgress(): Promise<void> {
         cosmicAsh: 0,
         obtainedEquipment: [],
         equipmentUpgradeLevels: {},
-        equippedSlots: { weapon: null, armor: null, accessory: null, wingman: null },
+        equippedSlots: { weapon: null, armor: null, accessory: null },
+        obtainedWingmen: [],
+        wingmanUpgradeLevels: {},
+        equippedWingman: null,
         _achievements: { data: {} },
       },
     });
