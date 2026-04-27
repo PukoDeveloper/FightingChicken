@@ -2772,6 +2772,7 @@ async function enter(core: Core): Promise<void> {
           const ey = enemyEntity.position.y;
           const px = playerEntity.position.x;
           const py = playerEntity.position.y;
+          // rotOffset: sweeps from -0.25 rad (first wave) to +0.25 rad (last wave)
           const rotOffset = (fp.waveIndex / fp.totalWaves - 0.5) * 0.5;
           const baseAngle = Math.atan2(py - ey, px - ex) + rotOffset;
           const half = (fp.count - 1) / 2;
