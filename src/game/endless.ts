@@ -141,7 +141,7 @@ const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
 /** Maximum stack counts for buffs that have a hard cap on usefulness. */
 const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
   evasion: 3,        // 3 × 10% = 30% dodge cap; a 4th stack is wasted
-  item_drop_up: 4,   // 4 stacks reduces spawn to ~31.6% of base, near the 2 s floor
+  item_drop_up: 5,   // 5 stacks brings both spawn intervals to their 2 s / 4 s floors; a 6th is wasted
   regen: 3,          // 3 stacks reaches the 6 s interval floor; a 4th stack is wasted
 };
 
@@ -181,6 +181,11 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
     // Skip fire_rate_up when the fire interval is already at its hard floor (60 ms):
     // additional stacks would have no effect.
     if (buff.id === 'fire_rate_up' && fireRateAtFloor) {
+      return false;
+    }
+    // Skip hp_up when the effective max HP is already at the hard ceiling (10):
+    // additional stacks would not increase max HP or provide any healing.
+    if (buff.id === 'hp_up' && effectiveHpMax >= 10) {
       return false;
     }
     // Skip buffs that have reached their stack cap
