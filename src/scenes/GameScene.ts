@@ -39,7 +39,6 @@ import {
   ITEM_SPAWN_MIN_MS,
   ITEM_SPAWN_MAX_MS,
   POWER_UP_DURATION_MS,
-  POWER_FIRE_INTERVAL,
   HEALTH_ITEM_PROB,
   HEALTH_ITEM_INVINCIBLE_MS,
   MOOSE_GIFT_INTERVAL_MS,
@@ -91,9 +90,8 @@ import {
   WINGMAN_PULSAR_INTERVAL_MS,
   WINGMAN_PULSAR_DMG_PER_LEVEL,
   WINGMAN_BOUNCER_INTERVAL_MS,
-  WINGMAN_BOUNCER_DMG_PER_LEVEL,
-  WINGMAN_BOUNCER_VX,
-  WINGMAN_BOUNCER_VY,
+  WINGMAN_BOUNCER_REPEL_RADIUS_BASE,
+  WINGMAN_BOUNCER_REPEL_PER_LEVEL,
   COL_WINGMAN_BULLET,
 } from '../constants';
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState, wingmanState } from '../game/store';
@@ -2883,11 +2881,9 @@ async function enter(core: Core): Promise<void> {
             : effectiveFireInterval;
           // burst_fire skill: halve fire interval while skillActiveMs > 0
           const burstFireActive = activeSkillId === 'burst_fire' && skillActiveMs > 0;
-          const fireInterval = powerUpTimer > 0
-            ? POWER_FIRE_INTERVAL
-            : burstFireActive
-              ? Math.max(Math.round(baseInterval / 2), 60)
-              : baseInterval;
+          const fireInterval = (powerUpTimer > 0 || burstFireActive)
+            ? Math.max(Math.round(baseInterval / 2), 60)
+            : baseInterval;
           playerFireTimer = fireInterval;
           // Determine per-cycle damage override (costume abilities are mutually exclusive):
           // - Hero: charged damage accumulated during invincibility (one-shot, then cleared).
@@ -2982,21 +2978,27 @@ async function enter(core: Core): Promise<void> {
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_BOUNCER_INTERVAL_MS;
-            const dmg = wingmanDmg(WINGMAN_BOUNCER_DMG_PER_LEVEL);
-            // Fire two bullets: one angled left, one angled right
-            for (const vx of [-WINGMAN_BOUNCER_VX, WINGMAN_BOUNCER_VX]) {
-              const bDisp = new Graphics();
-              bDisp.circle(0, 0, PLAYER_BULLET_R + 2).fill({ color: COL_WINGMAN_BULLET, alpha: 0.25 });
-              bDisp.circle(0, 0, PLAYER_BULLET_R).fill(COL_WINGMAN_BULLET);
-              bDisp.x = wmX;
-              bDisp.y = wmY - 18;
-              bDisp.visible = true;
-              playerBulletsContainer.addChild(bDisp);
-              playerBullets.push({
-                display: bDisp, x: wmX, y: wmY - 18,
-                vx, vy: WINGMAN_BOUNCER_VY,
-                damage: dmg, pooled: false,
-                bouncing: true, bounced: false,
+            // Deflect all enemy homing (curve) bullets within the repel radius away from the player
+            const repelRadius = WINGMAN_BOUNCER_REPEL_RADIUS_BASE + (wingmanLevel - 1) * WINGMAN_BOUNCER_REPEL_PER_LEVEL;
+            const px = playerEntity.position.x;
+            const py = playerEntity.position.y;
+            let deflectedAny = false;
+            for (const cb of curveBullets) {
+              const dx = cb.x - px;
+              const dy = cb.y - py;
+              if (Math.sqrt(dx * dx + dy * dy) < repelRadius) {
+                cb.angle = Math.atan2(dy, dx); // redirect: point away from player
+                deflectedAny = true;
+              }
+            }
+            if (deflectedAny) {
+              core.events.emitSync('particle/emit', {
+                config: {
+                  x: px, y: py,
+                  burst: true, burstCount: 8, speed: 120, speedVariance: 40,
+                  spread: 180, lifetime: 300, startAlpha: 0.9, endAlpha: 0,
+                  startScale: 0.8, endScale: 0, startColor: 0xffee44, endColor: 0xffaa00, radius: 4,
+                },
               });
             }
           }
