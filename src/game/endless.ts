@@ -141,7 +141,7 @@ const NON_STACKABLE_BUFFS: BuffId[] = ['berserker', 'periodic_shield'];
 /** Maximum stack counts for buffs that have a hard cap on usefulness. */
 const MAX_BUFF_STACKS: Partial<Record<BuffId, number>> = {
   evasion: 3,        // 3 × 10% = 30% dodge cap; a 4th stack is wasted
-  item_drop_up: 5,   // 5 stacks brings both spawn intervals to their 2 s / 4 s floors; a 6th is wasted
+  item_drop_up: 3,   // 3 stacks reduces both spawn intervals by 75% (linear), hitting the 2 s / 4 s floors; a 4th is wasted
   regen: 3,          // 3 stacks reaches the 6 s interval floor; a 4th stack is wasted
 };
 
@@ -297,10 +297,10 @@ export function computeEffectiveStats(buffs: BuffId[], ctx: StatContext): Effect
   let evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
   let effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
   let itemSpawnMinMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * ctx.levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * ctx.levelItemDropMult * Math.max(1 - 0.25 * buffItemDropCount, 0)), 2000)
     : Math.round(ITEM_SPAWN_MIN_MS * ctx.levelItemDropMult);
   let itemSpawnMaxMs = buffItemDropCount > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * ctx.levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * ctx.levelItemDropMult * Math.max(1 - 0.25 * buffItemDropCount, 0)), 4000)
     : Math.round(ITEM_SPAWN_MAX_MS * ctx.levelItemDropMult);
   let regenIntervalMs = buffRegenCount > 0 ? Math.max(15000 - buffRegenCount * 3000, 6000) : 0;
 
@@ -429,8 +429,8 @@ export function buffDesc(
     case 'item_drop_up': {
       const n = count('item_drop_up');
       if (n === 0)
-        return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（每次縮短 25%，最多疊加 4 次）`;
-      const nxtReductionPct = Math.round((1 - Math.pow(0.75, n + 1)) * 100);
+        return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（每次縮短 25%，最多疊加 3 次）`;
+      const nxtReductionPct = Math.min((n + 1) * 25, 100);
       return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（已疊加 ${n + 1} 次，累計縮短 ${nxtReductionPct}%）`;
     }
 
