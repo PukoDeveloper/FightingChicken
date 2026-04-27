@@ -2,9 +2,10 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { endlessState } from '../game/store';
+import { endlessState, costumeState, skillState, equipmentState } from '../game/store';
 import { pickRandomBuffs, ALL_BUFFS, buffDesc } from '../game/endless';
-import type { BuffDef } from '../game/endless';
+import type { BuffDef, StatContext } from '../game/endless';
+import { FROST_GEM_INVINCIBLE_BONUS } from '../constants';
 import { sfxWaveClear, sfxMenuClick } from '../game/audio';
 
 let _cleanup: (() => void) | null = null;
@@ -76,6 +77,22 @@ async function enter(core: Core): Promise<void> {
 
   // ── Buff cards ────────────────────────────────────────────────────────────
   const buffs: BuffDef[] = pickRandomBuffs(3, endlessState.buffs);
+
+  // Build the stat context from the current equipment / costume / skill state so
+  // that buff descriptions show the actual in-game values rather than raw buff math.
+  const _eqWeapon    = equipmentState.equippedSlots.weapon;
+  const _eqArmor     = equipmentState.equippedSlots.armor;
+  const _eqAccessory = equipmentState.equippedSlots.accessory;
+  const statCtx: StatContext = {
+    equipAttackBonus:    _eqWeapon    === 'rapid_shot'          ? (equipmentState.upgradeLevels['rapid_shot']          ?? 1) * 1                     : 0,
+    equipDefenseBonus:   _eqArmor     === 'iron_shield'         ? (equipmentState.upgradeLevels['iron_shield']         ?? 1) * 1                     : 0,
+    equipInvincibleBonus:_eqArmor     === 'frost_gem'           ? (equipmentState.upgradeLevels['frost_gem']           ?? 1) * FROST_GEM_INVINCIBLE_BONUS : 0,
+    equipEvasionBonus:   _eqArmor     === 'moon_cape'           ? (equipmentState.upgradeLevels['moon_cape']           ?? 1) * 0.01                  : 0,
+    isBossCostume: costumeState.selected === 'boss',
+    isFoxCostume:  costumeState.selected === 'fox',
+    skillIronWill: skillState.selected   === 'iron_will',
+    levelItemDropMult: 1.0, // endless mode has no per-level drop multiplier
+  };
   const cardW = W * 0.78;
   const cardH = 110;
   const cardGap = 16;
@@ -113,7 +130,7 @@ async function enter(core: Core): Promise<void> {
       fill: 0xdddddd,
       lineHeight: 22,
     });
-    const descText = new Text({ text: buffDesc(buff.id, endlessState.buffs, endlessState.currentHp), style: descStyle });
+    const descText = new Text({ text: buffDesc(buff.id, endlessState.buffs, endlessState.currentHp, statCtx), style: descStyle });
     descText.x = 18;
     descText.y = 48;
     card.addChild(descText);

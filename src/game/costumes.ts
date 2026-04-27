@@ -75,7 +75,7 @@ export const COSTUMES: CostumeConfig[] = [
     id: 'adventure',
     name: '冒險小雞',
     description: '走遍四方、無所畏懼的旅行者',
-    ability: '被動：距離敵人越近傷害越高（1× ～ 3×）',
+    ability: '被動：距離敵人越近傷害越高（1× ～ 4×）',
     unlockHint: '通關關卡模式第一關解鎖',
     stats: { speedMult: 1.0, fireRateMult: 1.0, hpBonus: 0 },
   },

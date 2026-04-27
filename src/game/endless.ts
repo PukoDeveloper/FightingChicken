@@ -16,6 +16,7 @@ import {
   PLAYER_HP_MAX,
   PLAYER_FIRE_INTERVAL,
   INVINCIBLE_MS,
+  ITEM_SPAWN_MIN_MS,
   ITEM_SPAWN_MAX_MS,
   SNIPER_WARN_MS,
 } from '../constants';
@@ -187,6 +188,129 @@ export function pickRandomBuffs(count: number, currentBuffs: BuffId[] = []): Buf
   return result;
 }
 
+// ─── Stat Context & Unified Stat Computation ──────────────────────────────────
+
+/**
+ * All external bonuses (equipment, costume, skill) that modify effective player
+ * stats on top of the raw buff stack values. Pass this to `computeEffectiveStats`
+ * so that descriptions in `buffDesc` show the exact in-game numbers.
+ */
+export interface StatContext {
+  /** Extra attack damage from rapid_shot equipment (0 if not equipped). */
+  equipAttackBonus: number;
+  /** Extra max HP from iron_shield equipment (0 if not equipped). */
+  equipDefenseBonus: number;
+  /** Extra invincibility duration (ms) from frost_gem equipment (0 if not equipped). */
+  equipInvincibleBonus: number;
+  /** Extra evasion chance (0–1 fraction) from moon_cape equipment (0 if not equipped). */
+  equipEvasionBonus: number;
+  /** Whether the boss costume (×1.5 multiplier to all stats) is active. */
+  isBossCostume: boolean;
+  /** Whether the fox costume (−30% item spawn intervals) is active. */
+  isFoxCostume: boolean;
+  /** Whether the iron_will skill (+1 max HP) is selected. */
+  skillIronWill: boolean;
+  /** Level-specific item-drop frequency multiplier (< 1 = more frequent; always 1.0 in endless mode). */
+  levelItemDropMult: number;
+}
+
+/** Effective player stats after applying all buffs and external context modifiers. */
+export interface EffectiveStats {
+  effectiveHpMax: number;
+  effectiveFireInterval: number;
+  bulletDamage: number;
+  evasionChance: number;
+  effectiveInvincibleMs: number;
+  itemSpawnMinMs: number;
+  itemSpawnMaxMs: number;
+  /** 0 means regen is inactive (no regen buffs). */
+  regenIntervalMs: number;
+}
+
+/** Context with no equipment, default costume, and no skill bonuses (useful as a fallback). */
+export const DEFAULT_STAT_CONTEXT: StatContext = {
+  equipAttackBonus: 0,
+  equipDefenseBonus: 0,
+  equipInvincibleBonus: 0,
+  equipEvasionBonus: 0,
+  isBossCostume: false,
+  isFoxCostume: false,
+  skillIronWill: false,
+  levelItemDropMult: 1.0,
+};
+
+/** Boss costume stat multiplier (mirrors BOSS_STAT_MULT in GameScene). */
+const BOSS_STAT_MULT = 1.5;
+
+/**
+ * Compute the player's effective stats from a combined buff list and external
+ * context. This is the single canonical formula used by both GameScene (runtime)
+ * and EndlessBuffScene (preview descriptions), ensuring the two always agree.
+ */
+export function computeEffectiveStats(buffs: BuffId[], ctx: StatContext): EffectiveStats {
+  const count = (id: BuffId): number => buffs.filter(b => b === id).length;
+
+  const buffHpUpCount        = count('hp_up');
+  const buffFireRateCount    = count('fire_rate_up');
+  const buffBloodPriceCount  = count('blood_price');
+  const buffBulletPowerCount = count('bullet_power');
+  const buffEvasionCount     = count('evasion');
+  const buffLongInvCount     = count('long_invincible');
+  const buffItemDropCount    = count('item_drop_up');
+  const buffRegenCount       = count('regen');
+
+  let effectiveHpMax = Math.min(
+    Math.max(PLAYER_HP_MAX + buffHpUpCount - buffBloodPriceCount + (ctx.skillIronWill ? 1 : 0), 1),
+    10,
+  );
+  let effectiveFireInterval = Math.max(
+    Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, buffFireRateCount)),
+    60,
+  );
+  let bulletDamage = 1 + buffBloodPriceCount * 2 + buffBulletPowerCount;
+  let evasionChance = Math.min(buffEvasionCount * 0.10, 0.30);
+  let effectiveInvincibleMs = INVINCIBLE_MS + buffLongInvCount * 600;
+  let itemSpawnMinMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MIN_MS * ctx.levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 2000)
+    : Math.round(ITEM_SPAWN_MIN_MS * ctx.levelItemDropMult);
+  let itemSpawnMaxMs = buffItemDropCount > 0
+    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * ctx.levelItemDropMult * Math.pow(0.75, buffItemDropCount)), 4000)
+    : Math.round(ITEM_SPAWN_MAX_MS * ctx.levelItemDropMult);
+  let regenIntervalMs = buffRegenCount > 0 ? Math.max(15000 - buffRegenCount * 3000, 6000) : 0;
+
+  if (ctx.isBossCostume) {
+    effectiveHpMax        = Math.min(Math.round(effectiveHpMax * BOSS_STAT_MULT), 10);
+    effectiveFireInterval = Math.max(Math.round(effectiveFireInterval / BOSS_STAT_MULT), 60);
+    bulletDamage          = Math.round(bulletDamage * BOSS_STAT_MULT);
+    effectiveInvincibleMs = Math.round(effectiveInvincibleMs * BOSS_STAT_MULT);
+    evasionChance         = Math.min(evasionChance * BOSS_STAT_MULT, 0.30);
+    itemSpawnMinMs        = Math.max(Math.round(itemSpawnMinMs / BOSS_STAT_MULT), 2000);
+    itemSpawnMaxMs        = Math.max(Math.round(itemSpawnMaxMs / BOSS_STAT_MULT), 4000);
+    regenIntervalMs       = regenIntervalMs > 0 ? Math.max(Math.round(regenIntervalMs / BOSS_STAT_MULT), 6000) : 0;
+  }
+
+  if (ctx.isFoxCostume) {
+    itemSpawnMinMs = Math.max(Math.round(itemSpawnMinMs * 0.7), 2000);
+    itemSpawnMaxMs = Math.max(Math.round(itemSpawnMaxMs * 0.7), 4000);
+  }
+
+  bulletDamage          += ctx.equipAttackBonus;
+  effectiveHpMax         = Math.min(effectiveHpMax + ctx.equipDefenseBonus, 10);
+  evasionChance          = Math.min(evasionChance + ctx.equipEvasionBonus, 0.30);
+  effectiveInvincibleMs += ctx.equipInvincibleBonus;
+
+  return {
+    effectiveHpMax,
+    effectiveFireInterval,
+    bulletDamage,
+    evasionChance,
+    effectiveInvincibleMs,
+    itemSpawnMinMs,
+    itemSpawnMaxMs,
+    regenIntervalMs,
+  };
+}
+
 // ─── Dynamic Buff Descriptions ────────────────────────────────────────────────
 
 /** Helper: format milliseconds as a clean seconds string (1 decimal, no trailing zero). */
@@ -194,129 +318,110 @@ function toSec(ms: number): string {
   return `${parseFloat((ms / 1000).toFixed(1))}s`;
 }
 
-/** Effective fire interval after `stacks` fire_rate_up buffs (floored at 60 ms). */
-function fireInterval(stacks: number): number {
-  return Math.max(Math.round(PLAYER_FIRE_INTERVAL * Math.pow(0.90, stacks)), 60);
-}
-
-/** Effective item max-spawn interval after `stacks` item_drop_up buffs (floored at 4 000 ms). */
-function itemSpawnMax(stacks: number): number {
-  return stacks > 0
-    ? Math.max(Math.round(ITEM_SPAWN_MAX_MS * Math.pow(0.75, stacks)), 4000)
-    : ITEM_SPAWN_MAX_MS;
-}
-
 /**
- * Returns a dynamic description for a buff card that shows the player's
- * current value and the expected value after selecting this buff.
- * `currentBuffs` is the list of buffs already held (before this selection).
- * `currentHp` is the player's actual HP entering this buff screen (optional;
- * pass 0 or omit to fall back to the formula-only description).
+ * Returns a dynamic description for a buff card showing the player's current
+ * value and the expected value *after* selecting this buff.
+ *
+ * Uses `computeEffectiveStats` for both the before and after snapshots so that
+ * the displayed numbers always match the actual in-game values, including
+ * equipment bonuses, costume multipliers, and skill effects.
+ *
+ * @param id          The buff being previewed.
+ * @param currentBuffs Buffs already held (before this selection).
+ * @param currentHp   Player's actual HP entering this screen (0 = omit HP line).
+ * @param ctx         External modifier context; defaults to `DEFAULT_STAT_CONTEXT`.
  */
-export function buffDesc(id: BuffId, currentBuffs: BuffId[], currentHp: number = 0): string {
+export function buffDesc(
+  id: BuffId,
+  currentBuffs: BuffId[],
+  currentHp: number = 0,
+  ctx: StatContext = DEFAULT_STAT_CONTEXT,
+): string {
+  const cur = computeEffectiveStats(currentBuffs, ctx);
+  const nxt = computeEffectiveStats([...currentBuffs, id], ctx);
   const count = (b: BuffId): number => currentBuffs.filter(x => x === b).length;
 
   switch (id) {
     case 'fire_rate_up': {
-      const n   = count('fire_rate_up');
-      const cur = fireInterval(n);
-      const nxt = fireInterval(n + 1);
-      if (cur === nxt)
-        return `射擊間隔：${cur}ms（已達最短間隔）\n（已疊加 ${n} 次）`;
+      const n = count('fire_rate_up');
+      if (cur.effectiveFireInterval === nxt.effectiveFireInterval)
+        return `射擊間隔：${cur.effectiveFireInterval}ms（已達最短間隔）\n（已疊加 ${n} 次）`;
       if (n === 0)
-        return `射擊間隔：${cur}ms → ${nxt}ms\n（每次提升 10%，可多次疊加）`;
-      const totalPct = Math.round((1 - nxt / PLAYER_FIRE_INTERVAL) * 100);
-      return `射擊間隔：${cur}ms → ${nxt}ms\n（已疊加 ${n} 次，累計提升 ${totalPct}%）`;
+        return `射擊間隔：${cur.effectiveFireInterval}ms → ${nxt.effectiveFireInterval}ms\n（每次提升 10%，可多次疊加）`;
+      return `射擊間隔：${cur.effectiveFireInterval}ms → ${nxt.effectiveFireInterval}ms\n（已疊加 ${n} 次）`;
     }
 
     case 'triple_shot': {
-      const n   = count('triple_shot');
-      const cur = 1 + n;
-      const nxt = cur + 1;
+      const n = count('triple_shot');
+      const bullets = 1 + n;
       if (n === 0)
-        return `每次射擊子彈數：${cur} → ${nxt} 顆\n（每次疊加 +1 顆）`;
-      return `每次射擊子彈數：${cur} → ${nxt} 顆\n（已疊加 ${n} 次）`;
+        return `每次射擊子彈數：${bullets} → ${bullets + 1} 顆\n（每次疊加 +1 顆）`;
+      return `每次射擊子彈數：${bullets} → ${bullets + 1} 顆\n（已疊加 ${n} 次）`;
     }
 
     case 'blood_price': {
-      const hpUp   = count('hp_up');
-      const bp     = count('blood_price');
-      const bpow   = count('bullet_power');
-      const curDmg = 1 + bp * 2 + bpow;
-      const curMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
-      const nxtMax = Math.max(curMax - 1, 1);
-      return `傷害：${curDmg} → ${curDmg + 2}（+2）\n生命上限：${curMax} → ${nxtMax}（-1）`;
+      const dmgDelta = nxt.bulletDamage - cur.bulletDamage;
+      const hpDelta  = nxt.effectiveHpMax - cur.effectiveHpMax;
+      const hpNote   = hpDelta < 0 ? `（${hpDelta}）` : '（無變化）';
+      return `傷害：${cur.bulletDamage} → ${nxt.bulletDamage}（+${dmgDelta}）\n生命上限：${cur.effectiveHpMax} → ${nxt.effectiveHpMax}${hpNote}`;
     }
 
     case 'bullet_power': {
-      const n      = count('bullet_power');
-      const bp     = count('blood_price');
-      const curDmg = 1 + bp * 2 + n;
+      const n        = count('bullet_power');
+      const dmgDelta = nxt.bulletDamage - cur.bulletDamage;
       if (n === 0)
-        return `子彈傷害：${curDmg} → ${curDmg + 1}（+1）\n（可多次疊加）`;
-      return `子彈傷害：${curDmg} → ${curDmg + 1}（+1）\n（已疊加 ${n} 次）`;
+        return `子彈傷害：${cur.bulletDamage} → ${nxt.bulletDamage}（+${dmgDelta}）\n（可多次疊加）`;
+      return `子彈傷害：${cur.bulletDamage} → ${nxt.bulletDamage}（+${dmgDelta}）\n（已疊加 ${n} 次）`;
     }
 
     case 'evasion': {
       const n      = count('evasion');
-      const curPct = Math.min(n * 10, 30);
-      const nxtPct = Math.min((n + 1) * 10, 30);
+      const curPct = Math.round(cur.evasionChance * 100);
+      const nxtPct = Math.round(nxt.evasionChance * 100);
       if (n === 0)
-        return `閃避機率：0% → ${nxtPct}%\n（每次 +10%，上限 30%）`;
+        return `閃避機率：${curPct}% → ${nxtPct}%\n（每次 +10%，上限 30%）`;
       return `閃避機率：${curPct}% → ${nxtPct}%\n（已疊加 ${n} 次，上限 30%）`;
     }
 
     case 'regen': {
-      const n      = count('regen');
-      const nxtMs  = Math.max(15000 - (n + 1) * 3000, 6000);
+      const n = count('regen');
       if (n === 0)
-        return `每 ${toSec(nxtMs)} 自動回復 1 HP\n（可疊加 3 次，最快每 6s）`;
-      const curMs = Math.max(15000 - n * 3000, 6000);
-      if (curMs === nxtMs)
-        return `每 ${toSec(curMs)} 自動回復 1 HP\n（已達最短間隔，疊加 ${n} 次）`;
-      return `回復間隔：${toSec(curMs)} → ${toSec(nxtMs)}\n（已疊加 ${n} 次）`;
+        return `每 ${toSec(nxt.regenIntervalMs)} 自動回復 1 HP\n（可疊加 3 次）`;
+      if (cur.regenIntervalMs === nxt.regenIntervalMs)
+        return `每 ${toSec(cur.regenIntervalMs)} 自動回復 1 HP\n（已達最短間隔，疊加 ${n} 次）`;
+      return `回復間隔：${toSec(cur.regenIntervalMs)} → ${toSec(nxt.regenIntervalMs)}\n（已疊加 ${n} 次）`;
     }
 
     case 'long_invincible': {
       const n     = count('long_invincible');
-      const curMs = INVINCIBLE_MS + n * 600;
-      const nxtMs = INVINCIBLE_MS + (n + 1) * 600;
+      const delta = nxt.effectiveInvincibleMs - cur.effectiveInvincibleMs;
       if (n === 0)
-        return `受傷無敵：${toSec(curMs)} → ${toSec(nxtMs)}\n（每次疊加 +0.6s）`;
-      return `受傷無敵：${toSec(curMs)} → ${toSec(nxtMs)}\n（已疊加 ${n} 次）`;
+        return `受傷無敵：${toSec(cur.effectiveInvincibleMs)} → ${toSec(nxt.effectiveInvincibleMs)}（+${toSec(delta)}）\n（可多次疊加）`;
+      return `受傷無敵：${toSec(cur.effectiveInvincibleMs)} → ${toSec(nxt.effectiveInvincibleMs)}（+${toSec(delta)}）\n（已疊加 ${n} 次）`;
     }
 
     case 'item_drop_up': {
-      const n      = count('item_drop_up');
-      const curMax = itemSpawnMax(n);
-      const nxtMax = itemSpawnMax(n + 1);
+      const n = count('item_drop_up');
       if (n === 0)
-        return `道具最長間隔：${toSec(curMax)} → ${toSec(nxtMax)}\n（每次縮短 25%，最多疊加 4 次）`;
+        return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（每次縮短 25%，最多疊加 4 次）`;
       const nxtReductionPct = Math.round((1 - Math.pow(0.75, n + 1)) * 100);
-      return `道具最長間隔：${toSec(curMax)} → ${toSec(nxtMax)}\n（已疊加 ${n} 次，累計縮短 ${nxtReductionPct}%）`;
+      return `道具最長間隔：${toSec(cur.itemSpawnMaxMs)} → ${toSec(nxt.itemSpawnMaxMs)}\n（已疊加 ${n} 次，累計縮短 ${nxtReductionPct}%）`;
     }
 
     case 'hp_up': {
-      const hpUp   = count('hp_up');
-      const bp     = count('blood_price');
-      const curMax = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
-      const nxtMax = Math.min(curMax + 1, 10);
-      const hpNow  = currentHp > 0 ? currentHp : curMax;
-      const hpAfter = Math.min(hpNow + 1, nxtMax);
-      return `生命上限：${curMax} → ${nxtMax}（+1）\nHP：${hpNow}/${curMax} → ${hpAfter}/${nxtMax}`;
+      const hpNow   = currentHp > 0 ? currentHp : cur.effectiveHpMax;
+      const hpAfter = Math.min(hpNow + 1, nxt.effectiveHpMax);
+      return `生命上限：${cur.effectiveHpMax} → ${nxt.effectiveHpMax}（+1）\nHP：${hpNow}/${cur.effectiveHpMax} → ${hpAfter}/${nxt.effectiveHpMax}`;
     }
 
     case 'hp_restore': {
-      const hpUp  = count('hp_up');
-      const bp    = count('blood_price');
-      const maxHp = Math.min(Math.max(PLAYER_HP_MAX + hpUp - bp, 1), 10);
-      const heal  = Math.ceil(maxHp / 2);
-      const hpNow = currentHp > 0 ? currentHp : maxHp;
-      const hpAfter = Math.min(hpNow + heal, maxHp);
-      const gained = hpAfter - hpNow;
+      const heal    = Math.ceil(cur.effectiveHpMax / 2);
+      const hpNow   = currentHp > 0 ? currentHp : cur.effectiveHpMax;
+      const hpAfter = Math.min(hpNow + heal, cur.effectiveHpMax);
+      const gained  = hpAfter - hpNow;
       if (gained <= 0)
-        return `立即恢復 HP（上限 ${heal}）\nHP：${hpNow}/${maxHp}（已滿血，效果浪費）`;
-      return `立即恢復 ${gained} HP\nHP：${hpNow}/${maxHp} → ${hpAfter}/${maxHp}`;
+        return `立即恢復 HP（上限 ${heal}）\nHP：${hpNow}/${cur.effectiveHpMax}（已滿血，效果浪費）`;
+      return `立即恢復 ${gained} HP\nHP：${hpNow}/${cur.effectiveHpMax} → ${hpAfter}/${cur.effectiveHpMax}`;
     }
 
     default: {
