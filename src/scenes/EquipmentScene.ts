@@ -310,11 +310,11 @@ async function enter(core: Core): Promise<void> {
   }
 
   // ── Equipment slot definitions ────────────────────────────────────────────
-  const EQUIP_SLOT_DEFS: { id: EquipSlotId; name: string; icon: string; acceptsWeaponItems?: boolean }[] = [
+  const EQUIP_SLOT_DEFS: { id: EquipSlotId; name: string; icon: string }[] = [
     { id: 'weapon',    name: '武器',   icon: '⚔️' },
     { id: 'armor',     name: '防具',   icon: '🛡️' },
     { id: 'accessory', name: '飾品',   icon: '💍' },
-    { id: 'wingman',   name: '僚雞武器', icon: '🐔', acceptsWeaponItems: true },
+    { id: 'wingman',   name: '僚雞武器', icon: '🐔' },
   ];
 
   // ── Panel builder ─────────────────────────────────────────────────────────

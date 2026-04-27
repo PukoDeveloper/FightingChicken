@@ -2967,12 +2967,13 @@ async function enter(core: Core): Promise<void> {
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_RAPID_INTERVAL_MS;
+            const wmDmg = bulletDamage + wingmanUpgLevel * 1;
             const wmBullet = playerBulletPool.acquire();
             wmBullet.x = wmX;
             wmBullet.y = wmY - 18;
             wmBullet.visible = true;
             playerBulletsContainer.addChild(wmBullet);
-            playerBullets.push({ display: wmBullet, x: wmX, y: wmY - 18, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: undefined });
+            playerBullets.push({ display: wmBullet, x: wmX, y: wmY - 18, vx: 0, vy: -PLAYER_BULLET_SPEED, damage: wmDmg });
           }
         }
       }
