@@ -3995,7 +3995,7 @@ async function enter(core: Core): Promise<void> {
             invincibleMs = Math.max(invincibleMs, HEALTH_ITEM_INVINCIBLE_MS);
           } else if (item.type === 'gift') {
             // Moose costume gift box: apply a random buff
-            const picked = pickRandomBuffs(1, [...(isEndless ? endlessState.buffs : []), ...giftBuffs]);
+            const picked = pickRandomBuffs(1, [...(isEndless ? endlessState.buffs : []), ...giftBuffs], buildStatContext());
             if (picked.length > 0) {
               applyGiftBuff(picked[0].id);
             }
