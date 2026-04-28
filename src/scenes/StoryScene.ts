@@ -17,6 +17,7 @@ const CHAPTERS: ChapterEntry[] = [
   { number: '第二章', title: '第一次對決',   subtitle: '初戰告捷，卻留下疑問' },
   { number: '第三章', title: '幽靈之謎',     subtitle: '神秘的幻影在暗中窺視' },
   { number: '第四章', title: '混沌的降臨',   subtitle: '星空深處的真正主人現身' },
+  { number: '第五章', title: '水晶守衛的試煉', subtitle: '前往水晶塔，拯救祖父' },
 ];
 
 const CHAPTER_ITEM_H = 88;
@@ -93,6 +94,7 @@ async function enter(core: Core): Promise<void> {
       2: 'story_ch2',
       3: 'story_ch3',
       4: 'story_ch4',
+      5: 'story_ch5',
     };
     return keys[idx] ?? null;
   }
@@ -100,7 +102,7 @@ async function enter(core: Core): Promise<void> {
   for (let i = 0; i < CHAPTERS.length; i++) {
     const ch = CHAPTERS[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
-    // Chapter 0 (prologue), Chapter 1 (index 1), Chapter 2 (index 2), Chapter 3 (index 3), and Chapter 4 (index 4) are playable; all others are coming soon
+    // Chapters 0–5 are playable; all others are coming soon
     const isPlayable = chapterSceneKey(i) !== null;
 
     const item = new Container();
