@@ -149,6 +149,75 @@ async function main(): Promise<void> {
             },
           );
 
+          // ── Persistence error notification overlay ──────────────────────────
+          const SAVE_W = 310;
+          const SAVE_H = 70;
+          const saveContainer = new Container();
+          saveContainer.alpha = 0;
+          saveContainer.x = (GAME_W - SAVE_W) / 2;
+          saveContainer.y = 144;
+          sysLayer.addChild(saveContainer);
+
+          const saveBg = new Graphics();
+          saveBg
+            .roundRect(0, 0, SAVE_W, SAVE_H, 12)
+            .fill({ color: 0x331111, alpha: 0.95 });
+          saveBg
+            .roundRect(0, 0, SAVE_W, SAVE_H, 12)
+            .stroke({ color: 0xff6666, width: 2 });
+          saveContainer.addChild(saveBg);
+
+          const saveTitleText = new Text({
+            text: TEXT.persistence.errorToastTitle,
+            style: new TextStyle({
+              fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+              fontSize: 14,
+              fill: 0xffaaaa,
+              fontWeight: 'bold',
+            }),
+          });
+          saveTitleText.x = 12;
+          saveTitleText.y = 8;
+          saveContainer.addChild(saveTitleText);
+
+          const saveBodyText = new Text({
+            text: TEXT.persistence.errorToastBody,
+            style: new TextStyle({
+              fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+              fontSize: 12,
+              fill: 0xffdddd,
+              wordWrap: true,
+              wordWrapWidth: SAVE_W - 24,
+            }),
+          });
+          saveBodyText.x = 12;
+          saveBodyText.y = 30;
+          saveContainer.addChild(saveBodyText);
+
+          let saveHideTimer = 0;
+          c.events.on(
+            'game-bootstrap',
+            'persistence/error',
+            () => {
+              c.events.emitSync('tween/kill', { target: saveContainer as unknown as Record<string, unknown> });
+              c.events.emitSync('tween/to', {
+                target: saveContainer as unknown as Record<string, unknown>,
+                props: { alpha: 1 },
+                duration: 250,
+                ease: 'easeOutQuad',
+              });
+              clearTimeout(saveHideTimer);
+              saveHideTimer = window.setTimeout(() => {
+                c.events.emitSync('tween/to', {
+                  target: saveContainer as unknown as Record<string, unknown>,
+                  props: { alpha: 0 },
+                  duration: 500,
+                  ease: 'easeInQuad',
+                });
+              }, 4200);
+            },
+          );
+
           // ── DPR & canvas scaling ────────────────────────────────────────────
           const dpr = window.devicePixelRatio || 1;
           c.app.renderer.resolution = dpr;
@@ -167,8 +236,11 @@ async function main(): Promise<void> {
           c.events.on('game-bootstrap', 'core/destroy', () => {
             window.removeEventListener('resize', scaleCanvas);
             clearTimeout(achHideTimer);
+            clearTimeout(saveHideTimer);
             sysLayer.removeChild(achContainer);
+            sysLayer.removeChild(saveContainer);
             achContainer.destroy({ children: true });
+            saveContainer.destroy({ children: true });
           });
 
           // ── Camera origin ───────────────────────────────────────────────────

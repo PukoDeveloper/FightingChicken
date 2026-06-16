@@ -3,6 +3,7 @@ import type { Core } from '@inkshot/engine';
 import { devConfig } from '../game/store';
 import { clearProgress, exportProgress, importProgress } from '../game/persistence';
 import { PLAYER_MOVE_SPEED, ITEM_FALL_SPEED } from '../constants';
+import { TEXT } from '../game/i18n';
 
 // ─── DevMenu overlay (HTML) ──────────────────────────────────────────────────
 // Renders a simple HTML panel on top of the canvas so we can use native
@@ -137,6 +138,12 @@ async function enter(core: Core): Promise<void> {
   const importFileInput = panel.querySelector<HTMLInputElement>('#dev-import-file')!;
   const importStatus    = panel.querySelector<HTMLElement>('#dev-import-status')!;
 
+  function setStatus(message: string, color: string): void {
+    importStatus.style.display = 'block';
+    importStatus.style.color = color;
+    importStatus.textContent = message;
+  }
+
   speedSlider.addEventListener('input', () => {
     devConfig.playerMoveSpeed = Number(speedSlider.value);
     speedVal.textContent = `${devConfig.playerMoveSpeed} px/s`;
@@ -171,12 +178,24 @@ async function enter(core: Core): Promise<void> {
   });
 
   clearYesBtn.addEventListener('click', async () => {
-    await clearProgress();
-    window.location.reload();
+    const result = await clearProgress();
+    if (result.ok) {
+      setStatus(TEXT.persistence.clearSuccess, '#aaffcc');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      setStatus(TEXT.persistence.clearFailure(result.message), '#ffaaaa');
+      clearConfirm.style.display = 'none';
+      clearDataBtn.style.display = 'inline-block';
+    }
   });
 
   exportBtn.addEventListener('click', () => {
-    exportProgress();
+    const result = exportProgress();
+    if (result.ok) {
+      setStatus(TEXT.persistence.exportSuccess, '#aaffcc');
+    } else {
+      setStatus(TEXT.persistence.exportFailure(result.message), '#ffaaaa');
+    }
   });
 
   importBtn.addEventListener('click', () => {
@@ -186,19 +205,20 @@ async function enter(core: Core): Promise<void> {
   importFileInput.addEventListener('change', async () => {
     const file = importFileInput.files?.[0];
     if (!file) return;
-    importStatus.style.display = 'block';
-    importStatus.style.color = '#aaccff';
-    importStatus.textContent = '⏳ 正在匯入...';
+    setStatus('⏳ 正在匯入...', '#aaccff');
     try {
       const text = await file.text();
       const data = JSON.parse(text) as Record<string, unknown>;
-      await importProgress(data);
-      importStatus.style.color = '#aaffcc';
-      importStatus.textContent = '✅ 匯入成功！頁面即將重新載入…';
-      setTimeout(() => window.location.reload(), 1200);
-    } catch {
-      importStatus.style.color = '#ffaaaa';
-      importStatus.textContent = '❌ 匯入失敗：檔案格式不正確';
+      const result = await importProgress(data);
+      if (result.ok) {
+        setStatus(TEXT.persistence.importSuccess, '#aaffcc');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        setStatus(TEXT.persistence.importFailure(result.message), '#ffaaaa');
+      }
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : TEXT.persistence.invalidImportFile;
+      setStatus(TEXT.persistence.importFailure(message), '#ffaaaa');
     }
     // Reset file input so the same file can be re-selected if needed.
     importFileInput.value = '';

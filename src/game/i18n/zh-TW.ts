@@ -80,6 +80,17 @@ export const zhTW = {
     unlockedToastTitle: '🏆 成就解鎖！',
     backButton: '← 返回',
   },
+  persistence: {
+    errorToastTitle: '⚠️ 存檔失敗',
+    errorToastBody: '進度可能尚未保存，請確認瀏覽器儲存空間或隱私模式設定。',
+    exportSuccess: '✅ 匯出成功',
+    exportFailure: (message: string): string => `❌ 匯出失敗：${message}`,
+    importSuccess: '✅ 匯入成功！頁面即將重新載入…',
+    importFailure: (message: string): string => `❌ 匯入失敗：${message}`,
+    clearSuccess: '✅ 存檔已清除，頁面即將重新載入…',
+    clearFailure: (message: string): string => `❌ 清除失敗：${message}`,
+    invalidImportFile: '檔案格式不正確',
+  },
   levelSelect: {
     title: '選擇關卡',
     levelNumber: (level: number): string => `第 ${level} 關`,
