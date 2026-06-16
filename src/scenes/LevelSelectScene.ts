@@ -98,6 +98,7 @@ async function enter(core: Core): Promise<void> {
   const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444, 0x44aaff, 0xcc44ff, 0xff6600];
   const btnW = 260, btnH = 68, btnGap = 16;
   const levelBtns: Container[] = [];
+  const levelUnlocked: boolean[] = [];
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
     const cfg = createLevel(i);
@@ -154,6 +155,7 @@ async function enter(core: Core): Promise<void> {
     btn.y = scrollTop + btnH / 2 + (i - 1) * (btnH + btnGap);
     listContent.addChild(btn);
     levelBtns.push(btn);
+    levelUnlocked.push(unlocked);
   }
 
   // Total content height so we can clamp scrolling
@@ -223,7 +225,7 @@ async function enter(core: Core): Promise<void> {
       dragging = false;
       totalDragDist = 0;
       if (wasTap) {
-        if (!unlocked) {
+        if (!levelUnlocked[idx]) {
           sfxMenuClick();
           return;
         }
