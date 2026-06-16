@@ -17,6 +17,8 @@ import {
   COL_BULLET_SNIPER,
   SHOCKWAVE_EXPAND_SPEED,
   BUBBLE_SPEED,
+  PHASE2_FRAC,
+  PHASE3_FRAC,
   TELEPORT_WARN_MS,
   SNIPER_WARN_MS,
 } from '../constants';
@@ -146,6 +148,11 @@ export interface LevelConfig {
   /** Determines which enemy sprite & mechanics theme is active. */
   enemyType: EnemyType;
   waves: WaveConfig[];
+  /**
+   * Optional final-phase guardian encounter. This keeps boss-specific phase-3
+   * events data-driven instead of hard-coded by level number in GameScene.
+   */
+  guardianPetFinale?: 'chaos' | 'dragon';
   /**
    * Multiplier applied to item spawn intervals (< 1 = more frequent drops).
    * Defaults to 1.0 when omitted.
@@ -557,6 +564,7 @@ const LEVEL_5: LevelConfig = {
   levelNumber: 5,
   name: '混沌深淵',
   enemyType: 'chaos',
+  guardianPetFinale: 'chaos',
   itemDropMult: 0.65,
   waves: [
     {
@@ -915,6 +923,7 @@ const LEVEL_8: LevelConfig = {
   levelNumber: 8,
   name: '龍王之戰',
   enemyType: 'dragon',
+  guardianPetFinale: 'dragon',
   itemDropMult: 0.80,
   waves: [
     {
@@ -1035,7 +1044,219 @@ const LEVEL_8: LevelConfig = {
   ],
 };
 
-const LEVELS: LevelConfig[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8];
+// ─── Scaled late-game progression helpers ────────────────────────────────────
+
+type PhaseScale = {
+  /** Raises pattern density by shortening active intervals. */
+  density: number;
+  /** Multiplies bullet speeds and ring expansion speeds. */
+  speed: number;
+  /** Multiplies way/count values for active volleys. */
+  count: number;
+  /** Multiplies HP independently from pattern pressure. */
+  hp: number;
+};
+
+const INTERVAL_KEYS: (keyof WavePhaseConfig)[] = [
+  'spiralInterval',
+  'aimInterval',
+  'spreadInterval',
+  'ringInterval',
+  'shockwaveInterval',
+  'bubbleInterval',
+  'bombInterval',
+  'laserInterval',
+  'curveInterval',
+  'straightInterval',
+  'flameInterval',
+  'groundSlamInterval',
+  'scatterInterval',
+  'sniperInterval',
+  'teleportInterval',
+];
+
+const COUNT_KEYS: (keyof WavePhaseConfig)[] = [
+  'spiralWays',
+  'aimWays',
+  'spreadWays',
+  'ringCount',
+  'bubbleCount',
+  'bombCount',
+  'bombRingCount',
+  'laserCount',
+  'curveWays',
+  'straightCount',
+  'flameWaves',
+  'flameCount',
+  'groundSlamRings',
+  'scatterCount',
+];
+
+const SPEED_KEYS: (keyof WavePhaseConfig)[] = [
+  'spiralSpeed',
+  'aimSpeed',
+  'spreadSpeed',
+  'ringSpeed',
+  'shockwaveSpeed',
+  'bubbleSpeed',
+  'bombRingSpeed',
+  'laserSpeed',
+  'curveSpeed',
+  'straightSpeed',
+  'flameSpeed',
+  'groundSlamSpeed',
+  'scatterSpeedMin',
+  'scatterSpeedMax',
+  'sniperSpeed',
+];
+
+function roundToStep(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
+function scaleActiveInterval(value: number, density: number): number {
+  if (value <= 0) return 0;
+  return Math.max(280, roundToStep(value / density, 25));
+}
+
+function scaleActiveCount(value: number, count: number): number {
+  if (value <= 0) return value;
+  return Math.max(1, Math.round(value * count));
+}
+
+function scaleActiveSpeed(value: number, speed: number): number {
+  if (value <= 0) return value;
+  return Math.max(60, roundToStep(value * speed, 5));
+}
+
+function scalePhase(base: WavePhaseConfig, scale: PhaseScale, phaseIndex: number): WavePhaseConfig {
+  const phasePressure = 1 + phaseIndex * 0.04;
+  const scaled: WavePhaseConfig = { ...base };
+
+  for (const key of INTERVAL_KEYS) {
+    scaled[key] = scaleActiveInterval(base[key], scale.density * phasePressure);
+  }
+  for (const key of COUNT_KEYS) {
+    scaled[key] = scaleActiveCount(base[key], scale.count * (1 + phaseIndex * 0.03));
+  }
+  for (const key of SPEED_KEYS) {
+    scaled[key] = scaleActiveSpeed(base[key], scale.speed);
+  }
+
+  if (base.bombFuseMs > 0) {
+    scaled.bombFuseMs = Math.max(1500, roundToStep(base.bombFuseMs / Math.sqrt(scale.density), 50));
+  }
+  if (base.flameWaveGapMs > 0) {
+    scaled.flameWaveGapMs = Math.max(120, roundToStep(base.flameWaveGapMs / Math.sqrt(scale.density), 10));
+  }
+  if (base.groundSlamGapMs > 0) {
+    scaled.groundSlamGapMs = Math.max(110, roundToStep(base.groundSlamGapMs / Math.sqrt(scale.density), 10));
+  }
+  if (base.sniperWarnMs > 0) {
+    scaled.sniperWarnMs = Math.max(580, roundToStep(base.sniperWarnMs / Math.sqrt(scale.density), 25));
+  }
+  if (base.curveTurnRate > 0) {
+    scaled.curveTurnRate = Number((base.curveTurnRate * Math.sqrt(scale.speed)).toFixed(2));
+  }
+
+  return scaled;
+}
+
+function scaleWave(
+  base: WaveConfig,
+  waveNumber: number,
+  scale: PhaseScale,
+  movement?: Pick<WaveConfig, 'enemyTracksPlayer' | 'enemySineMoves' | 'enemySineAmplitude' | 'enemySinePeriodMs'>,
+): WaveConfig {
+  return {
+    waveNumber,
+    enemyHp: Math.max(120, roundToStep(base.enemyHp * scale.hp, 5)),
+    phase2Frac: PHASE2_FRAC,
+    phase3Frac: PHASE3_FRAC,
+    phases: [
+      scalePhase(base.phases[0], scale, 0),
+      scalePhase(base.phases[1], scale, 1),
+      scalePhase(base.phases[2], scale, 2),
+    ],
+    enemyTracksPlayer: movement?.enemyTracksPlayer ?? base.enemyTracksPlayer,
+    enemySineMoves: movement?.enemySineMoves ?? base.enemySineMoves,
+    enemySineAmplitude: movement?.enemySineAmplitude ?? base.enemySineAmplitude,
+    enemySinePeriodMs: movement?.enemySinePeriodMs ?? base.enemySinePeriodMs,
+  };
+}
+
+// ─── Level 9 · 機械風暴 (hybrid Mech/Storm pressure) ──────────────────────────
+
+const LEVEL_9: LevelConfig = {
+  levelNumber: 9,
+  name: '機械風暴',
+  enemyType: 'mech',
+  itemDropMult: 0.78,
+  waves: [
+    scaleWave(LEVEL_6.waves[0], 1, { hp: 1.12, density: 1.04, speed: 1.03, count: 1.04 }, { enemyTracksPlayer: true }),
+    scaleWave(LEVEL_7.waves[0], 2, { hp: 1.05, density: 1.08, speed: 1.04, count: 1.04 }, { enemySineMoves: true, enemySineAmplitude: 120, enemySinePeriodMs: 2100 }),
+    scaleWave(LEVEL_6.waves[1], 3, { hp: 1.18, density: 1.12, speed: 1.05, count: 1.08 }, { enemyTracksPlayer: true }),
+  ],
+};
+
+// ─── Level 10 · 風暴龍影 (Storm control + Dragon fire) ────────────────────────
+
+const LEVEL_10: LevelConfig = {
+  levelNumber: 10,
+  name: '風暴龍影',
+  enemyType: 'storm',
+  itemDropMult: 0.74,
+  waves: [
+    scaleWave(LEVEL_7.waves[1], 1, { hp: 1.10, density: 1.08, speed: 1.04, count: 1.05 }, { enemySineMoves: true, enemySineAmplitude: 145, enemySinePeriodMs: 1900 }),
+    scaleWave(LEVEL_8.waves[1], 2, { hp: 1.00, density: 1.10, speed: 1.05, count: 1.05 }, { enemyTracksPlayer: true }),
+    scaleWave(LEVEL_7.waves[2], 3, { hp: 1.12, density: 1.15, speed: 1.06, count: 1.08 }, { enemySineMoves: true, enemySineAmplitude: 160, enemySinePeriodMs: 1700 }),
+  ],
+};
+
+// ─── Level 11 · 龍王再臨 (extended Dragon rematch) ────────────────────────────
+
+const LEVEL_11: LevelConfig = {
+  levelNumber: 11,
+  name: '龍王再臨',
+  enemyType: 'dragon',
+  guardianPetFinale: 'dragon',
+  itemDropMult: 0.70,
+  waves: [
+    scaleWave(LEVEL_8.waves[0], 1, { hp: 1.08, density: 1.06, speed: 1.04, count: 1.03 }),
+    scaleWave(LEVEL_8.waves[1], 2, { hp: 1.10, density: 1.10, speed: 1.05, count: 1.06 }),
+    scaleWave(LEVEL_8.waves[2], 3, { hp: 1.12, density: 1.14, speed: 1.06, count: 1.08 }, { enemyTracksPlayer: true }),
+    scaleWave(LEVEL_8.waves[3], 4, { hp: 1.16, density: 1.18, speed: 1.07, count: 1.10 }, { enemyTracksPlayer: true }),
+  ],
+};
+
+// ─── Level 12 · 虛空核心 (final mixed-pattern gauntlet) ───────────────────────
+
+const LEVEL_12: LevelConfig = {
+  levelNumber: 12,
+  name: '虛空核心',
+  enemyType: 'blackhole',
+  itemDropMult: 0.68,
+  waves: [
+    scaleWave(LEVEL_5.waves[3], 1, { hp: 1.12, density: 1.10, speed: 1.05, count: 1.06 }),
+    scaleWave(LEVEL_10.waves[2], 2, { hp: 1.10, density: 1.08, speed: 1.04, count: 1.04 }, { enemySineMoves: true, enemySineAmplitude: 165, enemySinePeriodMs: 1650 }),
+    scaleWave(LEVEL_11.waves[3], 3, { hp: 1.10, density: 1.10, speed: 1.04, count: 1.06 }, { enemyTracksPlayer: true }),
+  ],
+};
+
+const LEVELS: LevelConfig[] = [
+  LEVEL_1,
+  LEVEL_2,
+  LEVEL_3,
+  LEVEL_4,
+  LEVEL_5,
+  LEVEL_6,
+  LEVEL_7,
+  LEVEL_8,
+  LEVEL_9,
+  LEVEL_10,
+  LEVEL_11,
+  LEVEL_12,
+];
 
 /** Total number of defined levels. */
 export const TOTAL_LEVELS = LEVELS.length;

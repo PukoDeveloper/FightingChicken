@@ -16,118 +16,97 @@
 
 import type { Core } from '@inkshot/engine';
 import { costumeState } from './store';
+import { TOTAL_LEVELS } from './levels';
+import { createAchievementTexts } from './i18n';
+import type { AchievementTextId } from './i18n';
 
 export type AchievementDef = { name: string; description: string };
+export type AchievementId = AchievementTextId;
 
-export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = {
-  first_win:       { name: '初次勝利 🎉',   description: '首次擊敗勇氣！' },
-  level_all_clear: { name: '全關通關 🏅',   description: '通關全部 5 關' },
-  no_damage:       { name: '無傷英雄 🛡',   description: '通關一關且全程未受傷' },
-  score_1000:      { name: '得分高手 ⭐',   description: '單局得分達到 1 000' },
-  score_10000:     { name: '傳說分數 💫',   description: '單局得分達到 10 000' },
-  endless_wave_10: { name: '波浪挑戰者 🌊', description: '在無盡模式通過第 10 波' },
-  endless_wave_25: { name: '無盡鬥士 ⚔️',  description: '在無盡模式通過第 25 波' },
-  endless_wave_50: { name: '不滅傳說 👑',  description: '在無盡模式通過第 50 波' },
-  collector:       { name: '收藏家 🎁',    description: '累計收集 30 個道具' },
+export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = createAchievementTexts(TOTAL_LEVELS);
+
+type AchievementRegistration = {
+  id: AchievementId;
+  triggerEvent: string;
+  threshold?: number;
+  triggerFilter?: (payload: unknown) => boolean;
 };
+
+function defineAchievement(core: Core, registration: AchievementRegistration): void {
+  const text = ACHIEVEMENT_DEFS[registration.id];
+  core.events.emitSync('achievement/define', {
+    achievement: {
+      id: registration.id,
+      name: text.name,
+      description: text.description,
+      triggerEvent: registration.triggerEvent,
+      threshold: registration.threshold,
+      triggerFilter: registration.triggerFilter,
+    },
+  });
+}
 
 export function initAchievements(core: Core): void {
   // ── Level mode ──────────────────────────────────────────────────────────────
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'first_win',
-      name: '初次勝利 🎉',
-      description: '首次擊敗勇氣！',
-      triggerEvent: 'game/win',
+  defineAchievement(core, {
+    id: 'first_win',
+    triggerEvent: 'game/win',
+  });
+
+  defineAchievement(core, {
+    id: 'level_all_clear',
+    triggerEvent: 'game/win',
+    triggerFilter: (payload: unknown) => {
+      const { isNewClear } = payload as { isNewClear: boolean };
+      return isNewClear && costumeState.clearedLevels.size >= TOTAL_LEVELS;
     },
   });
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'level_all_clear',
-      name: '全關通關 🏅',
-      description: '通關全部 5 關',
-      triggerEvent: 'game/win',
-      triggerFilter: (payload: unknown) => {
-        const { isNewClear } = payload as { isNewClear: boolean };
-        return isNewClear && costumeState.clearedLevels.size >= 5;
-      },
-    },
-  });
-
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'no_damage',
-      name: '無傷英雄 🛡',
-      description: '通關一關且全程未受傷',
-      triggerEvent: 'game/no_damage_win',
-    },
+  defineAchievement(core, {
+    id: 'no_damage',
+    triggerEvent: 'game/no_damage_win',
   });
 
   // ── Score ───────────────────────────────────────────────────────────────────
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'score_1000',
-      name: '得分高手 ⭐',
-      description: '單局得分達到 1 000',
-      triggerEvent: 'game/score_1000',
-    },
+  defineAchievement(core, {
+    id: 'score_1000',
+    triggerEvent: 'game/score_1000',
   });
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'score_10000',
-      name: '傳說分數 💫',
-      description: '單局得分達到 10 000',
-      triggerEvent: 'game/score_10000',
-    },
+  defineAchievement(core, {
+    id: 'score_10000',
+    triggerEvent: 'game/score_10000',
   });
 
   // ── Endless mode ────────────────────────────────────────────────────────────
 
   type EndlessWavePayload = { wave: number };
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'endless_wave_10',
-      name: '波浪挑戰者 🌊',
-      description: '在無盡模式通過第 10 波',
-      triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 10,
-    },
+  defineAchievement(core, {
+    id: 'endless_wave_10',
+    triggerEvent: 'game/endless_wave',
+    triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 10,
   });
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'endless_wave_25',
-      name: '無盡鬥士 ⚔️',
-      description: '在無盡模式通過第 25 波',
-      triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 25,
-    },
+  defineAchievement(core, {
+    id: 'endless_wave_25',
+    triggerEvent: 'game/endless_wave',
+    triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 25,
   });
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'endless_wave_50',
-      name: '不滅傳說 👑',
-      description: '在無盡模式通過第 50 波',
-      triggerEvent: 'game/endless_wave',
-      triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 50,
-    },
+  defineAchievement(core, {
+    id: 'endless_wave_50',
+    triggerEvent: 'game/endless_wave',
+    triggerFilter: (payload: unknown) => (payload as EndlessWavePayload).wave >= 50,
   });
 
   // ── Collector ───────────────────────────────────────────────────────────────
 
-  core.events.emitSync('achievement/define', {
-    achievement: {
-      id: 'collector',
-      name: '收藏家 🎁',
-      description: '累計收集 30 個道具',
-      threshold: 30,
-      triggerEvent: 'game/item:collected',
-    },
+  defineAchievement(core, {
+    id: 'collector',
+    threshold: 30,
+    triggerEvent: 'game/item:collected',
   });
 }

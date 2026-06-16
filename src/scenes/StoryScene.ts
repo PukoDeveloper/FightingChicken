@@ -3,6 +3,7 @@ import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { startBgm, sfxMenuClick } from '../game/audio';
+import { TEXT } from '../game/i18n';
 
 // ─── Story chapter data ────────────────────────────────────────────────────
 interface ChapterEntry {
@@ -274,7 +275,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xccccff,
   });
-  const backText = new Text({ text: '回主選單', style: backStyle });
+  const backText = new Text({ text: TEXT.common.backToTitle, style: backStyle });
   backText.anchor.set(0.5);
   backBtn.addChild(backText);
 

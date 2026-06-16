@@ -2,9 +2,11 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { gameResult } from '../game/store';
+import { costumeState, gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
+import { TEXT } from '../game/i18n';
+import { isLevelUnlocked } from '../game/levelProgression';
 
 let _cleanup: (() => void) | null = null;
 
@@ -36,7 +38,7 @@ async function enter(core: Core): Promise<void> {
     stroke: { color: 0x330000, width: 4 },
     dropShadow: { color: 0xff0000, distance: 3, alpha: 0.85, blur: 2 },
   });
-  const titleLabel = new Text({ text: '選擇關卡', style: titleStyle });
+  const titleLabel = new Text({ text: TEXT.levelSelect.title, style: titleStyle });
   titleLabel.anchor.set(0.5);
   titleLabel.x = W * 0.5;
   titleLabel.y = H * 0.12;
@@ -60,7 +62,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xccccff,
   });
-  const backText = new Text({ text: '回主選單', style: backStyle });
+  const backText = new Text({ text: TEXT.common.backToTitle, style: backStyle });
   backText.anchor.set(0.5);
   backBtn.addChild(backText);
 
@@ -98,18 +100,23 @@ async function enter(core: Core): Promise<void> {
   const levelBorderColors = [0x44ff44, 0xffaa33, 0xff88ff, 0x44bbff, 0xff4444, 0x44aaff, 0xcc44ff, 0xff6600];
   const btnW = 260, btnH = 68, btnGap = 16;
   const levelBtns: Container[] = [];
+  const levelUnlocked: boolean[] = [];
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
     const cfg = createLevel(i);
+    const unlocked = isLevelUnlocked(i, costumeState.clearedLevels);
+    const highScore = gameResult.levelHighScores[i] ?? 0;
     const btn = new Container();
     btn.eventMode = 'static';
-    btn.cursor = 'pointer';
+    btn.cursor = unlocked ? 'pointer' : 'default';
 
     const bg = new Graphics();
+    const baseColor = levelColors[(i - 1) % levelColors.length];
+    const borderColor = levelBorderColors[(i - 1) % levelBorderColors.length];
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .fill({ color: levelColors[i - 1], alpha: 0.88 });
+      .fill({ color: unlocked ? baseColor : 0x15151d, alpha: unlocked ? 0.88 : 0.72 });
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .stroke({ color: levelBorderColors[i - 1], width: 2.5 });
+      .stroke({ color: unlocked ? borderColor : 0x444455, width: 2.5 });
     btn.addChild(bg);
 
     const numStyle = new TextStyle({
@@ -117,7 +124,7 @@ async function enter(core: Core): Promise<void> {
       fontSize: 12,
       fill: 0xaaaaaa,
     });
-    const numLabel = new Text({ text: `第 ${i} 關`, style: numStyle });
+    const numLabel = new Text({ text: TEXT.levelSelect.levelNumber(i), style: numStyle });
     numLabel.anchor.set(0.5);
     numLabel.y = -20;
     btn.addChild(numLabel);
@@ -126,7 +133,7 @@ async function enter(core: Core): Promise<void> {
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 24,
       fontWeight: 'bold',
-      fill: 0xffffff,
+      fill: unlocked ? 0xffffff : 0x777788,
     });
     const nameLabel = new Text({ text: cfg.name, style: nameStyle });
     nameLabel.anchor.set(0.5);
@@ -138,7 +145,10 @@ async function enter(core: Core): Promise<void> {
       fontSize: 12,
       fill: 0xdddddd,
     });
-    const waveLabel = new Text({ text: `${cfg.waves.length} 波`, style: waveStyle });
+    const waveText = unlocked
+      ? `${TEXT.levelSelect.waves(cfg.waves.length)}${highScore > 0 ? ` · ${TEXT.levelSelect.highScore(highScore)}` : ''}`
+      : TEXT.levelSelect.locked(i - 1);
+    const waveLabel = new Text({ text: waveText, style: waveStyle });
     waveLabel.anchor.set(0.5);
     waveLabel.y = 24;
     btn.addChild(waveLabel);
@@ -147,6 +157,7 @@ async function enter(core: Core): Promise<void> {
     btn.y = scrollTop + btnH / 2 + (i - 1) * (btnH + btnGap);
     listContent.addChild(btn);
     levelBtns.push(btn);
+    levelUnlocked.push(unlocked);
   }
 
   // Total content height so we can clamp scrolling
@@ -216,6 +227,10 @@ async function enter(core: Core): Promise<void> {
       dragging = false;
       totalDragDist = 0;
       if (wasTap) {
+        if (!levelUnlocked[idx]) {
+          sfxMenuClick();
+          return;
+        }
         sfxMenuClick();
         gameResult.currentLevel = idx + 1;
         await core.events.emit('scene/load', { key: 'skillselect' });
@@ -224,7 +239,9 @@ async function enter(core: Core): Promise<void> {
 
     btn.on('pointerupoutside', onPointerUp);
     btn.on('pointercancel',    onPointerUp);
-    btn.on('pointerover', () => btn.scale.set(1.04));
+    btn.on('pointerover', () => {
+      if (levelUnlocked[idx]) btn.scale.set(1.04);
+    });
     btn.on('pointerout',  () => btn.scale.set(1.0));
   });
 

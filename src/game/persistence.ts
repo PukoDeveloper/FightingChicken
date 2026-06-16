@@ -18,6 +18,51 @@ const SLOT_ID = 'progress';
 /** Module-level reference to `Core`, set by {@link initPersistence}. */
 let _core: Core | null = null;
 
+export type PersistenceOperation = 'save' | 'load' | 'export' | 'import' | 'clear';
+
+export type PersistenceResult =
+  | { ok: true }
+  | { ok: false; operation: PersistenceOperation; message: string; error: unknown };
+
+let _lastPersistenceError: Extract<PersistenceResult, { ok: false }> | null = null;
+
+function persistenceOk(): PersistenceResult {
+  _lastPersistenceError = null;
+  return { ok: true };
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.length > 0) return error;
+  return 'Unknown persistence error';
+}
+
+function reportPersistenceFailure(
+  operation: PersistenceOperation,
+  error: unknown,
+  notify = true,
+): PersistenceResult {
+  const failure: Extract<PersistenceResult, { ok: false }> = {
+    ok: false,
+    operation,
+    message: errorMessage(error),
+    error,
+  };
+  _lastPersistenceError = failure;
+  console.warn(`[persistence] ${operation} failed: ${failure.message}`, error);
+  if (notify && _core) {
+    _core.events.emitSync('persistence/error', {
+      operation,
+      message: failure.message,
+    });
+  }
+  return failure;
+}
+
+export function getLastPersistenceError(): Extract<PersistenceResult, { ok: false }> | null {
+  return _lastPersistenceError;
+}
+
 /**
  * Initialise the persistence module.
  * Must be called once during game bootstrap (before the first scene loads)
@@ -32,8 +77,8 @@ export function initPersistence(core: Core): void {
  * Persist the current player progress via the engine's SaveManager.
  * Returns a Promise that resolves once the slot has been written to storage.
  */
-export async function saveProgress(): Promise<void> {
-  if (!_core) return;
+export async function saveProgress(): Promise<PersistenceResult> {
+  if (!_core) return reportPersistenceFailure('save', new Error('Persistence module has not been initialised'), false);
   try {
     // Snapshot achievement states so they are included in the slot patch before
     // the storage adapter writes.  The AchievementPlugin hooks into the
@@ -68,8 +113,9 @@ export async function saveProgress(): Promise<void> {
       },
     });
     await _core.events.emit('save/slot:save', { id: SLOT_ID });
-  } catch {
-    // Silently ignore write failures (e.g., private-browsing quota exceeded).
+    return persistenceOk();
+  } catch (error) {
+    return reportPersistenceFailure('save', error);
   }
 }
 
@@ -77,15 +123,15 @@ export async function saveProgress(): Promise<void> {
  * Restore player progress from storage into the in-memory store.
  * Should be called once during game bootstrap before the first scene loads.
  */
-export async function loadProgress(): Promise<void> {
-  if (!_core) return;
+export async function loadProgress(): Promise<PersistenceResult> {
+  if (!_core) return reportPersistenceFailure('load', new Error('Persistence module has not been initialised'), false);
   try {
     const { output: loadOut } = await _core.events.emit('save/slot:load', { id: SLOT_ID });
-    if (!(loadOut as { loaded: boolean }).loaded) return;
+    if (!(loadOut as { loaded: boolean }).loaded) return persistenceOk();
 
     const { output: slotOut } = _core.events.emitSync('save/slot:get', { id: SLOT_ID });
     const data = (slotOut as { slot?: { data: Record<string, unknown> } }).slot?.data;
-    if (!data) return;
+    if (!data) return persistenceOk();
 
     if (data.levelHighScores && typeof data.levelHighScores === 'object') {
       for (const [key, val] of Object.entries(data.levelHighScores as Record<string, unknown>)) {
@@ -175,8 +221,9 @@ export async function loadProgress(): Promise<void> {
         wingmanState.equipped = data.equippedWingman as WingmanId;
       }
     }
-  } catch {
-    // Silently ignore corrupt or unreadable save data.
+    return persistenceOk();
+  } catch (error) {
+    return reportPersistenceFailure('load', error, false);
   }
 }
 
@@ -184,7 +231,7 @@ export async function loadProgress(): Promise<void> {
  * Export the current player progress as a downloadable JSON file.
  * Triggers a browser file download with a timestamped filename.
  */
-export function exportProgress(): void {
+export function exportProgress(): PersistenceResult {
   try {
     type AchievementEntry = { id: string; progress: number; unlockedAt: string | null };
     const achOut = _core?.events.emitSync('achievement/list', {})?.output as { achievements?: AchievementEntry[] } | undefined;
@@ -218,8 +265,9 @@ export function exportProgress(): void {
     a.download = `fightingchicken-save-${timestamp}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  } catch {
-    // Silently ignore export failures.
+    return persistenceOk();
+  } catch (error) {
+    return reportPersistenceFailure('export', error);
   }
 }
 
@@ -227,8 +275,8 @@ export function exportProgress(): void {
  * Import player progress from a plain-object snapshot (parsed from JSON).
  * Validates each field before writing to in-memory state, then persists.
  */
-export async function importProgress(data: Record<string, unknown>): Promise<void> {
-  if (!_core) return;
+export async function importProgress(data: Record<string, unknown>): Promise<PersistenceResult> {
+  if (!_core) return reportPersistenceFailure('import', new Error('Persistence module has not been initialised'), false);
   try {
     // Reset all state first so stale data is not carried over.
     gameResult.levelHighScores = {};
@@ -370,8 +418,9 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
       },
     });
     await _core.events.emit('save/slot:save', { id: SLOT_ID });
-  } catch {
-    // Silently ignore import failures.
+    return persistenceOk();
+  } catch (error) {
+    return reportPersistenceFailure('import', error);
   }
 }
 
@@ -379,8 +428,8 @@ export async function importProgress(data: Record<string, unknown>): Promise<voi
  * Clear all persisted player progress and reset in-memory store state to
  * its initial values.  Called from the developer menu to wipe records.
  */
-export async function clearProgress(): Promise<void> {
-  if (!_core) return;
+export async function clearProgress(): Promise<PersistenceResult> {
+  if (!_core) return reportPersistenceFailure('clear', new Error('Persistence module has not been initialised'), false);
   try {
     // Reset in-memory state.
     gameResult.levelHighScores = {};
@@ -418,7 +467,8 @@ export async function clearProgress(): Promise<void> {
       },
     });
     await _core.events.emit('save/slot:save', { id: SLOT_ID });
-  } catch {
-    // Silently ignore write failures.
+    return persistenceOk();
+  } catch (error) {
+    return reportPersistenceFailure('clear', error);
   }
 }

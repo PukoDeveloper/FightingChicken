@@ -4,6 +4,7 @@ import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { startBgm } from '../game/audio';
 import { ACHIEVEMENT_DEFS } from '../game/achievements';
+import { TEXT } from '../game/i18n';
 
 type AchEntry = {
   id: string;
@@ -44,7 +45,7 @@ async function enter(core: Core): Promise<void> {
     stroke: { color: 0x330000, width: 4 },
     dropShadow: { color: 0xff8800, distance: 3, alpha: 0.85, blur: 2 },
   });
-  const titleLabel = new Text({ text: '🏆 成就', style: titleStyle });
+  const titleLabel = new Text({ text: TEXT.achievements.sceneTitle, style: titleStyle });
   titleLabel.anchor.set(0.5);
   titleLabel.x = W * 0.5;
   titleLabel.y = 44;
@@ -145,7 +146,7 @@ async function enter(core: Core): Promise<void> {
   btn.addChild(btnBg);
 
   const btnText = new Text({
-    text: '← 返回',
+    text: TEXT.achievements.backButton,
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 20,
