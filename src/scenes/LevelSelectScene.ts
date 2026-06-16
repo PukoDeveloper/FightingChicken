@@ -6,6 +6,7 @@ import { costumeState, gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { TEXT } from '../game/i18n';
+import { isLevelUnlocked } from '../game/levelProgression';
 
 let _cleanup: (() => void) | null = null;
 
@@ -103,7 +104,7 @@ async function enter(core: Core): Promise<void> {
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
     const cfg = createLevel(i);
-    const unlocked = i === 1 || costumeState.clearedLevels.has(i - 1) || costumeState.clearedLevels.has(i);
+    const unlocked = isLevelUnlocked(i, costumeState.clearedLevels);
     const highScore = gameResult.levelHighScores[i] ?? 0;
     const btn = new Container();
     btn.eventMode = 'static';
@@ -238,7 +239,9 @@ async function enter(core: Core): Promise<void> {
 
     btn.on('pointerupoutside', onPointerUp);
     btn.on('pointercancel',    onPointerUp);
-    btn.on('pointerover', () => btn.scale.set(1.04));
+    btn.on('pointerover', () => {
+      if (levelUnlocked[idx]) btn.scale.set(1.04);
+    });
     btn.on('pointerout',  () => btn.scale.set(1.0));
   });
 

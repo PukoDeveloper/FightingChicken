@@ -97,12 +97,13 @@ import {
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState, wingmanState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
 import { WINGMAN_DEFS } from '../game/wingmen';
-import { createLevel, getStoryLevel, TOTAL_LEVELS } from '../game/levels';
+import { createLevel, getStoryLevel } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
 import type { BuffId, StatContext } from '../game/endless';
 import { createVoidWaveConfig } from '../game/void';
 import { resolveWaveClear, shouldStartGuardianFinale, usesDragonGuardianPets } from '../game/battleProgression';
+import { nextLevelAfterClear } from '../game/levelProgression';
 import { getEnemyDisplayName, TEXT } from '../game/i18n';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
@@ -314,6 +315,17 @@ interface TeleportEventData {
   warnMs: number;   // ms of warning remaining
   targetX: number;  // destination X
   display: Graphics; // pulsing warning circle at destination
+}
+
+interface EnemyHitParticleOptions {
+  startColor: number;
+  endColor: number;
+  burstCount?: number;
+  speed?: number;
+  speedVariance?: number;
+  lifetime?: number;
+  startScale?: number;
+  radius?: number;
 }
 
 // ─── Module-level cleanup handle ────────────────────────────────────────────
@@ -2334,6 +2346,66 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  function emitEnemyHitParticles(opts: EnemyHitParticleOptions): void {
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
+        y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
+        burst: true,
+        burstCount: opts.burstCount ?? 8,
+        speed: opts.speed ?? 90,
+        speedVariance: opts.speedVariance ?? 40,
+        spread: 180,
+        angle: 0,
+        lifetime: opts.lifetime ?? 350,
+        startAlpha: 1,
+        endAlpha: 0,
+        startScale: opts.startScale ?? 1,
+        endScale: 0,
+        startColor: opts.startColor,
+        endColor: opts.endColor,
+        radius: opts.radius ?? 4,
+      },
+    });
+  }
+
+  function updateScoreMilestones(): void {
+    if (!score1000Notified && score >= 1000) {
+      score1000Notified = true;
+      core.events.emitSync('game/score_1000', {});
+    }
+    if (!score10000Notified && score >= 10000) {
+      score10000Notified = true;
+      core.events.emitSync('game/score_10000', {});
+    }
+  }
+
+  function applyEnemyDamage(damage: number, particles: EnemyHitParticleOptions): boolean {
+    hitFlashTimer = 80;
+    sfxEnemyHit();
+
+    if (isVoid) {
+      // Black hole is invincible — accumulate damage, never deplete HP.
+      totalDamage += damage;
+    } else {
+      enemyHP = Math.max(0, enemyHP - damage);
+      score += SCORE_PER_HIT * damage;
+      updateScoreMilestones();
+    }
+
+    emitEnemyHitParticles(particles);
+
+    if (!isVoid) {
+      checkPhase();
+      if (enemyHP <= 0) {
+        handleEnemyDefeated();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   const unsubTouchStart = core.events.on(
     'game',
     'input/touch:start',
@@ -3409,58 +3481,12 @@ async function enter(core: Core): Promise<void> {
           const isCrit = critChance > 0 && Math.random() < critChance;
           const dmg = isCrit ? baseDmg * 2 : baseDmg;
           removeBullet(playerBullets, i, playerBulletsContainer, true);
-          hitFlashTimer = 80;
-          sfxEnemyHit();
-
-          if (isVoid) {
-            // Black hole is invincible — accumulate damage, never deplete HP.
-            totalDamage += dmg;
-          } else {
-            enemyHP = Math.max(0, enemyHP - dmg);
-            score += SCORE_PER_HIT * dmg;
-
-            // Score milestone achievements
-            if (!score1000Notified && score >= 1000) {
-              score1000Notified = true;
-              core.events.emitSync('game/score_1000', {});
-            }
-            if (!score10000Notified && score >= 10000) {
-              score10000Notified = true;
-              core.events.emitSync('game/score_10000', {});
-            }
-          }
 
           // Emit explosion particles (purple/violet for blackhole, orange otherwise)
           const pStart = isVoid ? 0xaa44ff : 0xff6600;
           const pEnd   = isVoid ? 0x6600cc : 0xff0000;
-          core.events.emitSync('particle/emit', {
-            config: {
-              x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
-              y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
-              burst: true,
-              burstCount: 8,
-              speed: 90,
-              speedVariance: 40,
-              spread: 180,
-              angle: 0,
-              lifetime: 350,
-              startAlpha: 1,
-              endAlpha: 0,
-              startScale: 1,
-              endScale: 0,
-              startColor: pStart,
-              endColor: pEnd,
-              radius: 4,
-            },
-          });
-
-          if (!isVoid) {
-            checkPhase();
-
-            if (enemyHP <= 0) {
-              handleEnemyDefeated();
-              return;
-            }
+          if (applyEnemyDamage(dmg, { startColor: pStart, endColor: pEnd })) {
+            return;
           }
         }
       }
@@ -3490,23 +3516,7 @@ async function enter(core: Core): Promise<void> {
             const edy = b.y - enemyEntity.position.y;
             if (Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
               removeBullet(enemyBullets, i, enemyBulletsContainer, false);
-              enemyHP = Math.max(0, enemyHP - 1);
-              hitFlashTimer = 80;
-              score += SCORE_PER_HIT;
-              sfxEnemyHit();
-              core.events.emitSync('particle/emit', {
-                config: {
-                  x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
-                  y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
-                  burst: true, burstCount: 8, speed: 90, speedVariance: 40,
-                  spread: 180, lifetime: 350, startAlpha: 1, endAlpha: 0,
-                  startScale: 1, endScale: 0,
-                  startColor: 0xff88cc, endColor: 0xff4488, radius: 4,
-                },
-              });
-              checkPhase();
-              if (enemyHP <= 0) {
-                handleEnemyDefeated();
+              if (applyEnemyDamage(1, { startColor: 0xff88cc, endColor: 0xff4488 })) {
                 return;
               }
             }
@@ -3760,46 +3770,21 @@ async function enter(core: Core): Promise<void> {
           const halfThick = SHOCKWAVE_THICKNESS / 2;
           if (Math.abs(edist - sw.radius) < halfThick + ENEMY_HITBOX_R) {
             sw.hitDealt = true;
-            hitFlashTimer = 80;
-            sfxEnemyHit();
 
             // Apply crit at hit time (consistent with all other player attack paths)
             const pulseHitDmg = critChance > 0 && Math.random() < critChance ? sw.damage * 2 : sw.damage;
 
-            if (isVoid) {
-              totalDamage += pulseHitDmg;
-            } else {
-              enemyHP = Math.max(0, enemyHP - pulseHitDmg);
-              score += SCORE_PER_HIT * pulseHitDmg;
-
-              // Score milestone achievements
-              if (!score1000Notified && score >= 1000) {
-                score1000Notified = true;
-                core.events.emitSync('game/score_1000', {});
-              }
-              if (!score10000Notified && score >= 10000) {
-                score10000Notified = true;
-                core.events.emitSync('game/score_10000', {});
-              }
-            }
-
-            core.events.emitSync('particle/emit', {
-              config: {
-                x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
-                y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
-                burst: true, burstCount: 12, speed: 100, speedVariance: 50,
-                spread: 180, lifetime: 420, startAlpha: 1, endAlpha: 0,
-                startScale: 1.2, endScale: 0,
-                startColor: sw.color, endColor: 0xffffff, radius: 5,
-              },
-            });
-
-            if (!isVoid) {
-              checkPhase();
-              if (enemyHP <= 0) {
-                handleEnemyDefeated();
-                return;
-              }
+            if (applyEnemyDamage(pulseHitDmg, {
+              startColor: sw.color,
+              endColor: 0xffffff,
+              burstCount: 12,
+              speed: 100,
+              speedVariance: 50,
+              lifetime: 420,
+              startScale: 1.2,
+              radius: 5,
+            })) {
+              return;
             }
           }
         }
@@ -4431,7 +4416,7 @@ async function enter(core: Core): Promise<void> {
         // Track cleared level for costume unlock system
         const isNewClear = !costumeState.clearedLevels.has(gameResult.currentLevel);
         costumeState.clearedLevels.add(gameResult.currentLevel);
-        gameResult.currentLevel = Math.min(gameResult.currentLevel + 1, TOTAL_LEVELS);
+        gameResult.currentLevel = nextLevelAfterClear(gameResult.currentLevel);
 
         // Award 宇宙灰燼 on level clear
         currencyState.cosmicAsh += 1;
