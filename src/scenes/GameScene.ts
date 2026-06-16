@@ -102,6 +102,7 @@ import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
 import type { BuffId, StatContext } from '../game/endless';
 import { createVoidWaveConfig } from '../game/void';
+import { resolveWaveClear, shouldStartGuardianFinale, usesDragonGuardianPets } from '../game/battleProgression';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
 import {
@@ -1608,16 +1609,15 @@ async function enter(core: Core): Promise<void> {
       }
       teleportEvents.length = 0;
 
-      // When entering phase 3 on the final wave of level 5 or 8: summon pet guardians
-      if (
-        newPhase === 3 &&
-        !petPhaseTriggered &&
-        !isEndless &&
-        (levelConfig?.levelNumber === 5 || levelConfig?.levelNumber === 8) &&
-        waveIdx === levelConfig.waves.length - 1
-      ) {
+      // Some bosses define a data-driven guardian finale for their final phase.
+      if (shouldStartGuardianFinale(levelConfig, {
+        isEndless,
+        newPhase,
+        waveIdx,
+        alreadyTriggered: petPhaseTriggered,
+      })) {
         petPhaseTriggered = true;
-        spawnPets(levelConfig.levelNumber === 8);
+        spawnPets(usesDragonGuardianPets(levelConfig));
       }
     }
   }
@@ -2323,6 +2323,19 @@ async function enter(core: Core): Promise<void> {
       tryActivateSkill();
     }
     return true;
+  }
+
+  async function handleEnemyDefeated(): Promise<void> {
+    score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
+
+    const resolution = resolveWaveClear(isEndless, waveIdx, levelConfig);
+    if (resolution.kind === 'endless') {
+      await advanceEndlessWave();
+    } else if (resolution.kind === 'nextWave') {
+      await advanceWave(resolution.nextWaveIdx);
+    } else {
+      await endGame(true);
+    }
   }
 
   const unsubTouchStart = core.events.on(
@@ -3449,17 +3462,7 @@ async function enter(core: Core): Promise<void> {
             checkPhase();
 
             if (enemyHP <= 0) {
-              score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
-              if (isEndless) {
-                advanceEndlessWave();
-              } else {
-                const nextWaveIdx = waveIdx + 1;
-                if (nextWaveIdx < levelConfig!.waves.length) {
-                  advanceWave(nextWaveIdx);
-                } else {
-                  endGame(true);
-                }
-              }
+              handleEnemyDefeated();
               return;
             }
           }
@@ -3507,17 +3510,7 @@ async function enter(core: Core): Promise<void> {
               });
               checkPhase();
               if (enemyHP <= 0) {
-                score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
-                if (isEndless) {
-                  advanceEndlessWave();
-                } else {
-                  const nextWaveIdx = waveIdx + 1;
-                  if (nextWaveIdx < levelConfig!.waves.length) {
-                    advanceWave(nextWaveIdx);
-                  } else {
-                    endGame(true);
-                  }
-                }
+                handleEnemyDefeated();
                 return;
               }
             }
@@ -3808,17 +3801,7 @@ async function enter(core: Core): Promise<void> {
             if (!isVoid) {
               checkPhase();
               if (enemyHP <= 0) {
-                score += waveMaxHp * SCORE_BONUS_WAVE_MULT;
-                if (isEndless) {
-                  advanceEndlessWave();
-                } else {
-                  const nextWaveIdx = waveIdx + 1;
-                  if (nextWaveIdx < levelConfig!.waves.length) {
-                    advanceWave(nextWaveIdx);
-                  } else {
-                    endGame(true);
-                  }
-                }
+                handleEnemyDefeated();
                 return;
               }
             }

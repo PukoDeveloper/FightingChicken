@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
-import { gameResult } from '../game/store';
+import { costumeState, gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 
@@ -101,15 +101,19 @@ async function enter(core: Core): Promise<void> {
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
     const cfg = createLevel(i);
+    const unlocked = i === 1 || costumeState.clearedLevels.has(i - 1) || costumeState.clearedLevels.has(i);
+    const highScore = gameResult.levelHighScores[i] ?? 0;
     const btn = new Container();
     btn.eventMode = 'static';
-    btn.cursor = 'pointer';
+    btn.cursor = unlocked ? 'pointer' : 'default';
 
     const bg = new Graphics();
+    const baseColor = levelColors[(i - 1) % levelColors.length];
+    const borderColor = levelBorderColors[(i - 1) % levelBorderColors.length];
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .fill({ color: levelColors[i - 1], alpha: 0.88 });
+      .fill({ color: unlocked ? baseColor : 0x15151d, alpha: unlocked ? 0.88 : 0.72 });
     bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, 12)
-      .stroke({ color: levelBorderColors[i - 1], width: 2.5 });
+      .stroke({ color: unlocked ? borderColor : 0x444455, width: 2.5 });
     btn.addChild(bg);
 
     const numStyle = new TextStyle({
@@ -126,7 +130,7 @@ async function enter(core: Core): Promise<void> {
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 24,
       fontWeight: 'bold',
-      fill: 0xffffff,
+      fill: unlocked ? 0xffffff : 0x777788,
     });
     const nameLabel = new Text({ text: cfg.name, style: nameStyle });
     nameLabel.anchor.set(0.5);
@@ -138,7 +142,10 @@ async function enter(core: Core): Promise<void> {
       fontSize: 12,
       fill: 0xdddddd,
     });
-    const waveLabel = new Text({ text: `${cfg.waves.length} 波`, style: waveStyle });
+    const waveText = unlocked
+      ? `${cfg.waves.length} 波${highScore > 0 ? ` · 最高 ${highScore}` : ''}`
+      : `🔒 通關第 ${i - 1} 關解鎖`;
+    const waveLabel = new Text({ text: waveText, style: waveStyle });
     waveLabel.anchor.set(0.5);
     waveLabel.y = 24;
     btn.addChild(waveLabel);
@@ -216,6 +223,10 @@ async function enter(core: Core): Promise<void> {
       dragging = false;
       totalDragDist = 0;
       if (wasTap) {
+        if (!unlocked) {
+          sfxMenuClick();
+          return;
+        }
         sfxMenuClick();
         gameResult.currentLevel = idx + 1;
         await core.events.emit('scene/load', { key: 'skillselect' });

@@ -46,6 +46,9 @@ async function enter(core: Core): Promise<void> {
     phantom:  '幽靈',
     chaos:    '混沌',
     mech:     '機甲',
+    storm:    '暴風魔',
+    dragon:   '龍王',
+    blackhole: '黑洞',
   };
   const bossName = bossNameMap[bossEnemyType] ?? '強敵';
 
