@@ -103,6 +103,7 @@ import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffe
 import type { BuffId, StatContext } from '../game/endless';
 import { createVoidWaveConfig } from '../game/void';
 import { resolveWaveClear, shouldStartGuardianFinale, usesDragonGuardianPets } from '../game/battleProgression';
+import { getEnemyDisplayName, TEXT } from '../game/i18n';
 import { SKILLS } from '../game/skills';
 import { saveProgress } from '../game/persistence';
 import {
@@ -817,13 +818,8 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffcccc,
     fontWeight: 'bold',
   });
-  const bossDisplayName = enemyTypeForDisplay === 'courage' ? '勇氣'
-    : enemyTypeForDisplay === 'phantom' ? '幽靈'
-    : enemyTypeForDisplay === 'mech' ? '機甲'
-    : enemyTypeForDisplay === 'blackhole' ? '黑洞'
-    : enemyTypeForDisplay === 'storm' ? '暴風魔'
-    : enemyTypeForDisplay === 'dragon' ? '龍王' : '混沌';
-  const bossLabelInitialText = isVoid ? `⏱ 剩餘時間` : `${bossDisplayName}  HP`;
+  const bossDisplayName = getEnemyDisplayName(enemyTypeForDisplay);
+  const bossLabelInitialText = isVoid ? TEXT.gameHud.voidTimerLabel : TEXT.gameHud.bossHpLabel(bossDisplayName);
   const bossLabel = new Text({ text: bossLabelInitialText, style: bossLabelStyle });
   bossLabel.anchor.set(0.5);
   bossLabel.x = W * 0.5;
@@ -837,7 +833,7 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffffff,
     fontWeight: 'bold',
   });
-  const scoreText = new Text({ text: isVoid ? '傷害：0' : 'SCORE: 0', style: scoreStyle });
+  const scoreText = new Text({ text: isVoid ? TEXT.gameHud.damage(0) : TEXT.gameHud.score(0), style: scoreStyle });
   scoreText.anchor.set(1, 0);
   scoreText.x = W - 10;
   scoreText.y = 10;
@@ -849,7 +845,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 14,
     fill: 0xff8888,
   });
-  const phaseText = new Text({ text: isVoid ? '' : 'PHASE 1', style: phaseStyle });
+  const phaseText = new Text({ text: isVoid ? '' : TEXT.gameHud.phase(1), style: phaseStyle });
   phaseText.anchor.set(0.5);
   phaseText.x = W * 0.5;
   phaseText.y = 48;
@@ -865,10 +861,10 @@ async function enter(core: Core): Promise<void> {
   });
   const levelWaveText = new Text({
     text: isVoid
-      ? `⬛ 虛空之境`
+      ? TEXT.gameHud.voidStatus
       : (isEndless
-          ? `∞ 無盡  第 ${endlessState.wave} 波`
-          : `LVL ${levelConfig!.levelNumber}  WAVE 1/${levelConfig!.waves.length}`),
+          ? TEXT.gameHud.endlessWave(endlessState.wave)
+          : TEXT.gameHud.levelWave(levelConfig!.levelNumber, 1, levelConfig!.waves.length)),
     style: levelWaveStyle,
   });
   levelWaveText.anchor.set(1, 1);
@@ -1420,19 +1416,19 @@ async function enter(core: Core): Promise<void> {
 
     // Score / phase / wave
     if (isVoid) {
-      scoreText.text = `傷害：${totalDamage}`;
+      scoreText.text = TEXT.gameHud.damage(totalDamage);
       bossLabel.text = `⏱ ${Math.ceil(voidTimerMs / 1000)}s`;
     } else {
-      scoreText.text = `SCORE: ${score}`;
-      phaseText.text = `PHASE ${phase}`;
+      scoreText.text = TEXT.gameHud.score(score);
+      phaseText.text = TEXT.gameHud.phase(phase);
     }
 
     // Build bottom-right status line
     let statusLine = isVoid
-      ? `⬛ 虛空之境`
+      ? TEXT.gameHud.voidStatus
       : (isEndless
-          ? `∞ 無盡  第 ${endlessState.wave} 波`
-          : `LVL ${levelConfig!.levelNumber}  WAVE ${waveIdx + 1}/${levelConfig!.waves.length}`);
+          ? TEXT.gameHud.endlessWave(endlessState.wave)
+          : TEXT.gameHud.levelWave(levelConfig!.levelNumber, waveIdx + 1, levelConfig!.waves.length));
     if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
     if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
     if (critChance > 0) statusLine += `  CRT:${Math.round(critChance * 100)}%`;

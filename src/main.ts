@@ -40,6 +40,7 @@ import { EquipmentScene } from './scenes/EquipmentScene';
 import { GAME_W, GAME_H } from './constants';
 import { initPersistence, loadProgress } from './game/persistence';
 import { initAchievements } from './game/achievements';
+import { TEXT } from './game/i18n';
 
 async function main(): Promise<void> {
   const { core } = await createEngine({
@@ -95,7 +96,7 @@ async function main(): Promise<void> {
           achContainer.addChild(achBg);
 
           const achTitleText = new Text({
-            text: '🏆 成就解鎖！',
+            text: TEXT.achievements.unlockedToastTitle,
             style: new TextStyle({
               fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
               fontSize: 13,

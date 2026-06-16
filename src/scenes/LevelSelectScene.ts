@@ -5,6 +5,7 @@ import { createStarfield } from '../game/sprites';
 import { costumeState, gameResult } from '../game/store';
 import { createLevel, TOTAL_LEVELS } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
+import { TEXT } from '../game/i18n';
 
 let _cleanup: (() => void) | null = null;
 
@@ -36,7 +37,7 @@ async function enter(core: Core): Promise<void> {
     stroke: { color: 0x330000, width: 4 },
     dropShadow: { color: 0xff0000, distance: 3, alpha: 0.85, blur: 2 },
   });
-  const titleLabel = new Text({ text: '選擇關卡', style: titleStyle });
+  const titleLabel = new Text({ text: TEXT.levelSelect.title, style: titleStyle });
   titleLabel.anchor.set(0.5);
   titleLabel.x = W * 0.5;
   titleLabel.y = H * 0.12;
@@ -60,7 +61,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xccccff,
   });
-  const backText = new Text({ text: '回主選單', style: backStyle });
+  const backText = new Text({ text: TEXT.common.backToTitle, style: backStyle });
   backText.anchor.set(0.5);
   backBtn.addChild(backText);
 
@@ -122,7 +123,7 @@ async function enter(core: Core): Promise<void> {
       fontSize: 12,
       fill: 0xaaaaaa,
     });
-    const numLabel = new Text({ text: `第 ${i} 關`, style: numStyle });
+    const numLabel = new Text({ text: TEXT.levelSelect.levelNumber(i), style: numStyle });
     numLabel.anchor.set(0.5);
     numLabel.y = -20;
     btn.addChild(numLabel);
@@ -144,8 +145,8 @@ async function enter(core: Core): Promise<void> {
       fill: 0xdddddd,
     });
     const waveText = unlocked
-      ? `${cfg.waves.length} 波${highScore > 0 ? ` · 最高 ${highScore}` : ''}`
-      : `🔒 通關第 ${i - 1} 關解鎖`;
+      ? `${TEXT.levelSelect.waves(cfg.waves.length)}${highScore > 0 ? ` · ${TEXT.levelSelect.highScore(highScore)}` : ''}`
+      : TEXT.levelSelect.locked(i - 1);
     const waveLabel = new Text({ text: waveText, style: waveStyle });
     waveLabel.anchor.set(0.5);
     waveLabel.y = 24;

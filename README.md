@@ -31,6 +31,63 @@
 - **關卡解鎖**：通關前一關後解鎖下一關，選關畫面會顯示最高分。
 - **短暫無敵時間**：受擊後有約 1.2 秒緩衝，利於彈幕閃避節奏。
 
+## 關卡進度
+
+| 區段 | 關卡 | 內容定位 |
+|------|------|----------|
+| 入門 | 1–3 | 勇氣 Boss，逐步教學螺旋、瞄準、扇形與環形彈 |
+| 中段 | 4–5 | 幽靈與混沌，引入陷阱泡泡、衝擊波、炸彈、雷射與護衛 |
+| 後段 | 6–8 | 機甲、暴風、龍王，各自帶有追蹤、散射、狙擊、傳送、火焰與地震機制 |
+| 終盤 | 9–12 | 以縮放後的混合 pattern 組合出高壓進階挑戰 |
+
+## 成就系統
+
+成就由 `src/game/achievements.ts` 註冊，顯示文字由 `src/game/i18n/zh-TW.ts` 的 `createAchievementTexts()` 提供。
+
+目前成就包含：
+
+- 首次勝利
+- 全關通關，門檻會自動使用 `TOTAL_LEVELS`
+- 無傷通關
+- 單局分數 1,000 / 10,000
+- 無盡模式第 10 / 25 / 50 波
+- 累計收集 30 個道具
+
+遊戲內成就相關顯示：
+
+- 解鎖 toast：`src/main.ts`
+- 成就列表：`src/scenes/AchievementsScene.ts`
+- 成就定義與觸發條件：`src/game/achievements.ts`
+- 語言文字來源：`src/game/i18n/zh-TW.ts`
+
+## 文字與語言檔
+
+目前主要 UI 共用文案集中在：
+
+```text
+src/game/i18n/
+├── index.ts       # 對外輸出目前語言與 helper
+└── zh-TW.ts       # 繁體中文文字表
+```
+
+已集中管理的文字包含：
+
+- 遊戲標題、開始遊戲、返回主選單等共用按鈕
+- 敵人顯示名稱
+- 模式選擇按鈕與副標
+- 選關畫面標題、鎖定提示、波數與最高分顯示
+- 戰鬥 HUD 的 Boss HP、分數、傷害、Phase、關卡/波次狀態
+- 結算畫面標題、分數、通關提示、失敗提示與按鈕
+- 成就名稱、描述、成就頁標題與解鎖 toast
+
+暫時仍保留在原場景檔內的長文本：
+
+- 故事章節對白
+- 圖鑑長篇說明
+- 裝備、服裝、技能、僚雞的資料型描述
+
+新增或修改 UI 文案時，優先檢查 `src/game/i18n/zh-TW.ts` 是否已有對應分類；只有劇情、圖鑑或資料型長文才建議保留在原資料檔。
+
 ## 開發 & 執行
 
 ```bash
@@ -46,3 +103,21 @@ npm run preview   # 預覽打包結果
 - **Vite** – 建置工具
 - **TypeScript** – 型別安全
 - 所有圖形以 **Pixi.js Graphics** API 程式化繪製，無需外部圖片資源
+
+## 重要目錄
+
+```text
+src/
+├── game/
+│   ├── levels.ts             # 關卡、波次、Boss pattern
+│   ├── battleProgression.ts  # 波次清除與 Boss 終章事件 helper
+│   ├── achievements.ts       # 成就註冊與觸發條件
+│   ├── i18n/                 # UI 語言檔
+│   ├── endless.ts            # 無盡模式 scaling 與 Buff
+│   └── persistence.ts        # 存檔載入/寫入
+└── scenes/
+    ├── GameScene.ts          # 核心戰鬥場景
+    ├── LevelSelectScene.ts   # 關卡選擇
+    ├── AchievementsScene.ts  # 成就列表
+    └── GameOverScene.ts      # 結算畫面
+```

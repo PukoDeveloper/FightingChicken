@@ -18,6 +18,7 @@ import { costumeState, endlessState, currencyState } from '../game/store';
 import { COSTUMES, isCostumeUnlocked } from '../game/costumes';
 import type { CostumeId } from '../game/costumes';
 import { startBgm, sfxMenuClick } from '../game/audio';
+import { TEXT } from '../game/i18n';
 
 // Clean up function stored between enter/exit
 let _cleanup: (() => void) | null = null;
@@ -101,7 +102,7 @@ async function enter(core: Core): Promise<void> {
     stroke: { color: 0x330000, width: 4 },
     dropShadow: { color: 0xff0000, distance: 3, alpha: 0.85, blur: 2 },
   });
-  const title = new Text({ text: '小雞大戰勇氣！', style: titleStyle });
+  const title = new Text({ text: TEXT.common.gameTitle, style: titleStyle });
   title.anchor.set(0.5);
   title.x = W * 0.5;
   title.y = H * 0.16;
@@ -113,7 +114,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xffdd88,
   });
-  const subtitle = new Text({ text: '彈幕射擊遊戲', style: subtitleStyle });
+  const subtitle = new Text({ text: TEXT.common.gameSubtitle, style: subtitleStyle });
   subtitle.anchor.set(0.5);
   subtitle.x = W * 0.5;
   subtitle.y = H * 0.24;
@@ -123,7 +124,7 @@ async function enter(core: Core): Promise<void> {
   // ── Costume picker ────────────────────────────────────────────────────────
   // Label above picker
   const costumeLabel = new Text({
-    text: '造型',
+    text: TEXT.common.costume,
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 13,
@@ -233,7 +234,7 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     fill: 0xffffff,
   });
-  const btnText = new Text({ text: '開始遊戲', style: btnStyle });
+  const btnText = new Text({ text: TEXT.common.startGame, style: btnStyle });
   btnText.anchor.set(0.5);
   btn.addChild(btnText);
 
@@ -256,7 +257,7 @@ async function enter(core: Core): Promise<void> {
   achBtn.addChild(achBtnBg);
 
   const achBtnText = new Text({
-    text: '🏆  成就',
+    text: TEXT.achievements.titleButton,
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 18,

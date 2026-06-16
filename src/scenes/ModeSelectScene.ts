@@ -5,6 +5,7 @@ import { createStarfield } from '../game/sprites';
 import { endlessState, voidState } from '../game/store';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { saveProgress } from '../game/persistence';
+import { TEXT } from '../game/i18n';
 
 let _cleanup: (() => void) | null = null;
 let _transitioning = false;
@@ -36,7 +37,7 @@ async function enter(core: Core): Promise<void> {
     stroke: { color: 0x330000, width: 4 },
     dropShadow: { color: 0xff0000, distance: 3, alpha: 0.85, blur: 2 },
   });
-  const titleLabel = new Text({ text: '選擇模式', style: titleStyle });
+  const titleLabel = new Text({ text: TEXT.modes.title, style: titleStyle });
   titleLabel.anchor.set(0.5);
   titleLabel.x = W * 0.5;
   titleLabel.y = H * 0.12;
@@ -105,8 +106,8 @@ async function enter(core: Core): Promise<void> {
 
   // 關卡模式
   const levelBtn = makeModeBtn({
-    label: '⚔️  關卡模式',
-    subLabel: '挑戰關卡，擊敗各種敵人',
+    label: TEXT.modes.level.label,
+    subLabel: TEXT.modes.level.subLabel,
     fillColor: 0x226622,
     strokeColor: 0x44ff44,
     textColor: 0xaaffaa,
@@ -130,8 +131,8 @@ async function enter(core: Core): Promise<void> {
 
   // 故事模式
   const storyBtn = makeModeBtn({
-    label: '📖  故事模式',
-    subLabel: '跟隨小雞展開冒險旅程',
+    label: TEXT.modes.story.label,
+    subLabel: TEXT.modes.story.subLabel,
     fillColor: 0x3d1a00,
     strokeColor: 0xffaa44,
     textColor: 0xffcc88,
@@ -153,8 +154,8 @@ async function enter(core: Core): Promise<void> {
 
   // 無盡模式
   const endlessBtn = makeModeBtn({
-    label: '∞  無盡模式',
-    subLabel: endlessState.bestWave > 1 ? `最高波數：第 ${endlessState.bestWave} 波` : '挑戰無限關卡！',
+    label: TEXT.modes.endless.label,
+    subLabel: endlessState.bestWave > 1 ? TEXT.modes.endless.bestWave(endlessState.bestWave) : TEXT.modes.endless.defaultSubLabel,
     fillColor: 0x004488,
     strokeColor: 0x44aaff,
     textColor: 0xaaddff,
@@ -183,8 +184,8 @@ async function enter(core: Core): Promise<void> {
 
   // 虛空之境
   const voidBtn = makeModeBtn({
-    label: '⬛  虛空之境',
-    subLabel: voidState.highScore > 0 ? `最高傷害：${voidState.highScore}` : '60秒造成最多傷害！',
+    label: TEXT.modes.void.label,
+    subLabel: voidState.highScore > 0 ? TEXT.modes.void.highDamage(voidState.highScore) : TEXT.modes.void.defaultSubLabel,
     fillColor: 0x110022,
     strokeColor: 0x8833ff,
     textColor: 0xcc88ff,
@@ -229,7 +230,7 @@ async function enter(core: Core): Promise<void> {
   backBtn.addChild(backBg);
 
   const backText = new Text({
-    text: '← 返回',
+    text: TEXT.common.back,
     style: new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 18,

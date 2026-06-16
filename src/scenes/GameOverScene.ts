@@ -5,6 +5,7 @@ import { createStarfield, createPlayerChicken, createEnemyDisplay } from '../gam
 import { gameResult, costumeState, endlessState, voidState } from '../game/store';
 import { createLevel, getStoryLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
+import { getEnemyDisplayName, TEXT } from '../game/i18n';
 
 let _cleanup: (() => void) | null = null;
 
@@ -41,16 +42,7 @@ async function enter(core: Core): Promise<void> {
     ? ((gameResult.storyMode ? getStoryLevel(clearedLevel) : null) ?? createLevel(clearedLevel)).enemyType
     : 'courage' as const;
 
-  const bossNameMap: Record<string, string> = {
-    courage:  '勇氣',
-    phantom:  '幽靈',
-    chaos:    '混沌',
-    mech:     '機甲',
-    storm:    '暴風魔',
-    dragon:   '龍王',
-    blackhole: '黑洞',
-  };
-  const bossName = bossNameMap[bossEnemyType] ?? '強敵';
+  const bossName = getEnemyDisplayName(bossEnemyType);
 
   const character = (won && !isVoidGameOver) ? createEnemyDisplay(bossEnemyType) : createPlayerChicken(costumeState.selected);
   character.scale.set((won && !isVoidGameOver) ? 1.8 : 1.6);
@@ -75,8 +67,8 @@ async function enter(core: Core): Promise<void> {
 
   // ── Result title ──────────────────────────────────────────────────────────
   const titleText = isVoidGameOver
-    ? (won ? '時間到！⏱' : '虛空湮滅...')
-    : (won ? '勝利！🎉' : '敗北...');
+    ? (won ? TEXT.gameOver.titles.voidWin : TEXT.gameOver.titles.voidLose)
+    : (won ? TEXT.gameOver.titles.win : TEXT.gameOver.titles.lose);
   const titleColor = isVoidGameOver ? 0xcc88ff : (won ? 0xffd700 : 0xff6666);
   const titleStyle = new TextStyle({
     fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
@@ -102,7 +94,7 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
   });
   const scoreLabel = new Text({
-    text: isVoidGameOver ? `總傷害：${score}` : `得分：${score}`,
+    text: isVoidGameOver ? TEXT.gameOver.damage(score) : TEXT.gameOver.score(score),
     style: scoreStyle,
   });
   scoreLabel.anchor.set(0.5);
@@ -117,7 +109,7 @@ async function enter(core: Core): Promise<void> {
     fill: 0xffdd88,
   });
   const hiScoreLabel = new Text({
-    text: isVoidGameOver ? `最高傷害：${highScore}` : `最高分：${highScore}`,
+    text: isVoidGameOver ? TEXT.gameOver.highDamage(highScore) : TEXT.gameOver.highScore(highScore),
     style: hiScoreStyle,
   });
   hiScoreLabel.anchor.set(0.5);
@@ -134,17 +126,17 @@ async function enter(core: Core): Promise<void> {
   });
   let levelLabelText: string;
   if (isVoidGameOver) {
-    levelLabelText = won ? '虛空之境 · 60秒挑戰完成！' : '虛空之境 · 被黑洞湮滅了';
+    levelLabelText = won ? TEXT.gameOver.voidLevelWin : TEXT.gameOver.voidLevelLose;
   } else if (isEndlessGameOver) {
     const waveReached = endlessState.wave;
     const best = endlessState.bestWave;
-    levelLabelText = `無盡模式 · 第 ${waveReached} 波  最高：第 ${best} 波`;
+    levelLabelText = TEXT.gameOver.endlessSummary(waveReached, best);
   } else {
     const storyLevelCfg = gameResult.storyMode ? getStoryLevel(clearedLevel) : null;
     const clearedLevelConfig = storyLevelCfg ?? createLevel(clearedLevel);
     levelLabelText = won
-      ? `通關第 ${clearedLevel} 關「${clearedLevelConfig.name}」！`
-      : `挑戰第 ${clearedLevel} 關「${clearedLevelConfig.name}」`;
+      ? TEXT.gameOver.levelWin(clearedLevel, clearedLevelConfig.name)
+      : TEXT.gameOver.levelChallenge(clearedLevel, clearedLevelConfig.name);
   }
   const levelLabel = new Text({ text: levelLabelText, style: levelStyle });
   levelLabel.anchor.set(0.5);
@@ -161,12 +153,12 @@ async function enter(core: Core): Promise<void> {
     align: 'center',
   });
   const msgText = isVoidGameOver
-    ? (won ? '黑洞無法被消滅...\n但你的傷害已被記錄！' : '被彈幕擊倒了...\n再接再厲！')
+    ? (won ? TEXT.gameOver.messages.voidWin : TEXT.gameOver.messages.defeat)
     : (isEndlessGameOver
-        ? '被彈幕擊倒了...\n無盡的挑戰等著你！'
+        ? TEXT.gameOver.messages.endlessDefeat
         : (won
-          ? `你擊敗了${bossName}！\n小雞的逆襲成功了！`
-          : '被彈幕擊倒了...\n再試一次！'));
+          ? TEXT.gameOver.messages.win(bossName)
+          : TEXT.gameOver.messages.defeat));
   const msgLabel = new Text({ text: msgText, style: msgStyle });
   msgLabel.anchor.set(0.5);
   msgLabel.x = W * 0.5;
@@ -197,7 +189,7 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
     fill: 0xffffff,
   });
-  const btnText = new Text({ text: '再玩一次', style: btnStyle });
+  const btnText = new Text({ text: TEXT.gameOver.replayButton, style: btnStyle });
   btnText.anchor.set(0.5);
   btn.addChild(btnText);
 
@@ -238,7 +230,7 @@ async function enter(core: Core): Promise<void> {
     storyBtn.addChild(sBtnBg);
 
     const sBtnText = new Text({
-      text: '繼續劇情 ▶',
+      text: TEXT.gameOver.continueStoryButton,
       style: new TextStyle({
         fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
         fontSize: 18,
@@ -280,7 +272,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 18,
     fill: 0xccccff,
   });
-  const titleBtnText = new Text({ text: '回主選單', style: titleBtnStyle });
+  const titleBtnText = new Text({ text: TEXT.common.backToTitle, style: titleBtnStyle });
   titleBtnText.anchor.set(0.5);
   titleBtn.addChild(titleBtnText);
 
