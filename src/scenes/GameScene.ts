@@ -97,7 +97,7 @@ import {
 import { gameResult, devConfig, endlessState, costumeState, skillState, currencyState, equipmentState, voidState, wingmanState } from '../game/store';
 import { EQUIPMENT_DEFS } from '../game/equipment';
 import { WINGMAN_DEFS } from '../game/wingmen';
-import { createLevel, getStoryLevel } from '../game/levels';
+import { createLevel, getStoryLevel, STORY_TOTAL_LEVELS } from '../game/levels';
 import type { WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
 import type { BuffId, StatContext } from '../game/endless';
@@ -4738,7 +4738,9 @@ async function enter(core: Core): Promise<void> {
         // Track cleared level for costume unlock system
         const isNewClear = !costumeState.clearedLevels.has(gameResult.currentLevel);
         costumeState.clearedLevels.add(gameResult.currentLevel);
-        gameResult.currentLevel = nextLevelAfterClear(gameResult.currentLevel);
+        gameResult.currentLevel = gameResult.storyMode
+          ? Math.min(gameResult.currentLevel + 1, STORY_TOTAL_LEVELS)
+          : nextLevelAfterClear(gameResult.currentLevel);
 
         // Award 宇宙灰燼 on level clear
         currencyState.cosmicAsh += 1;
