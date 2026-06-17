@@ -34,89 +34,98 @@ async function enter(core: Core): Promise<void> {
     'background:#1a1a2e',
     'border:2px solid #ff6644',
     'border-radius:12px',
-    'padding:28px 32px',
-    'min-width:280px',
-    'max-width:90vw',
+    'padding:22px',
+    'width:min(360px,calc(100vw - 32px))',
+    'max-height:86vh',
+    'box-sizing:border-box',
+    'overflow-y:auto',
     'color:#ffffff',
     'box-shadow:0 0 24px rgba(255,100,68,0.5)',
   ].join(';');
 
   panel.innerHTML = `
-    <h2 style="margin:0 0 20px;font-size:20px;color:#ffd700;text-align:center;">
+    <h2 style="margin:0 0 18px;font-size:20px;color:#ffd700;text-align:center;">
       🛠 開發者選單
     </h2>
 
-    <label style="display:block;margin-bottom:6px;font-size:14px;color:#ffccaa;">
-      小雞移動速度
-      <span id="dev-speed-val" style="margin-left:8px;color:#ffee44;font-weight:bold;">
-        ${devConfig.playerMoveSpeed} px/s
-      </span>
-    </label>
-    <input id="dev-speed" type="range"
-      min="100" max="800" step="10"
-      value="${devConfig.playerMoveSpeed}"
-      style="width:100%;margin-bottom:16px;accent-color:#ff6644;"
-    />
+    <section style="background:#111126;border:1px solid #333355;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <label style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:14px;color:#ffccaa;">
+        <span>小雞移動速度</span>
+        <span id="dev-speed-val" style="color:#ffee44;font-weight:bold;white-space:nowrap;">
+          ${devConfig.playerMoveSpeed} px/s
+        </span>
+      </label>
+      <input id="dev-speed" type="range"
+        min="100" max="800" step="10"
+        value="${devConfig.playerMoveSpeed}"
+        style="width:100%;accent-color:#ff6644;"
+      />
+    </section>
 
-    <label style="display:block;margin-bottom:6px;font-size:14px;color:#ffccaa;">
-      道具下落速度
-      <span id="dev-fall-val" style="margin-left:8px;color:#ffee44;font-weight:bold;">
-        ${devConfig.itemFallSpeed} px/s
-      </span>
-    </label>
-    <input id="dev-fall" type="range"
-      min="20" max="600" step="10"
-      value="${devConfig.itemFallSpeed}"
-      style="width:100%;margin-bottom:16px;accent-color:#ff6644;"
-    />
+    <section style="background:#111126;border:1px solid #333355;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <label style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:14px;color:#ffccaa;">
+        <span>道具下落速度</span>
+        <span id="dev-fall-val" style="color:#ffee44;font-weight:bold;white-space:nowrap;">
+          ${devConfig.itemFallSpeed} px/s
+        </span>
+      </label>
+      <input id="dev-fall" type="range"
+        min="20" max="600" step="10"
+        value="${devConfig.itemFallSpeed}"
+        style="width:100%;accent-color:#ff6644;"
+      />
+    </section>
 
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
       <button id="dev-reset"
-        style="padding:8px 16px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:14px;">
+        style="padding:10px 12px;background:#444;color:#fff;border:1px solid #888;border-radius:8px;cursor:pointer;font-size:14px;">
         重置預設值
       </button>
       <button id="dev-close"
-        style="padding:8px 16px;background:#cc2200;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;">
+        style="padding:10px 12px;background:#cc2200;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;">
         關閉
       </button>
     </div>
 
-    <hr style="border:none;border-top:1px solid #444;margin:20px 0 16px;" />
+    <hr style="border:none;border-top:1px solid #444;margin:18px 0;" />
 
-    <div style="text-align:center;">
+    <section style="background:#101624;border:1px solid #263a55;border-radius:10px;padding:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <button id="dev-export"
-        style="padding:8px 20px;background:#1a4a2e;color:#aaffcc;border:1px solid #33aa66;border-radius:6px;cursor:pointer;font-size:14px;">
+        style="padding:10px 12px;background:#1a4a2e;color:#aaffcc;border:1px solid #33aa66;border-radius:8px;cursor:pointer;font-size:14px;">
         📤 匯出存檔資料
       </button>
-      <span style="display:inline-block;width:10px;"></span>
       <button id="dev-import"
-        style="padding:8px 20px;background:#1a2e4a;color:#aaccff;border:1px solid #3366aa;border-radius:6px;cursor:pointer;font-size:14px;">
+        style="padding:10px 12px;background:#1a2e4a;color:#aaccff;border:1px solid #3366aa;border-radius:8px;cursor:pointer;font-size:14px;">
         📥 匯入存檔資料
       </button>
+      </div>
       <input id="dev-import-file" type="file" accept=".json" style="display:none;" />
       <p id="dev-import-status" style="display:none;margin:10px 0 0;font-size:13px;color:#aaccff;"></p>
-    </div>
+    </section>
 
-    <hr style="border:none;border-top:1px solid #444;margin:20px 0 16px;" />
+    <hr style="border:none;border-top:1px solid #444;margin:18px 0;" />
 
-    <div style="text-align:center;">
+    <section style="background:#221010;border:1px solid #553333;border-radius:10px;padding:14px;text-align:center;">
       <button id="dev-clear-data"
-        style="padding:8px 20px;background:#7a1010;color:#ffcccc;border:1px solid #cc3333;border-radius:6px;cursor:pointer;font-size:14px;">
+        style="width:100%;padding:10px 12px;background:#7a1010;color:#ffcccc;border:1px solid #cc3333;border-radius:8px;cursor:pointer;font-size:14px;">
         🗑 刪除存檔資料
       </button>
       <p id="dev-clear-confirm" style="display:none;margin:10px 0 0;font-size:13px;color:#ffaaaa;">
         確定要刪除所有存檔？此操作無法復原。
         <br/>
-        <button id="dev-clear-yes"
-          style="margin-top:8px;padding:6px 14px;background:#cc0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;">
-          確認刪除
-        </button>
-        <button id="dev-clear-no"
-          style="margin-top:8px;margin-left:8px;padding:6px 14px;background:#444;color:#fff;border:1px solid #888;border-radius:6px;cursor:pointer;font-size:13px;">
-          取消
-        </button>
+        <span style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <button id="dev-clear-yes"
+            style="padding:8px 12px;background:#cc0000;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;">
+            確認刪除
+          </button>
+          <button id="dev-clear-no"
+            style="padding:8px 12px;background:#444;color:#fff;border:1px solid #888;border-radius:8px;cursor:pointer;font-size:13px;">
+            取消
+          </button>
+        </span>
       </p>
-    </div>
+    </section>
   `;
 
   overlay.appendChild(panel);
