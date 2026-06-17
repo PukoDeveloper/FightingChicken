@@ -63,7 +63,7 @@ export const WINGMAN_DEFS: WingmanDef[] = [
     icon: '🏐',
     bodyColor:   0xccaa00,
     accentColor: 0xffee44,
-    abilityDesc: '定期彈開附近的敵方追蹤彈，每升 1 級增加影響範圍',
+    abilityDesc: '發射反彈追蹤彈，並定期彈開附近追蹤彈；升級增加影響範圍',
     abilityKey:  'bounce',
   },
 ];
