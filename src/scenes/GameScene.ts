@@ -633,7 +633,7 @@ async function enter(core: Core): Promise<void> {
     : null;
   let playerHP: number;
   if (!isEndless) {
-    playerHP = PLAYER_HP_MAX;
+    playerHP = effectiveHpMax;
   } else if (endlessState.currentHp <= 0) {
     // First wave — start at full effective max
     playerHP = effectiveHpMax;
@@ -1565,6 +1565,7 @@ async function enter(core: Core): Promise<void> {
         effectiveFireInterval * (1 - equipFlameBracerLv * FLAME_BRACER_FIRE_RATE_BONUS),
       ));
     }
+    playerHP = Math.min(playerHP, effectiveHpMax);
   }
 
   // ── Helper: apply a gift buff received from the moose costume's gift box ────
@@ -2646,6 +2647,58 @@ async function enter(core: Core): Promise<void> {
     return false;
   }
 
+  function fireMobVolley(mob: MobEnemyData, group: NonNullable<WaveConfig['mobGroup']>): void {
+    const attackPattern = group.attackPattern ?? 'aimed';
+    if (attackPattern === 'straight') {
+      const gap = 18;
+      const half = (group.bulletWays - 1) / 2;
+      for (let i = 0; i < group.bulletWays; i++) {
+        spawnEnemyBullet(
+          mob.x + (i - half) * gap,
+          mob.y,
+          0,
+          group.bulletSpeed,
+          group.bulletColor,
+        );
+      }
+      return;
+    }
+
+    if (attackPattern === 'ring') {
+      fireRingAt(
+        mob.x,
+        mob.y,
+        Math.max(6, group.bulletWays * 6),
+        group.bulletSpeed,
+        group.bulletColor,
+      );
+      return;
+    }
+
+    if (attackPattern === 'split') {
+      fireAimedFrom(
+        mob.x,
+        mob.y,
+        Math.max(1, group.bulletWays),
+        group.bulletSpread,
+        group.bulletSpeed,
+        group.bulletColor,
+      );
+      spawnEnemyBullet(mob.x - 12, mob.y, -45, group.bulletSpeed * 0.9, group.bulletColor);
+      spawnEnemyBullet(mob.x + 12, mob.y, 45, group.bulletSpeed * 0.9, group.bulletColor);
+      return;
+    }
+
+    fireAimedFrom(
+      mob.x,
+      mob.y,
+      group.bulletWays,
+      group.bulletSpread,
+      group.bulletSpeed,
+      group.bulletColor,
+    );
+  }
+
   spawnMobsForWave();
 
   const unsubTouchStart = core.events.on(
@@ -3368,12 +3421,28 @@ async function enter(core: Core): Promise<void> {
       if (!waveTransitioning && mobs.length > 0 && waveConfig.mobGroup) {
         const group = waveConfig.mobGroup;
         const amp = group.moveAmplitude ?? 24;
+        const verticalAmp = group.verticalAmplitude ?? 8;
         const period = group.movePeriodMs ?? 2400;
         for (const mob of mobs) {
           mob.bobTimer += dt;
           const t = (mob.bobTimer / period) * Math.PI * 2 + mob.phaseOffset;
-          mob.x = mob.baseX + Math.sin(t) * amp;
-          mob.y = mob.baseY + Math.sin(mob.bobTimer / 700 + mob.phaseOffset) * 7;
+          const pattern = group.movementPattern ?? 'sine';
+          if (pattern === 'zigzag') {
+            const zig = (2 / Math.PI) * Math.asin(Math.sin(t));
+            mob.x = mob.baseX + zig * amp;
+            mob.y = mob.baseY + Math.sin(t * 0.75 + mob.phaseOffset) * verticalAmp;
+          } else if (pattern === 'dive') {
+            mob.x = mob.baseX + Math.sin(t * 0.8) * amp;
+            mob.y = mob.baseY + (0.5 + 0.5 * Math.sin(t - Math.PI / 2)) * verticalAmp;
+          } else if (pattern === 'orbit') {
+            mob.x = W * 0.5 + Math.cos(t) * amp;
+            mob.y = mob.baseY + Math.sin(t) * verticalAmp;
+          } else {
+            mob.x = mob.baseX + Math.sin(t) * amp;
+            mob.y = mob.baseY + Math.sin(mob.bobTimer / 700 + mob.phaseOffset) * verticalAmp;
+          }
+          mob.x = Math.max(32, Math.min(W - 32, mob.x));
+          mob.y = Math.max(70, Math.min(H * 0.42, mob.y));
           mob.display.x = mob.x;
           mob.display.y = mob.y;
           mob.hpBarContainer.x = mob.x - MOB_BAR_W / 2;
@@ -3389,14 +3458,7 @@ async function enter(core: Core): Promise<void> {
           mob.fireTimer -= dt;
           if (mob.fireTimer <= 0) {
             mob.fireTimer = group.fireInterval;
-            fireAimedFrom(
-              mob.x,
-              mob.y,
-              group.bulletWays,
-              group.bulletSpread,
-              group.bulletSpeed,
-              group.bulletColor,
-            );
+            fireMobVolley(mob, group);
           }
         }
       }
