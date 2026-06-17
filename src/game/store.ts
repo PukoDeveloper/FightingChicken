@@ -19,6 +19,12 @@ export const gameResult = {
   storyMode: false,
 };
 
+/** Runtime story navigation state. Story text is loaded dynamically from content chunks. */
+export const storyState = {
+  /** Current story node to show in the shared story dialogue scene. */
+  currentNodeId: 'prologue',
+};
+
 /** Developer-only runtime config. Values here are editable via the dev menu. */
 export const devConfig = {
   /** Player movement speed in px/s. Initialised from PLAYER_MOVE_SPEED constant. */
