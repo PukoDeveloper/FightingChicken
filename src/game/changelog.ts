@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.2.1';
+export const APP_VERSION = '1.3.0';
 
 export interface ChangelogEntry {
   version: string;
@@ -9,6 +9,22 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.3.0',
+    date: '2026-06-17',
+    title: '無盡潮湧模式',
+    highlights: [
+      '無盡模式新增經典與潮湧子模式分頁',
+      '潮湧模式改為持續小怪來襲，生成間隔會隨生存時間縮短',
+      '潮湧模式加入升級箱掉落，拾取後可獲得隨機無盡 Buff',
+    ],
+    details: [
+      '經典模式保留原本逐波挑戰與波後 Buff 選擇流程。',
+      '潮湧模式沒有固定關卡或通關波次，會依生存時間提升小怪血量、數量、移動與攻擊壓力。',
+      '潮湧模式會記錄本次與最佳生存時間，結算畫面會顯示秒數紀錄。',
+      '升級箱沿用無盡 Buff 系統，可在戰鬥中即時套用生命、射速、傷害、再生、護盾等強化。',
+    ],
+  },
   {
     version: '1.2.1',
     date: '2026-06-17',
