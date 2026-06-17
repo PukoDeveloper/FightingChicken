@@ -7,6 +7,7 @@ import {
   createPlayerChicken,
   createEnemyDisplay,
   createEnemyHitFlash,
+  createMobDisplay,
   createPetDisplay,
   createDragonEyeDisplay,
   createTrapBubble,
@@ -1631,11 +1632,11 @@ async function enter(core: Core): Promise<void> {
     const margin = 56;
     const spacing = count > 1 ? Math.min(82, (W - margin * 2) / (count - 1)) : 0;
     const startX = count > 1 ? W * 0.5 - spacing * (count - 1) * 0.5 : W * 0.5;
-    const scale = group.displayScale ?? 0.58;
+    const scale = group.displayScale ?? 1;
     const radius = group.hitboxRadius ?? 26;
 
     for (let i = 0; i < count; i++) {
-      const display = createEnemyDisplay(enemyTypeForDisplay);
+      const display = createMobDisplay(group.mobSprite ?? 'chicklet', group.bodyColor, group.accentColor);
       display.scale.set(scale);
       const x = startX + i * spacing;
       const arcOffset = group.layout === 'arc'

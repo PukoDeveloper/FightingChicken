@@ -21,7 +21,7 @@ import {
   SNIPER_WARN_MS,
 } from '../constants';
 import type { EnemyType } from '../constants';
-import type { WaveConfig } from './levels';
+import type { MobGroupConfig, WaveConfig } from './levels';
 import { phase as makePhase } from './levels';
 
 // ─── Buff Definitions ─────────────────────────────────────────────────────────
@@ -507,6 +507,7 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const ENDLESS_HP_SOFT_CAP = 95000;
   const rawHp = Math.round(150 * d);
   const hp = Math.round(ENDLESS_HP_SOFT_CAP * rawHp / (ENDLESS_HP_SOFT_CAP + rawHp));
+  const isMobPhase = waveNum >= 2 && waveNum % 4 === 2;
 
   // Intervals shrink (faster attacks) but are floored.
   const spiral1 = Math.max(55, Math.round(260 / d));
@@ -574,11 +575,50 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
   const sn3 = hasSniper ? Math.max(1800, Math.round(4500 / d)) : 0;
   const snSpeed = capAt(550 + (waveNum - 21) * 10, 900);
 
+  let mobGroup: MobGroupConfig | undefined;
+  if (isMobPhase) {
+    const enemyType = endlessEnemyType(waveNum);
+    const mobCount = capAt(3 + Math.floor(waveNum / 6), 9);
+    const totalMobHp = Math.max(90, Math.round(hp * 0.72));
+    const mobHp = Math.max(25, Math.round(totalMobHp / mobCount));
+    const fireInterval = Math.max(650, Math.round(1650 / Math.sqrt(d)));
+    const bulletWays = capAt(1 + Math.floor(waveNum / 8), 4);
+    const bulletSpeed = capAt(BULLET_SPEED_SLOW + waveNum * 4, BULLET_SPEED_FAST + 90);
+
+    const theme: Record<EnemyType, Pick<MobGroupConfig, 'label' | 'mobSprite' | 'bodyColor' | 'accentColor' | 'bulletColor'>> = {
+      courage: { label: '勇氣小隊', mobSprite: 'chicklet', bodyColor: 0xffcc44, accentColor: 0xff4444, bulletColor: COL_BULLET_P1 },
+      phantom: { label: '幽光靈群', mobSprite: 'wisp', bodyColor: 0x4466ff, accentColor: COL_BUBBLE, bulletColor: COL_BUBBLE },
+      chaos: { label: '混沌幼體', mobSprite: 'voidling', bodyColor: 0x220033, accentColor: COL_BULLET_P3, bulletColor: COL_BULLET_P3 },
+      blackhole: { label: '虛空碎群', mobSprite: 'voidling', bodyColor: 0x050008, accentColor: 0xddaaff, bulletColor: COL_BULLET_P3 },
+      mech: { label: '機甲無人機', mobSprite: 'drone', bodyColor: 0x253545, accentColor: 0x44aaff, bulletColor: 0x44aaff },
+      storm: { label: '暴風晶群', mobSprite: 'crystal', bodyColor: COL_BULLET_STORM, accentColor: 0xffffff, bulletColor: COL_BULLET_STORM },
+      dragon: { label: '龍焰幼體', mobSprite: 'ember', bodyColor: COL_BULLET_FLAME, accentColor: 0xffdd44, bulletColor: COL_BULLET_FLAME },
+    };
+
+    mobGroup = {
+      ...theme[enemyType],
+      count: mobCount,
+      mobHp,
+      hitboxRadius: 24,
+      displayScale: 0.92,
+      layout: waveNum % 8 === 2 ? 'line' : 'arc',
+      yFrac: 0.19,
+      moveAmplitude: capAt(26 + Math.floor(waveNum / 3), 58),
+      movePeriodMs: Math.max(1350, 2600 - waveNum * 28),
+      initialFireDelayMs: 450,
+      fireInterval,
+      bulletWays,
+      bulletSpread: 0.20 + Math.min(waveNum * 0.004, 0.18),
+      bulletSpeed,
+    };
+  }
+
   return {
     waveNumber: waveNum,
-    enemyHp: hp,
+    enemyHp: mobGroup ? mobGroup.count * mobGroup.mobHp : hp,
     phase2Frac: 0.66,
     phase3Frac: 0.33,
+    mobGroup,
     phases: [
       makePhase({
         spiralInterval: spiral1, spiralWays: spiralWays1, spiralSpeed: BULLET_SPEED_SLOW,  spiralColor: COL_BULLET_P1,
