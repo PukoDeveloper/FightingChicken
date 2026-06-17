@@ -12,7 +12,9 @@ import {
   createPetDisplay,
   createBlackHoleDisplay,
   createDragonEyeDisplay,
+  createMobDisplay,
 } from '../game/sprites';
+import type { MobSpriteId } from '../constants';
 
 // ─── Encyclopedia (圖鑑) overlay ─────────────────────────────────────────────
 // Rendered as an HTML panel (same technique as DevMenuScene) so that we can
@@ -73,6 +75,12 @@ interface EntityEntry {
   appearsIn: string;
   description: string;
   tip: string;
+}
+
+interface MobEntry extends EntityEntry {
+  sprite: MobSpriteId;
+  bodyColor: number;
+  accentColor: number;
 }
 
 const BOSSES: BossEntry[] = [
@@ -283,6 +291,75 @@ const ENTITIES: EntityEntry[] = [
   },
 ];
 
+const MOBS: MobEntry[] = [
+  {
+    name: '勇氣小雞兵',
+    sprite: 'chicklet',
+    bodyColor: 0xffcc44,
+    accentColor: 0xff4444,
+    color: '#221600',
+    borderColor: '#ffcc44',
+    appearsIn: '關卡 1、故事前段、無盡勇氣小隊',
+    description: '最基礎的小怪單位，以小隊陣形出現。彈幕密度不高，但常作為 Boss 前的熱身壓力。',
+    tip: '優先清掉最靠近中線的小雞兵，為後續閃避保留橫向空間。',
+  },
+  {
+    name: '幽光靈',
+    sprite: 'wisp',
+    bodyColor: 0x4466ff,
+    accentColor: 0x44ddff,
+    color: '#06061e',
+    borderColor: '#44ddff',
+    appearsIn: '故事幽靈段、無盡幽靈波',
+    description: '漂浮的記憶碎光，會以較慢但干擾性高的彈幕壓縮移動路線。',
+    tip: '不要被慢速彈牽制在角落；先往中央回位再逐一擊破。',
+  },
+  {
+    name: '機甲無人機',
+    sprite: 'drone',
+    bodyColor: 0x253545,
+    accentColor: 0x44aaff,
+    color: '#07121f',
+    borderColor: '#44aaff',
+    appearsIn: '關卡 6、故事水晶塔段、無盡機甲波',
+    description: '小型機械飛行單位，隊列整齊且射擊節奏穩定，常以多機編隊形成交叉火線。',
+    tip: '觀察發射節奏後橫向切入；追蹤武器與僚雞能有效削減多目標壓力。',
+  },
+  {
+    name: '暴風晶群',
+    sprite: 'crystal',
+    bodyColor: 0xee66ff,
+    accentColor: 0xffffff,
+    color: '#14001f',
+    borderColor: '#ee66ff',
+    appearsIn: '故事暴風段、無盡暴風波',
+    description: '受暴風侵蝕的漂浮晶體，移動幅度較大，彈幕方向會隨陣形擺動而變化。',
+    tip: '先找出整群擺動方向，從反方向切入可減少被同時夾擊。',
+  },
+  {
+    name: '龍焰幼體',
+    sprite: 'ember',
+    bodyColor: 0xff5500,
+    accentColor: 0xffdd44,
+    color: '#1f0700',
+    borderColor: '#ff6600',
+    appearsIn: '故事龍王段、無盡龍王波',
+    description: '龍王火焰中誕生的小型火靈，彈速偏快，常在高壓階段前削弱玩家血量。',
+    tip: '保持距離，避免被快速彈連續命中；有清彈技能時可留到火靈密集開火後使用。',
+  },
+  {
+    name: '混沌幼體 / 虛空碎群',
+    sprite: 'voidling',
+    bodyColor: 0x220033,
+    accentColor: 0xdd88ff,
+    color: '#08000f',
+    borderColor: '#aa44ff',
+    appearsIn: '故事混沌與虛空段、無盡後期',
+    description: '由恐懼與空洞凝成的尖刺小怪，血量與數量會在後期無盡波顯著提升。',
+    tip: '優先集火單一目標觸發減員，別讓多隻同時留場拖長彈幕壓力。',
+  },
+];
+
 // ─── HTML generation ──────────────────────────────────────────────────────────
 
 function renderBossCard(b: BossEntry, spriteDataUrl: string): string {
@@ -443,6 +520,7 @@ async function enter(core: Core): Promise<void> {
 
   const TABS = [
     { id: 'boss',   label: '⚔️ BOSS' },
+    { id: 'mob',    label: '🐣 小怪' },
     { id: 'attack', label: '💥 攻擊方式' },
     { id: 'entity', label: '👾 其他實體' },
   ];
@@ -480,11 +558,18 @@ async function enter(core: Core): Promise<void> {
 
   const panes: Record<string, HTMLDivElement> = {
     boss:   document.createElement('div'),
+    mob:    document.createElement('div'),
     attack: document.createElement('div'),
     entity: document.createElement('div'),
   };
 
   panes.boss.innerHTML   = BOSSES.map((b, i) => renderBossCard(b, bossImgs[i])).join('');
+  const mobImgs = MOBS.map(m => spriteToDataUrl(
+    renderer as Renderer,
+    () => createMobDisplay(m.sprite, m.bodyColor, m.accentColor),
+    88,
+  ));
+  panes.mob.innerHTML    = MOBS.map((m, i) => renderEntityCard(m, mobImgs[i])).join('');
   panes.attack.innerHTML = ATTACKS.map(renderAttackCard).join('');
   panes.entity.innerHTML = ENTITIES.map((e, i) => renderEntityCard(e, entityImgs[i])).join('');
 

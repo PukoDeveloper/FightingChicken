@@ -22,7 +22,7 @@ import {
   TELEPORT_WARN_MS,
   SNIPER_WARN_MS,
 } from '../constants';
-import type { EnemyType } from '../constants';
+import type { EnemyType, MobSpriteId } from '../constants';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -120,13 +120,19 @@ export interface WavePhaseConfig {
 export interface MobGroupConfig {
   /** Display label shown in the HP bar for this encounter. */
   label: string;
+  /** Visual silhouette used by the mobs. Defaults to chicklet. */
+  mobSprite?: MobSpriteId;
+  /** Primary body colour for the mob sprite. */
+  bodyColor?: number;
+  /** Accent / glow colour for the mob sprite. */
+  accentColor?: number;
   /** Number of mobs spawned at the start of the wave. */
   count: number;
   /** HP for each individual mob. */
   mobHp: number;
   /** Collision radius for each mob. Defaults to 26 px. */
   hitboxRadius?: number;
-  /** Visual scale applied to the level's enemy sprite. Defaults to 0.58. */
+  /** Visual scale applied to the mob sprite. Defaults to 1.0. */
   displayScale?: number;
   /** Horizontal formation shape. Defaults to a straight line. */
   layout?: 'line' | 'arc';
@@ -283,10 +289,13 @@ const LEVEL_1: LevelConfig = {
       phase3Frac: 0.33,
       mobGroup: {
         label: '勇氣小隊',
+        mobSprite: 'chicklet',
+        bodyColor: 0xffcc44,
+        accentColor: 0xff4444,
         count: 3,
         mobHp: 40,
         hitboxRadius: 24,
-        displayScale: 0.54,
+        displayScale: 0.95,
         layout: 'line',
         yFrac: 0.20,
         moveAmplitude: 24,
@@ -811,10 +820,13 @@ const LEVEL_6: LevelConfig = {
       phase3Frac: 0.33,
       mobGroup: {
         label: '機甲小隊',
+        mobSprite: 'drone',
+        bodyColor: 0x253545,
+        accentColor: COL_BULLET_MECH,
         count: 4,
         mobHp: 80,
         hitboxRadius: 25,
-        displayScale: 0.50,
+        displayScale: 0.92,
         layout: 'arc',
         yFrac: 0.21,
         moveAmplitude: 34,

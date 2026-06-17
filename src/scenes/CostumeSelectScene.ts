@@ -37,6 +37,17 @@ function buildPreview(id: CostumeId): Container {
   }
 }
 
+function costumeAbilityText(id: CostumeId): string {
+  const cfg = COSTUMES.find(c => c.id === id)!;
+  return cfg.ability.length > 0 ? cfg.ability : '無特殊技能：保持標準性能，適合熟悉基礎操作';
+}
+
+function shortAbilityText(id: CostumeId): string {
+  return costumeAbilityText(id)
+    .replace(/^主動：/, '主動 ')
+    .replace(/^被動：/, '被動 ');
+}
+
 async function enter(core: Core): Promise<void> {
   const W = core.app.screen.width;
   const H = core.app.screen.height;
@@ -100,6 +111,8 @@ async function enter(core: Core): Promise<void> {
     fontSize: 14,
     fill: 0xdddddd,
     align: 'center',
+    wordWrap: true,
+    wordWrapWidth: W * 0.86,
   });
   const descLabel = new Text({ text: '', style: descStyle });
   descLabel.anchor.set(0.5);
@@ -125,7 +138,7 @@ async function enter(core: Core): Promise<void> {
     const cfg = COSTUMES.find(c => c.id === id)!;
     nameLabel.text = cfg.name;
     descLabel.text = cfg.description;
-    abilityLabel.text = cfg.ability ? `✨ ${cfg.ability}` : '';
+    abilityLabel.text = `✨ 技能：${costumeAbilityText(id)}`;
   }
   refreshLabels(selectedId);
 
@@ -176,7 +189,7 @@ async function enter(core: Core): Promise<void> {
       wordWrap: true,
       wordWrapWidth: cardW - 16,
     });
-    const hintText = unlocked ? '已解鎖' : `🔒 ${cfg.unlockHint}`;
+    const hintText = unlocked ? `技能：${shortAbilityText(cfg.id)}` : `🔒 ${cfg.unlockHint}`;
     const hint = new Text({ text: hintText, style: hintStyle });
     hint.anchor.set(0.5);
     hint.y = 14;

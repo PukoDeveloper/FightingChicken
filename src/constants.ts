@@ -68,6 +68,9 @@ export const SCORE_BONUS_WAVE_MULT = 20;
 /** Identifies which enemy sprite & theme is used for a level. */
 export type EnemyType = 'courage' | 'phantom' | 'chaos' | 'blackhole' | 'mech' | 'storm' | 'dragon';
 
+/** Identifies smaller enemy silhouettes used by mob-group encounters. */
+export type MobSpriteId = 'chicklet' | 'wisp' | 'drone' | 'crystal' | 'ember' | 'voidling';
+
 // ─── Void Realm mode ─────────────────────────────────────────────────────────
 /** Duration of a Void Realm timed session in ms (60 seconds). */
 export const VOID_DURATION_MS = 60000;

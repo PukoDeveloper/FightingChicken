@@ -1,5 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import type { EnemyType } from '../constants';
+import type { MobSpriteId } from '../constants';
 import type { CostumeId } from './costumes';
 
 // ─── Chicken (小雞) ──────────────────────────────────────────────────────────
@@ -240,6 +241,122 @@ export function createEnemyDisplay(type: EnemyType): Container {
     case 'dragon':    return createDragonDisplay();
     default:          return createCourageDisplay();
   }
+}
+
+// ─── Mob enemies (small encounter units) ─────────────────────────────────────
+
+/**
+ * Build a compact mob display with a unique silhouette. These are intentionally
+ * simpler than bosses so mob waves read as squads instead of mini-bosses.
+ */
+export function createMobDisplay(type: MobSpriteId, bodyColor?: number, accentColor?: number): Container {
+  switch (type) {
+    case 'wisp':     return createWispMobDisplay(bodyColor ?? 0x4466ff, accentColor ?? 0x88ffff);
+    case 'drone':    return createDroneMobDisplay(bodyColor ?? 0x334455, accentColor ?? 0x44aaff);
+    case 'crystal':  return createCrystalMobDisplay(bodyColor ?? 0x55ddff, accentColor ?? 0xffffff);
+    case 'ember':    return createEmberMobDisplay(bodyColor ?? 0xff5500, accentColor ?? 0xffdd44);
+    case 'voidling': return createVoidlingMobDisplay(bodyColor ?? 0x220033, accentColor ?? 0xdd88ff);
+    default:         return createChickletMobDisplay(bodyColor ?? 0xffcc44, accentColor ?? 0xff4444);
+  }
+}
+
+function createChickletMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.ellipse(0, 20, 18, 5).fill({ color: 0x000000, alpha: 0.22 });
+  g.ellipse(-16, 3, 8, 6).fill({ color: bodyColor, alpha: 0.75 });
+  g.circle(0, 0, 20).fill(bodyColor);
+  g.ellipse(5, 6, 9, 7).fill({ color: 0xffffff, alpha: 0.28 });
+  g.moveTo(-7, -17).lineTo(-2, -27).lineTo(2, -17).lineTo(7, -25).lineTo(10, -16).closePath().fill(accentColor);
+  g.moveTo(14, -1).lineTo(24, 3).lineTo(14, 8).closePath().fill(0xff8800);
+  g.circle(9, -6, 5).fill(0xffffff);
+  g.circle(10, -5, 2.5).fill(0x111111);
+  g.rect(-7, 18, 3, 7).fill(0xff8800);
+  g.rect(4, 18, 3, 7).fill(0xff8800);
+  c.addChild(g);
+  return c;
+}
+
+function createWispMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.circle(0, 0, 26).fill({ color: accentColor, alpha: 0.10 });
+  g.circle(0, -2, 18).fill({ color: bodyColor, alpha: 0.75 });
+  g.ellipse(-9, 18, 5, 12).fill({ color: bodyColor, alpha: 0.45 });
+  g.ellipse(0, 21, 6, 14).fill({ color: bodyColor, alpha: 0.40 });
+  g.ellipse(9, 18, 5, 12).fill({ color: bodyColor, alpha: 0.45 });
+  g.circle(-6, -5, 4).fill(accentColor);
+  g.circle(6, -5, 4).fill(accentColor);
+  g.circle(-5, -6, 1.2).fill(0xffffff);
+  g.circle(7, -6, 1.2).fill(0xffffff);
+  g.arc(0, 5, 7, 0.1, Math.PI - 0.1).stroke({ color: 0x001133, width: 2, alpha: 0.65 });
+  c.addChild(g);
+  return c;
+}
+
+function createDroneMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.ellipse(0, 20, 20, 5).fill({ color: 0x000000, alpha: 0.24 });
+  g.roundRect(-22, -14, 44, 28, 7).fill(bodyColor);
+  g.roundRect(-22, -14, 44, 28, 7).stroke({ color: accentColor, width: 2 });
+  g.rect(-4, -24, 8, 10).fill(bodyColor);
+  g.circle(0, -27, 4).fill(accentColor);
+  g.roundRect(-34, -7, 10, 14, 3).fill({ color: accentColor, alpha: 0.55 });
+  g.roundRect(24, -7, 10, 14, 3).fill({ color: accentColor, alpha: 0.55 });
+  g.circle(-8, -2, 5).fill(0xff3333);
+  g.circle(8, -2, 5).fill(0xff3333);
+  g.rect(-14, 10, 28, 3).fill({ color: 0x111111, alpha: 0.6 });
+  c.addChild(g);
+  return c;
+}
+
+function createCrystalMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.circle(0, 0, 24).fill({ color: bodyColor, alpha: 0.14 });
+  g.poly([0, -28, 18, -8, 12, 20, -10, 25, -20, -6]).fill({ color: bodyColor, alpha: 0.88 });
+  g.poly([0, -28, 18, -8, 0, 2]).fill({ color: accentColor, alpha: 0.28 });
+  g.poly([0, 2, 12, 20, -10, 25]).fill({ color: 0x117799, alpha: 0.35 });
+  g.circle(-6, -3, 3).fill(0xffffff);
+  g.circle(7, -2, 3).fill(0xffffff);
+  g.rect(-8, 9, 16, 3).fill({ color: 0x003344, alpha: 0.55 });
+  c.addChild(g);
+  return c;
+}
+
+function createEmberMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.circle(0, 0, 26).fill({ color: bodyColor, alpha: 0.12 });
+  g.moveTo(0, -30).bezierCurveTo(21, -10, 16, 18, 0, 26).bezierCurveTo(-18, 14, -18, -8, 0, -30).fill(bodyColor);
+  g.moveTo(3, -16).bezierCurveTo(14, -2, 8, 15, -3, 21).bezierCurveTo(-10, 8, -6, -5, 3, -16).fill(accentColor);
+  g.circle(-6, 0, 3).fill(0x330000);
+  g.circle(6, 0, 3).fill(0x330000);
+  g.circle(-5, -1, 1).fill(0xffffff);
+  g.circle(7, -1, 1).fill(0xffffff);
+  c.addChild(g);
+  return c;
+}
+
+function createVoidlingMobDisplay(bodyColor: number, accentColor: number): Container {
+  const c = new Container();
+  const g = new Graphics();
+  g.circle(0, 0, 27).fill({ color: accentColor, alpha: 0.10 });
+  const pts: number[] = [];
+  const spikes = 9;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? 23 : 16;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    pts.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.poly(pts).fill(bodyColor);
+  g.circle(0, 0, 15).fill(0x050008);
+  g.circle(0, 0, 9).stroke({ color: accentColor, width: 3, alpha: 0.85 });
+  g.circle(-5, -3, 2.5).fill(accentColor);
+  g.circle(6, 3, 2.5).fill(accentColor);
+  c.addChild(g);
+  return c;
 }
 
 // ─── Phantom Boss (幽靈) ──────────────────────────────────────────────────────
