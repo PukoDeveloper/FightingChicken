@@ -4748,34 +4748,41 @@ async function enter(core: Core): Promise<void> {
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene
     } else {
       gameResult.score = score;
-      // Update per-level high score
       const lvl = gameResult.currentLevel;
-      if (score > (gameResult.levelHighScores[lvl] ?? 0)) {
+
+      // Normal level records/unlocks are intentionally separate from story mode.
+      if (!gameResult.storyMode && score > (gameResult.levelHighScores[lvl] ?? 0)) {
         gameResult.levelHighScores[lvl] = score;
       }
+
       // Advance level on win, reset on loss
       if (won) {
-        gameResult.playedLevel = gameResult.currentLevel;
-        // Track cleared level for costume unlock system
-        const isNewClear = !costumeState.clearedLevels.has(gameResult.currentLevel);
-        costumeState.clearedLevels.add(gameResult.currentLevel);
+        gameResult.playedLevel = lvl;
+        let isNewClear = false;
         if (gameResult.storyMode) {
-          storyState.clearedLevels.add(gameResult.currentLevel);
+          storyState.clearedLevels.add(lvl);
+        } else {
+          // Track cleared level for level-mode unlocks and costume unlock system.
+          isNewClear = !costumeState.clearedLevels.has(lvl);
+          costumeState.clearedLevels.add(lvl);
         }
+
         gameResult.currentLevel = gameResult.storyMode
-          ? Math.min(gameResult.currentLevel + 1, STORY_TOTAL_LEVELS)
-          : nextLevelAfterClear(gameResult.currentLevel);
+          ? Math.min(lvl + 1, STORY_TOTAL_LEVELS)
+          : nextLevelAfterClear(lvl);
 
         // Award 宇宙灰燼 on level clear
         currencyState.cosmicAsh += 1;
 
-        // Achievement events
-        core.events.emitSync('game/win', { isNewClear });
-        if (!playerHitThisRun) {
-          core.events.emitSync('game/no_damage_win', {});
+        // Level-mode achievements should not be unlocked by story-mode clears.
+        if (!gameResult.storyMode) {
+          core.events.emitSync('game/win', { isNewClear });
+          if (!playerHitThisRun) {
+            core.events.emitSync('game/no_damage_win', {});
+          }
         }
       } else {
-        gameResult.playedLevel = gameResult.currentLevel;
+        gameResult.playedLevel = lvl;
       }
     }
 
