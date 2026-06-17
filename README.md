@@ -19,7 +19,7 @@
 ## 遊戲模式
 
 - **關卡模式**：12 關，後段關卡使用縮放後的混合 Boss pattern，難度曲線更長。
-- **故事模式**：章節對話與專屬戰鬥。
+- **故事模式**：章節對話與專屬戰鬥；第一章 50 關大綱見 [`docs/story-chapter-1-outline.md`](docs/story-chapter-1-outline.md)。
 - **無盡模式**：逐波提升難度，每波後可選 Buff。
 - **虛空之境**：60 秒內對黑洞造成最高傷害。
 
@@ -120,4 +120,9 @@ src/
     ├── LevelSelectScene.ts   # 關卡選擇
     ├── AchievementsScene.ts  # 成就列表
     └── GameOverScene.ts      # 結算畫面
+```
+
+```text
+docs/
+└── story-chapter-1-outline.md # 第一章 50 關故事大綱與角色弧線
 ```
