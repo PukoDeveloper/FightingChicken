@@ -3303,6 +3303,27 @@ async function enter(core: Core): Promise<void> {
           wingmanFireTimer -= dt;
           if (wingmanFireTimer <= 0) {
             wingmanFireTimer = WINGMAN_BOUNCER_INTERVAL_MS;
+
+            const bounceDir = wmX >= W * 0.5 ? -1 : 1;
+            const bounceBullet = new Graphics();
+            bounceBullet.circle(0, 0, 8).fill({ color: COL_WINGMAN_BULLET, alpha: 0.28 });
+            bounceBullet.circle(0, 0, 5).fill(COL_WINGMAN_BULLET);
+            bounceBullet.circle(0, 0, 2).fill({ color: 0xffffff, alpha: 0.55 });
+            bounceBullet.x = wmX;
+            bounceBullet.y = wmY - 18;
+            playerBulletsContainer.addChild(bounceBullet);
+            playerBullets.push({
+              display: bounceBullet,
+              x: wmX,
+              y: wmY - 18,
+              vx: bounceDir * 180,
+              vy: -PLAYER_BULLET_SPEED * 0.88,
+              damage: wingmanDmg(0),
+              pooled: false,
+              bouncing: true,
+              bounced: false,
+            });
+
             // Deflect all enemy homing (curve) bullets within the repel radius away from the player
             const repelRadius = WINGMAN_BOUNCER_REPEL_RADIUS_BASE + (wingmanLevel - 1) * WINGMAN_BOUNCER_REPEL_PER_LEVEL;
             const px = playerEntity.position.x;
