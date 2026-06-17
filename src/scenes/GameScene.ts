@@ -250,6 +250,25 @@ interface PlayerShockwaveData {
   hitDealt: boolean; // true once the ring has dealt damage (one hit per pulse)
 }
 
+// ─── Mob enemy data (small-enemy encounter waves) ─────────────────────────────
+interface MobEnemyData {
+  display: Container;
+  hitFlash: Graphics;
+  hpBarContainer: Container;
+  hpBarFill: Graphics;
+  hp: number;
+  maxHp: number;
+  x: number;
+  y: number;
+  baseX: number;
+  baseY: number;
+  radius: number;
+  bobTimer: number;
+  fireTimer: number;
+  hitFlashMs: number;
+  phaseOffset: number;
+}
+
 // ─── Pet Guardian data ────────────────────────────────────────────────────────
 interface PetData {
   display: Container;
@@ -320,6 +339,8 @@ interface TeleportEventData {
 interface EnemyHitParticleOptions {
   startColor: number;
   endColor: number;
+  x?: number;
+  y?: number;
   burstCount?: number;
   speed?: number;
   speedVariance?: number;
@@ -366,7 +387,9 @@ async function enter(core: Core): Promise<void> {
     : (isEndless
         ? createEndlessWaveConfig(endlessState.wave)
         : levelConfig!.waves[waveIdx]);
-  let waveMaxHp = waveConfig.enemyHp;
+  const getWaveMaxHp = (config: WaveConfig): number =>
+    config.mobGroup ? config.mobGroup.count * config.mobGroup.mobHp : config.enemyHp;
+  let waveMaxHp = getWaveMaxHp(waveConfig);
 
   const enemyTypeForDisplay = isVoid
     ? 'blackhole'
@@ -400,12 +423,13 @@ async function enter(core: Core): Promise<void> {
   const shockwavesContainer = new Container();
   const bubblesContainer = new Container();
   const lasersContainer = new Container();
+  const mobsContainer = new Container();
   const petsContainer = new Container();
   const guardsContainer = new Container();
   const playerShockwavesContainer = new Container(); // pulse emitter weapon
   // Warning display for sniper aim lines and teleport destination circles
   const sniperWarningDisplay = new Graphics();
-  worldLayer.addChild(shockwavesContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer, sniperWarningDisplay);
+  worldLayer.addChild(shockwavesContainer, mobsContainer, enemyBulletsContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, itemsContainer, playerBulletsContainer, playerShockwavesContainer, sniperWarningDisplay);
 
   // ── Player entity ────────────────────────────────────────────────────────
   const chickenDisplay = createPlayerChicken(costumeState.selected);
@@ -436,6 +460,7 @@ async function enter(core: Core): Promise<void> {
     : enemyTypeForDisplay === 'dragon' ? 52 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
+  enemyDisplay.visible = !waveConfig.mobGroup;
 
   const { output: enemyOut } = await core.events.emit('entity/create', {
     id: 'enemy',
@@ -649,6 +674,7 @@ async function enter(core: Core): Promise<void> {
   let pulseTimer = 0;
 
   // ── Pet guardian state (Level 5, last wave, phase 3 only) ────────────────
+  const mobs: MobEnemyData[] = [];
   const pets: PetData[] = [];
   let petPhaseActive = false;
   let petPhaseTriggered = false;
@@ -666,6 +692,7 @@ async function enter(core: Core): Promise<void> {
   const PET_BAR_W = 54;
   const BOSS_REGEN_INTERVAL = 2000; // ms between boss HP regen ticks during pet phase
   const BOSS_REGEN_AMOUNT = 3;      // HP restored per tick
+  const MOB_BAR_W = 42;
 
   // Timers (ms counters ticked down each update)
   let playerFireTimer = 0;
@@ -831,7 +858,11 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
   });
   const bossDisplayName = getEnemyDisplayName(enemyTypeForDisplay);
-  const bossLabelInitialText = isVoid ? TEXT.gameHud.voidTimerLabel : TEXT.gameHud.bossHpLabel(bossDisplayName);
+  const bossLabelInitialText = isVoid
+    ? TEXT.gameHud.voidTimerLabel
+    : (waveConfig.mobGroup
+        ? TEXT.gameHud.mobHpLabel(waveConfig.mobGroup.label)
+        : TEXT.gameHud.bossHpLabel(bossDisplayName));
   const bossLabel = new Text({ text: bossLabelInitialText, style: bossLabelStyle });
   bossLabel.anchor.set(0.5);
   bossLabel.x = W * 0.5;
@@ -1364,8 +1395,9 @@ async function enter(core: Core): Promise<void> {
     playerBulletsContainer.addChild(display);
     // Point initially toward the enemy so the bullet doesn't start flying in the
     // wrong direction before the homing steering kicks in.
-    const ex = enemyEntity.position.x;
-    const ey = enemyEntity.position.y;
+    const target = getCurrentDamageTarget(x, y);
+    const ex = target.x;
+    const ey = target.y;
     const initAngle = Math.atan2(ey - y, ex - x);
     playerBullets.push({
       display, x, y,
@@ -1420,8 +1452,10 @@ async function enter(core: Core): Promise<void> {
     } else {
       const frac = Math.max(0, enemyHP / waveMaxHp);
       if (frac > 0) {
-        const barColor = frac > waveConfig.phase2Frac ? 0xff2222
-          : frac > waveConfig.phase3Frac ? 0xff8800 : 0xaa00ff;
+        const barColor = waveConfig.mobGroup
+          ? (frac > 0.5 ? 0x66ff66 : frac > 0.25 ? 0xffdd44 : 0xff8844)
+          : (frac > waveConfig.phase2Frac ? 0xff2222
+              : frac > waveConfig.phase3Frac ? 0xff8800 : 0xaa00ff);
         hpBarFill.rect(0, 0, BAR_W * frac, 18).fill(barColor);
       }
     }
@@ -1432,7 +1466,12 @@ async function enter(core: Core): Promise<void> {
       bossLabel.text = `⏱ ${Math.ceil(voidTimerMs / 1000)}s`;
     } else {
       scoreText.text = TEXT.gameHud.score(score);
-      phaseText.text = TEXT.gameHud.phase(phase);
+      phaseText.text = waveConfig.mobGroup
+        ? `MOBS ${mobs.length}/${waveConfig.mobGroup.count}`
+        : TEXT.gameHud.phase(phase);
+      bossLabel.text = waveConfig.mobGroup
+        ? TEXT.gameHud.mobHpLabel(waveConfig.mobGroup.label)
+        : TEXT.gameHud.bossHpLabel(bossDisplayName);
     }
 
     // Build bottom-right status line
@@ -1561,8 +1600,208 @@ async function enter(core: Core): Promise<void> {
     updateHUD();
   }
 
+  function isMobWave(): boolean {
+    return waveConfig.mobGroup !== undefined;
+  }
+
+  function updateMobTotalHp(): void {
+    enemyHP = mobs.reduce((sum, mob) => sum + mob.hp, 0);
+  }
+
+  function removeAllMobs(): void {
+    for (const mob of mobs) {
+      mobsContainer.removeChild(mob.display);
+      mobsContainer.removeChild(mob.hpBarContainer);
+      mob.display.destroy();
+      mob.hpBarContainer.destroy({ children: true });
+    }
+    mobs.length = 0;
+  }
+
+  function spawnMobsForWave(): void {
+    removeAllMobs();
+    const group = waveConfig.mobGroup;
+    enemyDisplay.visible = !group;
+    if (!group) {
+      return;
+    }
+
+    const count = group.count;
+    const y = H * (group.yFrac ?? 0.20);
+    const margin = 56;
+    const spacing = count > 1 ? Math.min(82, (W - margin * 2) / (count - 1)) : 0;
+    const startX = count > 1 ? W * 0.5 - spacing * (count - 1) * 0.5 : W * 0.5;
+    const scale = group.displayScale ?? 0.58;
+    const radius = group.hitboxRadius ?? 26;
+
+    for (let i = 0; i < count; i++) {
+      const display = createEnemyDisplay(enemyTypeForDisplay);
+      display.scale.set(scale);
+      const x = startX + i * spacing;
+      const arcOffset = group.layout === 'arc'
+        ? Math.abs(i - (count - 1) / 2) * 14
+        : 0;
+      const mobY = y + arcOffset;
+      display.x = x;
+      display.y = mobY;
+      mobsContainer.addChild(display);
+
+      const hitFlash = createEnemyHitFlash(radius / scale);
+      display.addChild(hitFlash);
+
+      const hpBarContainer = new Container();
+      const hpBarBg = new Graphics();
+      hpBarBg.roundRect(0, 0, MOB_BAR_W, 6, 2).fill({ color: 0x111122, alpha: 0.85 });
+      hpBarContainer.addChild(hpBarBg);
+      const hpBarFill = new Graphics();
+      hpBarFill.rect(0, 0, MOB_BAR_W, 6).fill(0x66ff66);
+      hpBarContainer.addChild(hpBarFill);
+      const hpBarBorder = new Graphics();
+      hpBarBorder.roundRect(0, 0, MOB_BAR_W, 6, 2).stroke({ color: 0xaaffaa, width: 1 });
+      hpBarContainer.addChild(hpBarBorder);
+      hpBarContainer.x = x - MOB_BAR_W / 2;
+      hpBarContainer.y = mobY - radius - 12;
+      mobsContainer.addChild(hpBarContainer);
+
+      mobs.push({
+        display,
+        hitFlash,
+        hpBarContainer,
+        hpBarFill,
+        hp: group.mobHp,
+        maxHp: group.mobHp,
+        x,
+        y: mobY,
+        baseX: x,
+        baseY: mobY,
+        radius,
+        bobTimer: i * 260,
+        fireTimer: (group.initialFireDelayMs ?? 500) + i * 220,
+        hitFlashMs: 0,
+        phaseOffset: i * 0.7,
+      });
+    }
+
+    updateMobTotalHp();
+  }
+
+  function getNearestMob(x: number, y: number): MobEnemyData | null {
+    if (mobs.length === 0) return null;
+    let nearest = mobs[0];
+    let nearestDist2 = Infinity;
+    for (const mob of mobs) {
+      const dx = mob.x - x;
+      const dy = mob.display.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < nearestDist2) {
+        nearestDist2 = d2;
+        nearest = mob;
+      }
+    }
+    return nearest;
+  }
+
+  function getCurrentDamageTarget(fromX: number, fromY: number): { x: number; y: number; radius: number } {
+    if (petPhaseActive && pets.length > 0) {
+      let nearestPet = pets[0];
+      let nearestDist2 = Infinity;
+      for (const pet of pets) {
+        const dx = pet.x - fromX;
+        const dy = pet.display.y - fromY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < nearestDist2) {
+          nearestDist2 = d2;
+          nearestPet = pet;
+        }
+      }
+      return { x: nearestPet.x, y: nearestPet.display.y, radius: PET_HITBOX_R };
+    }
+
+    const nearestMob = getNearestMob(fromX, fromY);
+    if (nearestMob) {
+      return { x: nearestMob.x, y: nearestMob.display.y, radius: nearestMob.radius };
+    }
+
+    return { x: enemyEntity.position.x, y: enemyEntity.position.y, radius: ENEMY_HITBOX_R };
+  }
+
+  function findMobHitByCircle(x: number, y: number, radius: number): number {
+    for (let i = mobs.length - 1; i >= 0; i--) {
+      const mob = mobs[i];
+      const dx = x - mob.x;
+      const dy = y - mob.display.y;
+      if (Math.sqrt(dx * dx + dy * dy) < mob.radius + radius) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  function removeMob(idx: number): void {
+    const mob = mobs[idx];
+    core.events.emitSync('particle/emit', {
+      config: {
+        x: mob.x,
+        y: mob.display.y,
+        burst: true,
+        burstCount: 14,
+        speed: 120,
+        speedVariance: 55,
+        spread: 180,
+        lifetime: 420,
+        startAlpha: 1,
+        endAlpha: 0,
+        startScale: 1.1,
+        endScale: 0,
+        startColor: 0xffdd66,
+        endColor: 0xff5522,
+        radius: 5,
+      },
+    });
+    sfxEnemyDeath();
+    mobsContainer.removeChild(mob.display);
+    mobsContainer.removeChild(mob.hpBarContainer);
+    mob.display.destroy();
+    mob.hpBarContainer.destroy({ children: true });
+    mobs.splice(idx, 1);
+  }
+
+  function applyMobDamage(idx: number, damage: number, particles: EnemyHitParticleOptions): boolean {
+    const mob = mobs[idx];
+    mob.hitFlashMs = 80;
+    sfxEnemyHit();
+    mob.hp = Math.max(0, mob.hp - damage);
+    score += SCORE_PER_HIT * damage;
+    updateScoreMilestones();
+
+    const barFrac = Math.max(0, mob.hp / mob.maxHp);
+    mob.hpBarFill.clear();
+    if (barFrac > 0) {
+      const barColor = barFrac > 0.5 ? 0x66ff66 : barFrac > 0.25 ? 0xffdd44 : 0xff8844;
+      mob.hpBarFill.rect(0, 0, MOB_BAR_W * barFrac, 6).fill(barColor);
+    }
+
+    emitEnemyHitParticles({
+      ...particles,
+      x: mob.x + (Math.random() - 0.5) * 18,
+      y: mob.display.y + (Math.random() - 0.5) * 18,
+      burstCount: particles.burstCount ?? 6,
+    });
+
+    if (mob.hp <= 0) {
+      removeMob(idx);
+    }
+    updateMobTotalHp();
+
+    if (isMobWave() && mobs.length === 0) {
+      handleEnemyDefeated();
+      return true;
+    }
+    return false;
+  }
 
   function checkPhase(): void {
+    if (isMobWave()) return;
     const frac = enemyHP / waveMaxHp;
     const newPhase: 1 | 2 | 3 = frac > waveConfig.phase2Frac ? 1 : frac > waveConfig.phase3Frac ? 2 : 3;
     if (newPhase !== phase) {
@@ -2349,8 +2588,8 @@ async function enter(core: Core): Promise<void> {
   function emitEnemyHitParticles(opts: EnemyHitParticleOptions): void {
     core.events.emitSync('particle/emit', {
       config: {
-        x: enemyEntity.position.x + (Math.random() - 0.5) * 30,
-        y: enemyEntity.position.y + (Math.random() - 0.5) * 30,
+        x: opts.x ?? enemyEntity.position.x + (Math.random() - 0.5) * 30,
+        y: opts.y ?? enemyEntity.position.y + (Math.random() - 0.5) * 30,
         burst: true,
         burstCount: opts.burstCount ?? 8,
         speed: opts.speed ?? 90,
@@ -2405,6 +2644,8 @@ async function enter(core: Core): Promise<void> {
 
     return false;
   }
+
+  spawnMobsForWave();
 
   const unsubTouchStart = core.events.on(
     'game',
@@ -2692,10 +2933,11 @@ async function enter(core: Core): Promise<void> {
             // Channel complete: fire the fireball
             wizardMagicCircle.visible = false;
             wizardCooldownMs = WIZARD_COOLDOWN_MS;
-            const ex = enemyEntity.position.x;
-            const ey = enemyEntity.position.y;
             const px = playerEntity.position.x;
             const py = playerEntity.position.y;
+            const target = getCurrentDamageTarget(px, py);
+            const ex = target.x;
+            const ey = target.y;
             const dist = Math.sqrt((ex - px) * (ex - px) + (ey - py) * (ey - py)) || 1;
             const fbVx = ((ex - px) / dist) * WIZARD_FIREBALL_SPEED;
             const fbVy = ((ey - py) / dist) * WIZARD_FIREBALL_SPEED;
@@ -2808,8 +3050,9 @@ async function enter(core: Core): Promise<void> {
           if (guard.fireTimer <= 0 && !waveTransitioning) {
             guard.fireTimer = PRINCESS_GUARD_FIRE_INTERVAL_MS;
             // Spawn a player bullet from the guard toward the enemy
-            const ex = enemyEntity.position.x;
-            const ey = enemyEntity.position.y;
+            const target = getCurrentDamageTarget(guard.x, guard.y);
+            const ex = target.x;
+            const ey = target.y;
             const dist = Math.sqrt(
               (ex - guard.x) * (ex - guard.x) + (ey - guard.y) * (ey - guard.y),
             ) || 1;
@@ -2863,8 +3106,9 @@ async function enter(core: Core): Promise<void> {
             heroChargedDamage = 0;
             updateHUD();
           } else if (isAdventureCostume) {
-            const adx = playerEntity.position.x - enemyEntity.position.x;
-            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const target = getCurrentDamageTarget(playerEntity.position.x, playerEntity.position.y);
+            const adx = playerEntity.position.x - target.x;
+            const ady = playerEntity.position.y - target.y;
             const adDist = Math.sqrt(adx * adx + ady * ady);
             const adT = 1 - Math.min(1, Math.max(0,
               (adDist - ADVENTURE_PROXIMITY_MIN_DIST) / (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
@@ -2927,8 +3171,9 @@ async function enter(core: Core): Promise<void> {
             heroChargedDamage = 0;
             updateHUD();
           } else if (isAdventureCostume) {
-            const adx = playerEntity.position.x - enemyEntity.position.x;
-            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const target = getCurrentDamageTarget(playerEntity.position.x, playerEntity.position.y);
+            const adx = playerEntity.position.x - target.x;
+            const ady = playerEntity.position.y - target.y;
             const adDist = Math.sqrt(adx * adx + ady * ady);
             const adT = 1 - Math.min(1, Math.max(0,
               (adDist - ADVENTURE_PROXIMITY_MIN_DIST) / (ADVENTURE_PROXIMITY_MAX_DIST - ADVENTURE_PROXIMITY_MIN_DIST),
@@ -2974,8 +3219,9 @@ async function enter(core: Core): Promise<void> {
             heroChargedDamage = 0;
             updateHUD();
           } else if (isAdventureCostume) {
-            const adx = playerEntity.position.x - enemyEntity.position.x;
-            const ady = playerEntity.position.y - enemyEntity.position.y;
+            const target = getCurrentDamageTarget(playerEntity.position.x, playerEntity.position.y);
+            const adx = playerEntity.position.x - target.x;
+            const ady = playerEntity.position.y - target.y;
             const adDist = Math.sqrt(adx * adx + ady * ady);
             const adT = 1 - Math.min(1, Math.max(0,
               (adDist - ADVENTURE_PROXIMITY_MIN_DIST) /
@@ -3096,9 +3342,46 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
+      // ── Mob group update (small-enemy encounter waves) ────────────────────
+      if (!waveTransitioning && mobs.length > 0 && waveConfig.mobGroup) {
+        const group = waveConfig.mobGroup;
+        const amp = group.moveAmplitude ?? 24;
+        const period = group.movePeriodMs ?? 2400;
+        for (const mob of mobs) {
+          mob.bobTimer += dt;
+          const t = (mob.bobTimer / period) * Math.PI * 2 + mob.phaseOffset;
+          mob.x = mob.baseX + Math.sin(t) * amp;
+          mob.y = mob.baseY + Math.sin(mob.bobTimer / 700 + mob.phaseOffset) * 7;
+          mob.display.x = mob.x;
+          mob.display.y = mob.y;
+          mob.hpBarContainer.x = mob.x - MOB_BAR_W / 2;
+          mob.hpBarContainer.y = mob.y - mob.radius - 12;
+
+          if (mob.hitFlashMs > 0) {
+            mob.hitFlashMs = Math.max(0, mob.hitFlashMs - dt);
+            mob.hitFlash.visible = true;
+            mob.hitFlash.alpha = mob.hitFlashMs / 80;
+            if (mob.hitFlashMs <= 0) mob.hitFlash.visible = false;
+          }
+
+          mob.fireTimer -= dt;
+          if (mob.fireTimer <= 0) {
+            mob.fireTimer = group.fireInterval;
+            fireAimedFrom(
+              mob.x,
+              mob.y,
+              group.bulletWays,
+              group.bulletSpread,
+              group.bulletSpeed,
+              group.bulletColor,
+            );
+          }
+        }
+      }
+
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
       // Boss does not attack while pet guardians are active.
-      if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive) {
+      if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive && !isMobWave()) {
         const p = waveConfig.phases[phase - 1];
 
         if (p.spiralInterval > 0) {
@@ -3383,24 +3666,9 @@ async function enter(core: Core): Promise<void> {
 
         // Homing bullets steer toward the enemy each frame before moving.
         if (b.homing && !waveTransitioning) {
-          let ex: number;
-          let ey: number;
-          if (petPhaseActive && pets.length > 0) {
-            // During pet phase, home toward the nearest pet guardian instead of the boss.
-            let nearestDist2 = Infinity;
-            let nearestPet = pets[0];
-            for (const pet of pets) {
-              const pdx = pet.x - b.x;
-              const pdy = pet.y - b.y;
-              const d2 = pdx * pdx + pdy * pdy;
-              if (d2 < nearestDist2) { nearestDist2 = d2; nearestPet = pet; }
-            }
-            ex = nearestPet.x;
-            ey = nearestPet.y;
-          } else {
-            ex = enemyEntity.position.x;
-            ey = enemyEntity.position.y;
-          }
+          const target = getCurrentDamageTarget(b.x, b.y);
+          const ex = target.x;
+          const ey = target.y;
           const targetAngle = Math.atan2(ey - b.y, ex - b.x);
           let diff = targetAngle - Math.atan2(b.vy, b.vx);
           while (diff > Math.PI)  diff -= 2 * Math.PI;
@@ -3472,6 +3740,20 @@ async function enter(core: Core): Promise<void> {
           continue;
         }
 
+        const mobHitIdx = findMobHitByCircle(b.x, b.y, b.radius ?? PLAYER_BULLET_R);
+        if (mobHitIdx >= 0) {
+          const baseDmg = b.damage ?? bulletDamage;
+          const isCrit = critChance > 0 && Math.random() < critChance;
+          const dmg = isCrit ? baseDmg * 2 : baseDmg;
+          removeBullet(playerBullets, i, playerBulletsContainer, true);
+          if (applyMobDamage(mobHitIdx, dmg, { startColor: 0xffcc66, endColor: 0xff5522 })) {
+            return;
+          }
+          continue;
+        }
+
+        if (isMobWave()) continue;
+
         // Hit enemy
         const dx = b.x - enemyEntity.position.x;
         const dy = b.y - enemyEntity.position.y;
@@ -3512,9 +3794,18 @@ async function enter(core: Core): Promise<void> {
         // Deflected bullets fly toward the enemy instead of the player.
         if (b.deflected) {
           if (!waveTransitioning && !petPhaseActive) {
+            const mobHitIdx = findMobHitByCircle(b.x, b.y, ENEMY_BULLET_R);
+            if (mobHitIdx >= 0) {
+              removeBullet(enemyBullets, i, enemyBulletsContainer, false);
+              if (applyMobDamage(mobHitIdx, 1, { startColor: 0xff88cc, endColor: 0xff4488 })) {
+                return;
+              }
+              continue;
+            }
+
             const edx = b.x - enemyEntity.position.x;
             const edy = b.y - enemyEntity.position.y;
-            if (Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
+            if (!isMobWave() && Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
               removeBullet(enemyBullets, i, enemyBulletsContainer, false);
               if (applyEnemyDamage(1, { startColor: 0xff88cc, endColor: 0xff4488 })) {
                 return;
@@ -3764,10 +4055,37 @@ async function enter(core: Core): Promise<void> {
 
         // Collision: ring boundary crosses the enemy hitbox
         if (!sw.hitDealt && !waveTransitioning && !petPhaseActive) {
+          const halfThick = SHOCKWAVE_THICKNESS / 2;
+
+          for (let mi = mobs.length - 1; mi >= 0; mi--) {
+            const mob = mobs[mi];
+            const mdx = mob.x - sw.x;
+            const mdy = mob.display.y - sw.y;
+            const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+            if (Math.abs(mdist - sw.radius) < halfThick + mob.radius) {
+              sw.hitDealt = true;
+              const pulseHitDmg = critChance > 0 && Math.random() < critChance ? sw.damage * 2 : sw.damage;
+              if (applyMobDamage(mi, pulseHitDmg, {
+                startColor: sw.color,
+                endColor: 0xffffff,
+                burstCount: 10,
+                speed: 95,
+                speedVariance: 45,
+                lifetime: 380,
+                startScale: 1.1,
+                radius: 5,
+              })) {
+                return;
+              }
+              break;
+            }
+          }
+
+          if (sw.hitDealt || isMobWave()) continue;
+
           const edx = enemyEntity.position.x - sw.x;
           const edy = enemyEntity.position.y - sw.y;
           const edist = Math.sqrt(edx * edx + edy * edy);
-          const halfThick = SHOCKWAVE_THICKNESS / 2;
           if (Math.abs(edist - sw.radius) < halfThick + ENEMY_HITBOX_R) {
             sw.hitDealt = true;
 
@@ -4268,6 +4586,9 @@ async function enter(core: Core): Promise<void> {
     }
     items.length = 0;
 
+    // Clear mob enemies between waves
+    removeAllMobs();
+
     // Clear any pet guardians (safety — normally they are only on last wave)
     for (let i = pets.length - 1; i >= 0; i--) {
       petsContainer.removeChild(pets[i].display);
@@ -4297,7 +4618,7 @@ async function enter(core: Core): Promise<void> {
     // Switch to new wave config
     waveIdx = nextWaveIdx;
     waveConfig = levelConfig!.waves[waveIdx];
-    waveMaxHp = waveConfig.enemyHp;
+    waveMaxHp = getWaveMaxHp(waveConfig);
     enemyHP = waveMaxHp;
 
     // Restore 2 HP to the player on wave clear (capped at effective max)
@@ -4323,6 +4644,7 @@ async function enter(core: Core): Promise<void> {
     enemyEntity.position.x = W * 0.5;
     enemyEntity.position.y = H * 0.18;
     enemyBobTimer = 0;
+    spawnMobsForWave();
 
     updateHUD();
     waveTransitioning = false;
@@ -4567,6 +4889,9 @@ async function enter(core: Core): Promise<void> {
     }
     pets.length = 0;
 
+    // Destroy all mob enemies
+    removeAllMobs();
+
     // Destroy all princess guard chickens
     for (const guard of guards) {
       guardsContainer.removeChild(guard.display);
@@ -4580,7 +4905,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('entity/destroy', { id: 'enemy' });
 
     // Destroy world objects
-    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar, sniperWarningDisplay);
+    worldLayer.removeChild(stars, scrollA, scrollB, playerBulletsContainer, itemsContainer, mobsContainer, enemyBulletsContainer, shockwavesContainer, bubblesContainer, lasersContainer, petsContainer, guardsContainer, trapRing, costumeRing, playerShockwavesContainer, beamChargeBar, sniperWarningDisplay);
     stars.destroy({ children: true });
     scrollA.destroy({ children: true });
     scrollB.destroy({ children: true });
@@ -4590,6 +4915,7 @@ async function enter(core: Core): Promise<void> {
     shockwavesContainer.destroy({ children: true });
     bubblesContainer.destroy({ children: true });
     lasersContainer.destroy({ children: true });
+    mobsContainer.destroy({ children: true });
     petsContainer.destroy({ children: true });
     guardsContainer.destroy({ children: true });
     playerShockwavesContainer.destroy({ children: true });

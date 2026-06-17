@@ -100,6 +100,7 @@ export const zhTW = {
   },
   gameHud: {
     bossHpLabel: (bossName: string): string => `${bossName}  HP`,
+    mobHpLabel: (mobName: string): string => `${mobName}  HP`,
     voidTimerLabel: '⏱ 剩餘時間',
     score: (score: number): string => `SCORE: ${score}`,
     damage: (damage: number): string => `傷害：${damage}`,

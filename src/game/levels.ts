@@ -116,13 +116,49 @@ export interface WavePhaseConfig {
   teleportInterval: number; // ms between teleports; 0 = disabled
 }
 
+/** Configuration for a group of smaller enemies that must all be defeated to clear a wave. */
+export interface MobGroupConfig {
+  /** Display label shown in the HP bar for this encounter. */
+  label: string;
+  /** Number of mobs spawned at the start of the wave. */
+  count: number;
+  /** HP for each individual mob. */
+  mobHp: number;
+  /** Collision radius for each mob. Defaults to 26 px. */
+  hitboxRadius?: number;
+  /** Visual scale applied to the level's enemy sprite. Defaults to 0.58. */
+  displayScale?: number;
+  /** Horizontal formation shape. Defaults to a straight line. */
+  layout?: 'line' | 'arc';
+  /** Vertical spawn position as a fraction of screen height. Defaults to 0.2. */
+  yFrac?: number;
+  /** Horizontal patrol amplitude in px. Defaults to 24. */
+  moveAmplitude?: number;
+  /** Patrol period in ms. Defaults to 2400. */
+  movePeriodMs?: number;
+  /** Delay before each mob's first shot, staggered by mob index. Defaults to 500 ms. */
+  initialFireDelayMs?: number;
+  /** Interval between shots for each mob. */
+  fireInterval: number;
+  /** Bullets fired per volley. */
+  bulletWays: number;
+  /** Radian spread between bullets in a volley. */
+  bulletSpread: number;
+  /** Bullet speed in px/s. */
+  bulletSpeed: number;
+  /** Bullet colour for mob volleys. */
+  bulletColor: number;
+}
+
 /** Configuration for one enemy encounter (wave) within a level. */
 export interface WaveConfig {
   waveNumber: number;   // 1-based display number
-  enemyHp: number;
+  enemyHp: number;      // Boss HP, or total encounter HP for mob-group waves
   phase2Frac: number;   // HP fraction at which phase 2 starts
   phase3Frac: number;   // HP fraction at which phase 3 starts
   phases: [WavePhaseConfig, WavePhaseConfig, WavePhaseConfig]; // [phase1, phase2, phase3]
+  /** Optional mob encounter; when set, this wave spawns several smaller enemies instead of the boss. */
+  mobGroup?: MobGroupConfig;
   /**
    * When true the enemy smoothly tracks the player's X position (horizontally)
    * during gameplay, creating a "left-right swaying tracking" movement pattern.
@@ -233,7 +269,7 @@ export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
   };
 }
 
-// ─── Level 1 · 初級挑戰 (1 wave) ──────────────────────────────────────────────
+// ─── Level 1 · 初級挑戰 (mob warm-up + boss) ──────────────────────────────────
 
 const LEVEL_1: LevelConfig = {
   levelNumber: 1,
@@ -242,6 +278,30 @@ const LEVEL_1: LevelConfig = {
   waves: [
     {
       waveNumber: 1,
+      enemyHp: 120,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      mobGroup: {
+        label: '勇氣小隊',
+        count: 3,
+        mobHp: 40,
+        hitboxRadius: 24,
+        displayScale: 0.54,
+        layout: 'line',
+        yFrac: 0.20,
+        moveAmplitude: 24,
+        movePeriodMs: 2600,
+        initialFireDelayMs: 650,
+        fireInterval: 1550,
+        bulletWays: 1,
+        bulletSpread: 0.22,
+        bulletSpeed: BULLET_SPEED_SLOW,
+        bulletColor: COL_BULLET_P1,
+      },
+      phases: [phase({}), phase({}), phase({})],
+    },
+    {
+      waveNumber: 2,
       enemyHp: 200,
       phase2Frac: 0.66,
       phase3Frac: 0.33,
@@ -735,8 +795,7 @@ const LEVEL_5: LevelConfig = {
 };
 
 // ─── Level 6 · 機甲試煉 (2 waves) ─────────────────────────────────────────────
-// Wave 1: Tracking Mech – sways left-right to follow the player and rains
-//         bullets straight down, mixing in rings, aimed shots, and bombs.
+// Wave 1: Mech Drone Squad – several smaller drones fan out before the boss.
 // Wave 2: Mech Chicken BOSS – full arsenal with straight-down curtains.
 
 const LEVEL_6: LevelConfig = {
@@ -750,7 +809,23 @@ const LEVEL_6: LevelConfig = {
       enemyHp: 320,
       phase2Frac: 0.66,
       phase3Frac: 0.33,
-      enemyTracksPlayer: true,
+      mobGroup: {
+        label: '機甲小隊',
+        count: 4,
+        mobHp: 80,
+        hitboxRadius: 25,
+        displayScale: 0.50,
+        layout: 'arc',
+        yFrac: 0.21,
+        moveAmplitude: 34,
+        movePeriodMs: 2200,
+        initialFireDelayMs: 500,
+        fireInterval: 1350,
+        bulletWays: 2,
+        bulletSpread: 0.24,
+        bulletSpeed: BULLET_SPEED_FAST,
+        bulletColor: COL_BULLET_MECH,
+      },
       phases: [
         phase({
           spiralInterval: 280, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_MECH,
@@ -1168,9 +1243,21 @@ function scaleWave(
   scale: PhaseScale,
   movement?: Pick<WaveConfig, 'enemyTracksPlayer' | 'enemySineMoves' | 'enemySineAmplitude' | 'enemySinePeriodMs'>,
 ): WaveConfig {
+  const scaledMobGroup = base.mobGroup
+    ? {
+        ...base.mobGroup,
+        mobHp: Math.max(10, roundToStep(base.mobGroup.mobHp * scale.hp, 5)),
+        fireInterval: scaleActiveInterval(base.mobGroup.fireInterval, scale.density),
+        bulletWays: scaleActiveCount(base.mobGroup.bulletWays, scale.count),
+        bulletSpeed: scaleActiveSpeed(base.mobGroup.bulletSpeed, scale.speed),
+      }
+    : undefined;
+
   return {
     waveNumber,
-    enemyHp: Math.max(120, roundToStep(base.enemyHp * scale.hp, 5)),
+    enemyHp: scaledMobGroup
+      ? scaledMobGroup.count * scaledMobGroup.mobHp
+      : Math.max(120, roundToStep(base.enemyHp * scale.hp, 5)),
     phase2Frac: PHASE2_FRAC,
     phase3Frac: PHASE3_FRAC,
     phases: [
@@ -1178,6 +1265,7 @@ function scaleWave(
       scalePhase(base.phases[1], scale, 1),
       scalePhase(base.phases[2], scale, 2),
     ],
+    mobGroup: scaledMobGroup,
     enemyTracksPlayer: movement?.enemyTracksPlayer ?? base.enemyTracksPlayer,
     enemySineMoves: movement?.enemySineMoves ?? base.enemySineMoves,
     enemySineAmplitude: movement?.enemySineAmplitude ?? base.enemySineAmplitude,
