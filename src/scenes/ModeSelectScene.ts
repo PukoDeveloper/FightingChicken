@@ -172,14 +172,7 @@ async function enter(core: Core): Promise<void> {
     if (_transitioning) return;
     _transitioning = true;
     sfxMenuClick();
-    endlessState.active = true;
-    endlessState.wave = 1;
-    endlessState.buffs = [];
-    endlessState.score = 0;
-    endlessState.periodicShieldTimer = 0;
-    endlessState.regenTimer = 0;
-    await saveProgress();
-    await core.events.emit('scene/load', { key: 'skillselect' });
+    await core.events.emit('scene/load', { key: 'endlessselect' });
   });
 
   // 虛空之境

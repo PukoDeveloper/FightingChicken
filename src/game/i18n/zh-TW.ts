@@ -67,6 +67,16 @@ export const zhTW = {
       label: '∞  無盡模式',
       defaultSubLabel: '挑戰無限關卡！',
       bestWave: (wave: number): string => `最高波數：第 ${wave} 波`,
+      selectTitle: '選擇無盡模式',
+      classic: {
+        label: '∞  經典模式',
+        subLabel: '原本的無盡波次挑戰',
+      },
+      surge: {
+        label: '🌊  潮湧模式',
+        subLabel: '小怪不斷來襲，拾取升級箱獲得 Buff',
+        bestTime: (seconds: number): string => `最久生存：${seconds}s`,
+      },
     },
     void: {
       label: '⬛  虛空之境',
@@ -107,6 +117,7 @@ export const zhTW = {
     phase: (phase: number): string => `PHASE ${phase}`,
     voidStatus: '⬛ 虛空之境',
     endlessWave: (wave: number): string => `∞ 無盡  第 ${wave} 波`,
+    endlessSurge: (seconds: number): string => `🌊 潮湧  ${seconds}s`,
     levelWave: (level: number, wave: number, totalWaves: number): string => `LVL ${level}  WAVE ${wave}/${totalWaves}`,
   },
   gameOver: {
@@ -123,12 +134,14 @@ export const zhTW = {
     voidLevelWin: '虛空之境 · 60秒挑戰完成！',
     voidLevelLose: '虛空之境 · 被黑洞湮滅了',
     endlessSummary: (wave: number, best: number): string => `無盡模式 · 第 ${wave} 波  最高：第 ${best} 波`,
+    surgeSummary: (seconds: number, bestSeconds: number): string => `潮湧模式 · 生存 ${seconds}s  最久：${bestSeconds}s`,
     levelWin: (level: number, name: string): string => `通關第 ${level} 關「${name}」！`,
     levelChallenge: (level: number, name: string): string => `挑戰第 ${level} 關「${name}」`,
     messages: {
       voidWin: '黑洞無法被消滅...\n但你的傷害已被記錄！',
       defeat: '被彈幕擊倒了...\n再接再厲！',
       endlessDefeat: '被彈幕擊倒了...\n無盡的挑戰等著你！',
+      surgeDefeat: '潮湧仍在擴大...\n撐得越久，強化越關鍵！',
       win: (bossName: string): string => `你擊敗了${bossName}！\n小雞的逆襲成功了！`,
     },
     replayButton: '再玩一次',

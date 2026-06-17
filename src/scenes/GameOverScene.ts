@@ -30,6 +30,7 @@ async function enter(core: Core): Promise<void> {
   const { won, score } = gameResult;
   const isVoidGameOver    = gameResult.playedLevel === -1;
   const isEndlessGameOver = !isVoidGameOver && endlessState.active && gameResult.playedLevel === 0;
+  const isSurgeGameOver   = isEndlessGameOver && endlessState.variant === 'surge';
   const highScore = isVoidGameOver
     ? voidState.highScore
     : (isEndlessGameOver
@@ -129,9 +130,16 @@ async function enter(core: Core): Promise<void> {
   if (isVoidGameOver) {
     levelLabelText = won ? TEXT.gameOver.voidLevelWin : TEXT.gameOver.voidLevelLose;
   } else if (isEndlessGameOver) {
-    const waveReached = endlessState.wave;
-    const best = endlessState.bestWave;
-    levelLabelText = TEXT.gameOver.endlessSummary(waveReached, best);
+    if (isSurgeGameOver) {
+      levelLabelText = TEXT.gameOver.surgeSummary(
+        Math.floor(endlessState.lastSurgeMs / 1000),
+        Math.floor(endlessState.bestSurgeMs / 1000),
+      );
+    } else {
+      const waveReached = endlessState.wave;
+      const best = endlessState.bestWave;
+      levelLabelText = TEXT.gameOver.endlessSummary(waveReached, best);
+    }
   } else {
     const storyLevelCfg = gameResult.storyMode ? getStoryLevel(clearedLevel) : null;
     const clearedLevelConfig = storyLevelCfg ?? createLevel(clearedLevel);
@@ -159,7 +167,7 @@ async function enter(core: Core): Promise<void> {
   const msgText = isVoidGameOver
     ? (won ? TEXT.gameOver.messages.voidWin : TEXT.gameOver.messages.defeat)
     : (isEndlessGameOver
-        ? TEXT.gameOver.messages.endlessDefeat
+        ? (isSurgeGameOver ? TEXT.gameOver.messages.surgeDefeat : TEXT.gameOver.messages.endlessDefeat)
         : (won
           ? TEXT.gameOver.messages.win(bossName)
           : TEXT.gameOver.messages.defeat));
@@ -212,6 +220,8 @@ async function enter(core: Core): Promise<void> {
       endlessState.buffs = [];
       endlessState.currentHp = 0;
       endlessState.score = 0;
+      endlessState.surgeElapsedMs = 0;
+      endlessState.lastSurgeMs = 0;
       endlessState.periodicShieldTimer = 0;
       endlessState.regenTimer = 0;
     }

@@ -5,6 +5,8 @@ import type { SkillId } from './skills';
 import type { EquipmentId, EquipSlotId } from './equipment';
 import type { WingmanId } from './wingmen';
 
+export type EndlessVariant = 'classic' | 'surge';
+
 /** Shared game-result state written by GameScene and read by GameOverScene. */
 export const gameResult = {
   won: false,
@@ -43,6 +45,8 @@ export const devConfig = {
 export const endlessState = {
   /** Whether the current game session is endless mode. */
   active: false,
+  /** Sub-mode selected for the current endless session. */
+  variant: 'classic' as EndlessVariant,
   /** 1-based number of the wave currently being (or about to be) played. */
   wave: 1,
   /** Accumulated buff IDs chosen by the player so far. */
@@ -51,6 +55,12 @@ export const endlessState = {
   bestWave: 1,
   /** Best score achieved in endless mode. */
   highScore: 0,
+  /** Milliseconds survived in the current surge-mode attempt. */
+  surgeElapsedMs: 0,
+  /** Best survival time achieved in surge mode. */
+  bestSurgeMs: 0,
+  /** Last completed surge-mode survival time for the game-over screen. */
+  lastSurgeMs: 0,
   /** HP carried over from the previous wave (0 = start fresh at base HP). */
   currentHp: 0,
   /** Cumulative score across all waves in the current endless run. */

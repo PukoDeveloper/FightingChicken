@@ -109,7 +109,7 @@ import { gameResult, devConfig, endlessState, costumeState, skillState, currency
 import { EQUIPMENT_DEFS } from '../game/equipment';
 import { WINGMAN_DEFS } from '../game/wingmen';
 import { createLevel, getStoryLevel, STORY_TOTAL_LEVELS } from '../game/levels';
-import type { WaveConfig } from '../game/levels';
+import type { MobGroupConfig, WaveConfig } from '../game/levels';
 import { createEndlessWaveConfig, endlessEnemyType, pickRandomBuffs, computeEffectiveStats } from '../game/endless';
 import type { BuffId, StatContext } from '../game/endless';
 import { createVoidWaveConfig } from '../game/void';
@@ -278,6 +278,7 @@ interface MobEnemyData {
   fireTimer: number;
   hitFlashMs: number;
   phaseOffset: number;
+  group: MobGroupConfig;
 }
 
 // ─── Pet Guardian data ────────────────────────────────────────────────────────
@@ -380,6 +381,7 @@ async function enter(core: Core): Promise<void> {
 
   // ── Level / wave config ────────────────────────────────────────────────────
   const isEndless = endlessState.active;
+  const isSurgeMode = isEndless && endlessState.variant === 'surge';
   const isVoid    = voidState.active;
 
   // For endless mode we compute a single-wave "level" from endlessState.wave;
@@ -404,7 +406,9 @@ async function enter(core: Core): Promise<void> {
 
   const enemyTypeForDisplay = isVoid
     ? 'blackhole'
-    : (isEndless
+    : (isSurgeMode
+        ? 'chaos'
+        : isEndless
         ? endlessEnemyType(endlessState.wave)
         : levelConfig!.enemyType);
 
@@ -471,7 +475,7 @@ async function enter(core: Core): Promise<void> {
     : enemyTypeForDisplay === 'dragon' ? 52 : 44;
   const enemyHitFlash = createEnemyHitFlash(enemyHitFlashRadius);
   enemyDisplay.addChild(enemyHitFlash);
-  enemyDisplay.visible = !waveConfig.mobGroup;
+  enemyDisplay.visible = !isSurgeMode && !waveConfig.mobGroup;
 
   const { output: enemyOut } = await core.events.emit('entity/create', {
     id: 'enemy',
@@ -502,7 +506,16 @@ async function enter(core: Core): Promise<void> {
   const items: ItemData[] = [];
   let itemSpawnTimer = 5000; // first item spawns after 5 s
   let mooseGiftTimer = MOOSE_GIFT_INTERVAL_MS; // first gift box spawns after one full interval
+  let surgeUpgradeTimer = 11000; // first surge upgrade box drops after the opening rush
   let powerUpTimer = 0;      // ms remaining on current damage power-up
+
+  // ── Surge-mode pacing state ───────────────────────────────────────────────
+  let surgeElapsedMs = isSurgeMode ? endlessState.surgeElapsedMs : 0;
+  let surgeSpawnTimer = isSurgeMode ? 1200 : 0;
+  let surgeSpawnCount = 0;
+  const SURGE_MAX_MOBS = 18;
+  const SURGE_UPGRADE_INTERVAL_MS = 18500;
+  const SURGE_UPGRADE_DROP_CHANCE = 0.28;
 
   // ── Endless-mode buff state ───────────────────────────────────────────────
   // Gift buffs: granted mid-game by the moose costume's gift-box passive.
@@ -860,6 +873,7 @@ async function enter(core: Core): Promise<void> {
   const { container: hpBarContainer, fill: hpBarFill } = createBossHpBar(BAR_W);
   hpBarContainer.x = (W - BAR_W) / 2;
   hpBarContainer.y = 8;
+  hpBarContainer.visible = !isSurgeMode;
   uiLayer.addChild(hpBarContainer);
 
   const bossLabelStyle = new TextStyle({
@@ -869,7 +883,9 @@ async function enter(core: Core): Promise<void> {
     fontWeight: 'bold',
   });
   const bossDisplayName = getEnemyDisplayName(enemyTypeForDisplay);
-  const bossLabelInitialText = isVoid
+  const bossLabelInitialText = isSurgeMode
+    ? '🌊 潮湧來襲'
+    : isVoid
     ? TEXT.gameHud.voidTimerLabel
     : (waveConfig.mobGroup
         ? TEXT.gameHud.mobHpLabel(waveConfig.mobGroup.label)
@@ -899,7 +915,7 @@ async function enter(core: Core): Promise<void> {
     fontSize: 14,
     fill: 0xff8888,
   });
-  const phaseText = new Text({ text: isVoid ? '' : TEXT.gameHud.phase(1), style: phaseStyle });
+  const phaseText = new Text({ text: isVoid ? '' : (isSurgeMode ? 'SURGE' : TEXT.gameHud.phase(1)), style: phaseStyle });
   phaseText.anchor.set(0.5);
   phaseText.x = W * 0.5;
   phaseText.y = 48;
@@ -917,7 +933,7 @@ async function enter(core: Core): Promise<void> {
     text: isVoid
       ? TEXT.gameHud.voidStatus
       : (isEndless
-          ? TEXT.gameHud.endlessWave(endlessState.wave)
+          ? (isSurgeMode ? TEXT.gameHud.endlessSurge(Math.floor(surgeElapsedMs / 1000)) : TEXT.gameHud.endlessWave(endlessState.wave))
           : TEXT.gameHud.levelWave(levelConfig!.levelNumber, 1, levelConfig!.waves.length)),
     style: levelWaveStyle,
   });
@@ -1366,8 +1382,12 @@ async function enter(core: Core): Promise<void> {
 
   // ── Helper: spawn a random pickup item ────────────────────────────────────
   function spawnItem(): void {
-    const type: 'health' | 'power' = Math.random() < HEALTH_ITEM_PROB ? 'health' : 'power';
-    const display = type === 'health' ? createHealthItem() : createPowerItem();
+    const type: ItemData['type'] = isSurgeMode && Math.random() < SURGE_UPGRADE_DROP_CHANCE
+      ? 'gift'
+      : (Math.random() < HEALTH_ITEM_PROB ? 'health' : 'power');
+    const display = type === 'health'
+      ? createHealthItem()
+      : (type === 'gift' ? createGiftBoxItem() : createPowerItem());
     const x = 40 + Math.random() * (W - 80);
     const y = -20;
     display.x = x;
@@ -1460,7 +1480,7 @@ async function enter(core: Core): Promise<void> {
         const barColor = timeFrac > 0.5 ? 0x4444ff : timeFrac > 0.25 ? 0x8844ff : 0xff44ff;
         hpBarFill.rect(0, 0, BAR_W * timeFrac, 18).fill(barColor);
       }
-    } else {
+    } else if (!isSurgeMode) {
       const frac = Math.max(0, enemyHP / waveMaxHp);
       if (frac > 0) {
         const barColor = waveConfig.mobGroup
@@ -1475,6 +1495,10 @@ async function enter(core: Core): Promise<void> {
     if (isVoid) {
       scoreText.text = TEXT.gameHud.damage(totalDamage);
       bossLabel.text = `⏱ ${Math.ceil(voidTimerMs / 1000)}s`;
+    } else if (isSurgeMode) {
+      scoreText.text = TEXT.gameHud.score(score);
+      bossLabel.text = `🌊 生存 ${Math.floor(surgeElapsedMs / 1000)}s`;
+      phaseText.text = `MOBS ${mobs.length}/${SURGE_MAX_MOBS}`;
     } else {
       scoreText.text = TEXT.gameHud.score(score);
       phaseText.text = waveConfig.mobGroup
@@ -1489,8 +1513,9 @@ async function enter(core: Core): Promise<void> {
     let statusLine = isVoid
       ? TEXT.gameHud.voidStatus
       : (isEndless
-          ? TEXT.gameHud.endlessWave(endlessState.wave)
+          ? (isSurgeMode ? TEXT.gameHud.endlessSurge(Math.floor(surgeElapsedMs / 1000)) : TEXT.gameHud.endlessWave(endlessState.wave))
           : TEXT.gameHud.levelWave(levelConfig!.levelNumber, waveIdx + 1, levelConfig!.waves.length));
+    if (isSurgeMode) statusLine += `  ENEMY:${mobs.length}  NEXT:${Math.ceil(surgeSpawnTimer / 1000)}s`;
     if (bulletDamage > 1) statusLine += `  ATK:${bulletDamage}`;
     if (evasionChance > 0) statusLine += `  EVA:${Math.round(evasionChance * 100)}%`;
     if (critChance > 0) statusLine += `  CRT:${Math.round(critChance * 100)}%`;
@@ -1630,19 +1655,18 @@ async function enter(core: Core): Promise<void> {
     mobs.length = 0;
   }
 
-  function spawnMobsForWave(): void {
-    removeAllMobs();
-    const group = waveConfig.mobGroup;
-    enemyDisplay.visible = !group;
-    if (!group) {
-      return;
+  function spawnMobGroup(group: MobGroupConfig, append: boolean): void {
+    if (!append) {
+      removeAllMobs();
     }
-
     const count = group.count;
     const y = H * (group.yFrac ?? 0.20);
     const margin = 56;
     const spacing = count > 1 ? Math.min(82, (W - margin * 2) / (count - 1)) : 0;
-    const startX = count > 1 ? W * 0.5 - spacing * (count - 1) * 0.5 : W * 0.5;
+    const startXBase = count > 1 ? W * 0.5 - spacing * (count - 1) * 0.5 : W * 0.5;
+    const startX = append
+      ? Math.max(margin, Math.min(W - margin - spacing * Math.max(count - 1, 0), startXBase + (Math.random() - 0.5) * 120))
+      : startXBase;
     const scale = group.displayScale ?? 1;
     const radius = group.hitboxRadius ?? 26;
 
@@ -1691,10 +1715,176 @@ async function enter(core: Core): Promise<void> {
         fireTimer: (group.initialFireDelayMs ?? 500) + i * 220,
         hitFlashMs: 0,
         phaseOffset: i * 0.7,
+        group,
       });
     }
 
     updateMobTotalHp();
+  }
+
+  function spawnMobsForWave(): void {
+    const group = waveConfig.mobGroup;
+    enemyDisplay.visible = !isSurgeMode && !group;
+    if (!group) {
+      removeAllMobs();
+      return;
+    }
+
+    spawnMobGroup(group, false);
+  }
+
+  function getSurgeSpawnIntervalMs(): number {
+    const seconds = surgeElapsedMs / 1000;
+    return Math.max(850, Math.round(3600 - seconds * 18));
+  }
+
+  function createSurgeMobGroup(): MobGroupConfig {
+    const seconds = surgeElapsedMs / 1000;
+    const tier = Math.floor(seconds / 30);
+    const typeRoll = (surgeSpawnCount + tier) % 5;
+    const mobHp = Math.max(18, Math.round(22 + tier * 8 + Math.sqrt(Math.max(0, seconds)) * 4));
+    const count = Math.min(4, 1 + Math.floor(seconds / 45) + (surgeSpawnCount % 3 === 2 ? 1 : 0));
+    const fireInterval = Math.max(620, Math.round(1550 - seconds * 5));
+    const bulletWays = Math.min(4, 1 + Math.floor(seconds / 65));
+    const bulletSpeed = Math.min(270, 145 + tier * 10);
+
+    if (typeRoll === 0) {
+      return {
+        label: '潮湧小雞',
+        mobSprite: 'chicklet',
+        bodyColor: 0xffcc44,
+        accentColor: 0xff8844,
+        bulletColor: 0xffaa44,
+        count,
+        mobHp,
+        hitboxRadius: 22,
+        displayScale: 0.86,
+        layout: count >= 3 ? 'arc' : 'line',
+        movementPattern: 'zigzag',
+        attackPattern: 'aimed',
+        yFrac: 0.15 + Math.random() * 0.10,
+        moveAmplitude: 34 + tier * 4,
+        verticalAmplitude: 10 + tier * 2,
+        movePeriodMs: Math.max(1450, 2400 - tier * 60),
+        initialFireDelayMs: 550,
+        fireInterval,
+        bulletWays,
+        bulletSpread: 0.18,
+        bulletSpeed,
+      };
+    }
+
+    if (typeRoll === 1) {
+      return {
+        label: '潮湧幽光',
+        mobSprite: 'wisp',
+        bodyColor: 0x4466ff,
+        accentColor: COL_BUBBLE,
+        bulletColor: COL_BUBBLE,
+        count,
+        mobHp: Math.round(mobHp * 0.9),
+        hitboxRadius: 21,
+        displayScale: 0.84,
+        layout: 'arc',
+        movementPattern: 'sine',
+        attackPattern: 'split',
+        yFrac: 0.14 + Math.random() * 0.12,
+        moveAmplitude: 44 + tier * 5,
+        verticalAmplitude: 12 + tier * 2,
+        movePeriodMs: Math.max(1300, 2200 - tier * 70),
+        initialFireDelayMs: 450,
+        fireInterval: Math.max(560, fireInterval - 120),
+        bulletWays,
+        bulletSpread: 0.24,
+        bulletSpeed: bulletSpeed + 15,
+      };
+    }
+
+    if (typeRoll === 2) {
+      return {
+        label: '潮湧晶群',
+        mobSprite: 'crystal',
+        bodyColor: 0x55ddff,
+        accentColor: 0xffffff,
+        bulletColor: 0x55ddff,
+        count: Math.max(1, count - 1),
+        mobHp: Math.round(mobHp * 1.2),
+        hitboxRadius: 23,
+        displayScale: 0.88,
+        layout: 'line',
+        movementPattern: 'orbit',
+        attackPattern: tier >= 2 ? 'ring' : 'aimed',
+        yFrac: 0.18 + Math.random() * 0.08,
+        moveAmplitude: 48 + tier * 5,
+        verticalAmplitude: 14 + tier * 2,
+        movePeriodMs: Math.max(1500, 2600 - tier * 80),
+        initialFireDelayMs: 650,
+        fireInterval: Math.max(720, fireInterval + 80),
+        bulletWays: Math.max(1, bulletWays),
+        bulletSpread: 0.20,
+        bulletSpeed,
+      };
+    }
+
+    if (typeRoll === 3) {
+      return {
+        label: '潮湧幼焰',
+        mobSprite: 'ember',
+        bodyColor: 0xff6633,
+        accentColor: 0xffdd44,
+        bulletColor: 0xff8844,
+        count: Math.max(1, count - 1),
+        mobHp: Math.round(mobHp * 1.35),
+        hitboxRadius: 24,
+        displayScale: 0.9,
+        layout: 'arc',
+        movementPattern: 'dive',
+        attackPattern: 'split',
+        yFrac: 0.13 + Math.random() * 0.10,
+        moveAmplitude: 38 + tier * 4,
+        verticalAmplitude: 24 + tier * 3,
+        movePeriodMs: Math.max(1200, 2200 - tier * 55),
+        initialFireDelayMs: 500,
+        fireInterval: Math.max(680, fireInterval),
+        bulletWays,
+        bulletSpread: 0.25,
+        bulletSpeed: bulletSpeed + 10,
+      };
+    }
+
+    return {
+      label: '潮湧虛空',
+      mobSprite: 'voidling',
+      bodyColor: 0x220033,
+      accentColor: 0xcc44ff,
+      bulletColor: 0xcc44ff,
+      count: Math.max(1, count - 1),
+      mobHp: Math.round(mobHp * 1.45),
+      hitboxRadius: 24,
+      displayScale: 0.9,
+      layout: 'arc',
+      movementPattern: 'orbit',
+      attackPattern: tier >= 3 ? 'ring' : 'aimed',
+      yFrac: 0.16 + Math.random() * 0.10,
+      moveAmplitude: 50 + tier * 6,
+      verticalAmplitude: 16 + tier * 2,
+      movePeriodMs: Math.max(1300, 2500 - tier * 70),
+      initialFireDelayMs: 600,
+      fireInterval: Math.max(700, fireInterval + 40),
+      bulletWays: Math.max(1, bulletWays),
+      bulletSpread: 0.22,
+      bulletSpeed: bulletSpeed + 5,
+    };
+  }
+
+  function spawnSurgeMobPack(): void {
+    if (!isSurgeMode || mobs.length >= SURGE_MAX_MOBS) return;
+    const group = createSurgeMobGroup();
+    group.count = Math.min(group.count, SURGE_MAX_MOBS - mobs.length);
+    if (group.count <= 0) return;
+    surgeSpawnCount++;
+    spawnMobGroup(group, true);
+    enemyDisplay.visible = false;
   }
 
   function getNearestMob(x: number, y: number): MobEnemyData | null {
@@ -2720,6 +2910,9 @@ async function enter(core: Core): Promise<void> {
   }
 
   spawnMobsForWave();
+  if (isSurgeMode) {
+    spawnSurgeMobPack();
+  }
 
   const unsubTouchStart = core.events.on(
     'game',
@@ -2904,6 +3097,24 @@ async function enter(core: Core): Promise<void> {
               },
             });
           }
+        }
+      }
+
+      // ── Surge mode: continuously spawn small enemies and upgrade boxes ───
+      if (isSurgeMode && !waveTransitioning) {
+        surgeElapsedMs += dt;
+        endlessState.surgeElapsedMs = surgeElapsedMs;
+
+        surgeSpawnTimer -= dt;
+        if (surgeSpawnTimer <= 0) {
+          spawnSurgeMobPack();
+          surgeSpawnTimer = getSurgeSpawnIntervalMs();
+        }
+
+        surgeUpgradeTimer -= dt;
+        if (surgeUpgradeTimer <= 0) {
+          surgeUpgradeTimer = SURGE_UPGRADE_INTERVAL_MS;
+          spawnMooseGift();
         }
       }
 
@@ -3437,13 +3648,13 @@ async function enter(core: Core): Promise<void> {
         }
       }
 
-      // ── Mob group update (small-enemy encounter waves) ────────────────────
-      if (!waveTransitioning && mobs.length > 0 && waveConfig.mobGroup) {
-        const group = waveConfig.mobGroup;
-        const amp = group.moveAmplitude ?? 24;
-        const verticalAmp = group.verticalAmplitude ?? 8;
-        const period = group.movePeriodMs ?? 2400;
+      // ── Mob group update (small-enemy encounter waves / surge packs) ──────
+      if (!waveTransitioning && mobs.length > 0) {
         for (const mob of mobs) {
+          const group = mob.group;
+          const amp = group.moveAmplitude ?? 24;
+          const verticalAmp = group.verticalAmplitude ?? 8;
+          const period = group.movePeriodMs ?? 2400;
           mob.bobTimer += dt;
           const t = (mob.bobTimer / period) * Math.PI * 2 + mob.phaseOffset;
           const pattern = group.movementPattern ?? 'sine';
@@ -3485,7 +3696,7 @@ async function enter(core: Core): Promise<void> {
 
       // ── Enemy bullet patterns (driven by wave config) ─────────────────────
       // Boss does not attack while pet guardians are active.
-      if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive && !isMobWave()) {
+      if (phaseFlashTimer <= 0 && !waveTransitioning && !petPhaseActive && !isMobWave() && !isSurgeMode) {
         const p = waveConfig.phases[phase - 1];
 
         if (p.spiralInterval > 0) {
@@ -3856,7 +4067,7 @@ async function enter(core: Core): Promise<void> {
           continue;
         }
 
-        if (isMobWave()) continue;
+        if (isMobWave() || isSurgeMode) continue;
 
         // Hit enemy
         const dx = b.x - enemyEntity.position.x;
@@ -3909,7 +4120,7 @@ async function enter(core: Core): Promise<void> {
 
             const edx = b.x - enemyEntity.position.x;
             const edy = b.y - enemyEntity.position.y;
-            if (!isMobWave() && Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
+            if (!isMobWave() && !isSurgeMode && Math.sqrt(edx * edx + edy * edy) < ENEMY_HITBOX_R + ENEMY_BULLET_R) {
               removeBullet(enemyBullets, i, enemyBulletsContainer, false);
               if (applyEnemyDamage(1, { startColor: 0xff88cc, endColor: 0xff4488 })) {
                 return;
@@ -4188,7 +4399,7 @@ async function enter(core: Core): Promise<void> {
             }
           }
 
-          if (sw.hitDealt || isMobWave()) continue;
+          if (sw.hitDealt || isMobWave() || isSurgeMode) continue;
 
           const edx = enemyEntity.position.x - sw.x;
           const edy = enemyEntity.position.y - sw.y;
@@ -4834,11 +5045,17 @@ async function enter(core: Core): Promise<void> {
       gameResult.score = score;
       // In endless mode, record the wave reached, update endless high score, and reset the session
       if (score > endlessState.highScore) endlessState.highScore = score;
-      if (endlessState.wave > endlessState.bestWave) {
+      if (isSurgeMode) {
+        endlessState.lastSurgeMs = surgeElapsedMs;
+        if (surgeElapsedMs > endlessState.bestSurgeMs) {
+          endlessState.bestSurgeMs = surgeElapsedMs;
+        }
+      } else if (endlessState.wave > endlessState.bestWave) {
         endlessState.bestWave = endlessState.wave;
       }
       endlessState.currentHp = 0; // reset for next attempt
       endlessState.score = 0;
+      endlessState.surgeElapsedMs = 0;
       endlessState.periodicShieldTimer = 0;
       endlessState.regenTimer = 0;
       gameResult.playedLevel = 0; // signals "endless mode" to GameOverScene

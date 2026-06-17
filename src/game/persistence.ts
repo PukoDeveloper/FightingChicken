@@ -102,6 +102,7 @@ export async function saveProgress(): Promise<PersistenceResult> {
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
+        endlessBestSurgeMs: endlessState.bestSurgeMs,
         cosmicAsh: currencyState.cosmicAsh,
         obtainedEquipment: [...equipmentState.obtained],
         equipmentUpgradeLevels: { ...equipmentState.upgradeLevels },
@@ -169,6 +170,10 @@ export async function loadProgress(): Promise<PersistenceResult> {
 
     if (typeof data.endlessHighScore === 'number' && Number.isFinite(data.endlessHighScore)) {
       endlessState.highScore = data.endlessHighScore;
+    }
+
+    if (typeof data.endlessBestSurgeMs === 'number' && Number.isFinite(data.endlessBestSurgeMs)) {
+      endlessState.bestSurgeMs = data.endlessBestSurgeMs;
     }
 
     if (typeof data.voidHighScore === 'number' && Number.isFinite(data.voidHighScore)) {
@@ -256,6 +261,7 @@ export function exportProgress(): PersistenceResult {
       selectedCostume: costumeState.selected,
       endlessBestWave: endlessState.bestWave,
       endlessHighScore: endlessState.highScore,
+      endlessBestSurgeMs: endlessState.bestSurgeMs,
       voidHighScore: voidState.highScore,
       cosmicAsh: currencyState.cosmicAsh,
       obtainedEquipment: [...equipmentState.obtained],
@@ -292,6 +298,9 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
     gameResult.levelHighScores = {};
     endlessState.bestWave = 1;
     endlessState.highScore = 0;
+    endlessState.bestSurgeMs = 0;
+    endlessState.surgeElapsedMs = 0;
+    endlessState.lastSurgeMs = 0;
     voidState.highScore = 0;
     costumeState.clearedLevels = new Set();
     storyState.clearedLevels = new Set();
@@ -339,6 +348,10 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
 
     if (typeof data.endlessHighScore === 'number' && Number.isFinite(data.endlessHighScore)) {
       endlessState.highScore = data.endlessHighScore;
+    }
+
+    if (typeof data.endlessBestSurgeMs === 'number' && Number.isFinite(data.endlessBestSurgeMs)) {
+      endlessState.bestSurgeMs = data.endlessBestSurgeMs;
     }
 
     if (typeof data.voidHighScore === 'number' && Number.isFinite(data.voidHighScore)) {
@@ -426,6 +439,7 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
+        endlessBestSurgeMs: endlessState.bestSurgeMs,
         voidHighScore: voidState.highScore,
         cosmicAsh: currencyState.cosmicAsh,
         obtainedEquipment: [...equipmentState.obtained],
@@ -455,6 +469,9 @@ export async function clearProgress(): Promise<PersistenceResult> {
     gameResult.levelHighScores = {};
     endlessState.bestWave = 1;
     endlessState.highScore = 0;
+    endlessState.bestSurgeMs = 0;
+    endlessState.surgeElapsedMs = 0;
+    endlessState.lastSurgeMs = 0;
     voidState.highScore = 0;
     costumeState.clearedLevels = new Set();
     storyState.clearedLevels = new Set();
@@ -477,6 +494,7 @@ export async function clearProgress(): Promise<PersistenceResult> {
         selectedCostume: DEFAULT_COSTUME,
         endlessBestWave: 1,
         endlessHighScore: 0,
+        endlessBestSurgeMs: 0,
         voidHighScore: 0,
         cosmicAsh: 0,
         obtainedEquipment: [],

@@ -19,6 +19,7 @@ import { GameScene } from './scenes/GameScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { DevMenuScene } from './scenes/DevMenuScene';
 import { EndlessBuffScene } from './scenes/EndlessBuffScene';
+import { EndlessModeSelectScene } from './scenes/EndlessModeSelectScene';
 import { CostumeSelectScene } from './scenes/CostumeSelectScene';
 import { AchievementsScene } from './scenes/AchievementsScene';
 import { SkillSelectScene } from './scenes/SkillSelectScene';
@@ -244,6 +245,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: GameOverScene });
           c.events.emitSync('scene/register', { scene: DevMenuScene });
           c.events.emitSync('scene/register', { scene: EndlessBuffScene });
+          c.events.emitSync('scene/register', { scene: EndlessModeSelectScene });
           c.events.emitSync('scene/register', { scene: CostumeSelectScene });
           c.events.emitSync('scene/register', { scene: AchievementsScene });
           c.events.emitSync('scene/register', { scene: SkillSelectScene });
