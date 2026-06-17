@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.1';
 
 export interface ChangelogEntry {
   version: string;
@@ -9,6 +9,20 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.2.1',
+    date: '2026-06-17',
+    title: '開發者面板介面微調',
+    highlights: [
+      '主畫面 DEV 入口改為透明熱區，仍保留開發者可點擊入口',
+      '重新整理開發者面板排版，改善按鈕間距與對稱性',
+    ],
+    details: [
+      '右下角 DEV 按鈕不再顯示可見按鈕外觀，避免影響主畫面視覺。',
+      '開發者面板改用卡片式區塊與等寬網格按鈕，讓重置/關閉、匯出/匯入、刪除確認操作更整齊。',
+      '面板增加最大高度與內部捲動，避免小螢幕上按鈕過近或超出畫面。',
+    ],
+  },
   {
     version: '1.2.0',
     date: '2026-06-17',

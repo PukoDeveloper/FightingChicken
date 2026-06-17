@@ -282,32 +282,23 @@ async function enter(core: Core): Promise<void> {
   achBtn.on('pointerover', () => achBtn.scale.set(1.04));
   achBtn.on('pointerout',  () => achBtn.scale.set(1.0));
 
-  // ── DEV button (bottom-right corner) ─────────────────────────────────────
-  const devBtnW = 46, devBtnH = 22;
+  // ── Invisible DEV hot zone (bottom-right corner) ─────────────────────────
+  // Kept clickable for developers, but visually transparent for players.
+  const devBtnW = 58, devBtnH = 34;
   const devBtn = new Container();
   devBtn.eventMode = 'static';
   devBtn.cursor = 'pointer';
   const devBtnBg = new Graphics();
   devBtnBg.roundRect(0, 0, devBtnW, devBtnH, 5)
-    .fill({ color: 0x333333, alpha: 0.85 })
-    .stroke({ color: 0xff6644, width: 1 });
+    .fill({ color: 0x000000, alpha: 0.001 });
   devBtn.addChild(devBtnBg);
-  const devBtnStyle = new TextStyle({
-    fontFamily: 'Arial, sans-serif',
-    fontSize: 12,
-    fill: 0xffaa66,
-    fontWeight: 'bold',
-  });
-  const devBtnText = new Text({ text: 'DEV', style: devBtnStyle });
-  devBtnText.anchor.set(0.5);
-  devBtnText.x = devBtnW / 2;
-  devBtnText.y = devBtnH / 2;
-  devBtn.addChild(devBtnText);
   devBtn.x = W - devBtnW - 10;
   devBtn.y = H - devBtnH - 10;
   uiLayer.addChild(devBtn);
 
   devBtn.on('pointerup', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
     await core.events.emit('scene/load', { key: 'devmenu' });
   });
 
