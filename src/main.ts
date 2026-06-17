@@ -27,6 +27,7 @@ import { DynamicStoryScene } from './scenes/DynamicStoryScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { EncyclopediaScene } from './scenes/EncyclopediaScene';
 import { EquipmentScene } from './scenes/EquipmentScene';
+import { ChangelogScene } from './scenes/ChangelogScene';
 import { GAME_W, GAME_H } from './constants';
 import { initPersistence, loadProgress } from './game/persistence';
 import { initAchievements } from './game/achievements';
@@ -251,6 +252,7 @@ async function main(): Promise<void> {
           c.events.emitSync('scene/register', { scene: ModeSelectScene });
           c.events.emitSync('scene/register', { scene: EncyclopediaScene });
           c.events.emitSync('scene/register', { scene: EquipmentScene });
+          c.events.emitSync('scene/register', { scene: ChangelogScene });
 
           await c.events.emit('scene/load', { key: 'title' });
         },

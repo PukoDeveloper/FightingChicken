@@ -98,6 +98,13 @@ npm run build     # 生產打包 → dist/
 npm run preview   # 預覽打包結果
 ```
 
+## 版本與更新日誌
+
+- 目前版本與遊戲內更新日誌集中在 `src/game/changelog.ts`。
+- repo 層級更新日誌在 [`CHANGELOG.md`](CHANGELOG.md)。
+- 主畫面底部可開啟「日誌」頁查看版本內容。
+- 每次玩家可見更新都必須同步調整版本號與更新日誌；詳細流程見 [`docs/development-guidelines.md`](docs/development-guidelines.md)。
+
 ## 技術棧
 
 - **[@inkshot/engine](https://www.npmjs.com/package/@inkshot/engine)** – Data-oriented TypeScript 遊戲引擎（基於 Pixi.js v8）
@@ -127,5 +134,6 @@ src/
 
 ```text
 docs/
+├── development-guidelines.md  # 版本、日誌與提交前檢查指引
 └── story-chapter-1-outline.md # 第一章 50 關故事大綱與角色弧線
 ```

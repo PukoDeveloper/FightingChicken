@@ -1,0 +1,45 @@
+export const APP_VERSION = '1.1.0';
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  title: string;
+  highlights: string[];
+  details: string[];
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.1.0',
+    date: '2026-06-17',
+    title: '故事模式、小怪與系統內容更新',
+    highlights: [
+      '新增第一章 50 關故事模式規劃與動態載入劇情內容',
+      '加入小怪階段、專屬小怪造型與無盡模式小怪波',
+      '新增故事模式關卡鎖定，並與一般關卡進度分離',
+      '補強圖鑑與造型選擇頁資訊',
+    ],
+    details: [
+      '故事內容拆成 prologue 與 chapter1-act1~5 chunk，進入對應劇情時才載入。',
+      '小怪支援多種外觀、移動模式與攻擊模式，並能被技能、武器與僚雞正確鎖定。',
+      '修正 Boss 小雞等有效最大 HP 加成在非無盡模式開局時未同步到實際 HP 的問題。',
+      '故事模式通關只影響故事進度，不會解鎖一般關卡或一般關卡成就。',
+      '圖鑑加入小怪分頁；造型選擇頁顯示各小雞技能/能力摘要。',
+    ],
+  },
+  {
+    version: '1.0.0',
+    date: '2026-06-17',
+    title: '基礎版本',
+    highlights: [
+      '建立手機直向彈幕核心玩法',
+      '加入關卡、故事、無盡與虛空之境模式',
+      '加入技能、裝備、造型、僚雞、成就與圖鑑系統',
+    ],
+    details: [
+      '以 Pixi.js Graphics 程式化繪製角色、敵人、道具與彈幕。',
+      '支援多種 Boss 彈幕：螺旋、瞄準、環形、衝擊波、泡泡、炸彈、雷射、追蹤、散射、狙擊、傳送、火焰與地面衝擊。',
+      '建立存檔、進度解鎖、無盡 Buff 與虛空傷害紀錄流程。',
+    ],
+  },
+];
