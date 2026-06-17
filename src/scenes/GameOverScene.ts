@@ -2,10 +2,11 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { SceneDescriptor } from '@inkshot/engine';
 import type { Core } from '@inkshot/engine';
 import { createStarfield, createPlayerChicken, createEnemyDisplay } from '../game/sprites';
-import { gameResult, costumeState, endlessState, voidState } from '../game/store';
+import { gameResult, costumeState, endlessState, storyState, voidState } from '../game/store';
 import { createLevel, getStoryLevel } from '../game/levels';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { getEnemyDisplayName, TEXT } from '../game/i18n';
+import { storyNodeAfterBattle, storyTitleForLevel } from '../game/story/manifest';
 
 let _cleanup: (() => void) | null = null;
 
@@ -134,9 +135,12 @@ async function enter(core: Core): Promise<void> {
   } else {
     const storyLevelCfg = gameResult.storyMode ? getStoryLevel(clearedLevel) : null;
     const clearedLevelConfig = storyLevelCfg ?? createLevel(clearedLevel);
+    const displayLevelName = gameResult.storyMode
+      ? (storyTitleForLevel(clearedLevel) ?? clearedLevelConfig.name)
+      : clearedLevelConfig.name;
     levelLabelText = won
-      ? TEXT.gameOver.levelWin(clearedLevel, clearedLevelConfig.name)
-      : TEXT.gameOver.levelChallenge(clearedLevel, clearedLevelConfig.name);
+      ? TEXT.gameOver.levelWin(clearedLevel, displayLevelName)
+      : TEXT.gameOver.levelChallenge(clearedLevel, displayLevelName);
   }
   const levelLabel = new Text({ text: levelLabelText, style: levelStyle });
   levelLabel.anchor.set(0.5);
@@ -248,7 +252,8 @@ async function enter(core: Core): Promise<void> {
 
     storyBtn.on('pointerdown', async () => {
       sfxMenuClick();
-      await core.events.emit('scene/load', { key: `story_ch${gameResult.playedLevel}_end` });
+      storyState.currentNodeId = storyNodeAfterBattle(gameResult.playedLevel);
+      await core.events.emit('scene/load', { key: 'story_dynamic' });
     });
     storyBtn.on('pointerover', () => storyBtn!.scale.set(1.04));
     storyBtn.on('pointerout',  () => storyBtn!.scale.set(1.0));

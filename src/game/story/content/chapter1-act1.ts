@@ -1,0 +1,148 @@
+import type { StoryNode } from '../types';
+
+export const STORY_NODES: StoryNode[] = [
+  {
+    id: 'ch1-001-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '星野出發',
+    finalHint: '▶ 開始第 1 關',
+    next: { type: 'battle', level: 1 },
+    lines: [
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '星野的風好溫柔……可是越往前，祖父留下的徽記就越燙。' },
+      { speaker: '祖父的聲音', portrait: 'grandpa', accentColor: 0xffcc55, side: 'right', text: '星火會指向你真正害怕的地方。不要逃開。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '那就從這裡開始吧。第一步，不准腿軟！' },
+    ],
+  },
+  {
+    id: 'ch1-002-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '守門者勇氣',
+    finalHint: '▶ 開始第 2 關',
+    next: { type: 'battle', level: 2 },
+    lines: [
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '站住，小雞。星路不是散步的草地，想通過就拿出本事。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '我不是來闖禍的，我只是要找祖父。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '每個闖禍的人都說自己只是路過。讓我看看你的星火是真是假。' },
+    ],
+  },
+  {
+    id: 'ch1-003-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '不准說害怕',
+    finalHint: '▶ 開始第 3 關',
+    next: { type: 'battle', level: 3 },
+    lines: [
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '你的翅膀在抖。害怕就回家。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '我、我才沒有……好吧，我有一點怕。可是怕也不能代表我會退。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '哼。至少你沒有用大話遮住恐懼。再來！' },
+    ],
+  },
+  {
+    id: 'ch1-004-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '星火徽記',
+    finalHint: '▶ 開始第 4 關',
+    next: { type: 'battle', level: 4 },
+    lines: [
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '那枚徽記……不可能。它應該早就跟水晶塔一起沉默了。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '你認識它？祖父只說，當它發亮時，我就不能停下。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '那老火雞還是一樣亂來。小雞，你最好活著通過下一波。' },
+    ],
+  },
+  {
+    id: 'ch1-005-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '第一個同行者',
+    finalHint: '▶ 開始第 5 關',
+    next: { type: 'battle', level: 5 },
+    lines: [
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '你一直阻止我，是因為你知道祖父在哪裡嗎？' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '我只知道前面很危險。而你現在還太像一顆會自己撞牆的蛋。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '那就一起走啊。你看著我不要撞牆，我看著你不要嘴硬。' },
+    ],
+  },
+  {
+    id: 'ch1-005-post',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '同行的約定',
+    finalHint: '▶ 前往第 6 關',
+    next: { type: 'story', nodeId: 'ch1-006-pre' },
+    lines: [
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '別誤會，我不是擔心你。我只是要確認星火不會落到混沌手裡。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '嗯嗯，所以你只是剛好走在我旁邊，剛好提醒我閃彈幕。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '……閉嘴，出發。' },
+    ],
+  },
+  {
+    id: 'ch1-006-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '祖父的訊號',
+    finalHint: '▶ 開始第 6 關',
+    next: { type: 'battle', level: 6 },
+    lines: [
+      { speaker: '祖父的聲音', portrait: 'grandpa', accentColor: 0xffcc55, side: 'right', text: '孫兒……別只看星火，聽見它背後的顫動……' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '祖父！聲音斷斷續續的，可是方向更清楚了！' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '也可能是陷阱。越像希望的聲音，越要小心。' },
+    ],
+  },
+  {
+    id: 'ch1-007-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '記憶碎片一',
+    finalHint: '▶ 開始第 7 關',
+    next: { type: 'battle', level: 7 },
+    lines: [
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '我想起來了。祖父以前要我練飛，可我總是摔進草堆。' },
+      { speaker: '祖父火雞', portrait: 'grandpa', accentColor: 0xffcc55, side: 'right', text: '摔倒不是失敗。摔倒後知道自己怕什麼，才是起飛前的功課。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '記憶自己跑出來，通常代表有人在翻你的腦袋。' },
+    ],
+  },
+  {
+    id: 'ch1-008-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '勇氣的規矩',
+    finalHint: '▶ 開始第 8 關',
+    next: { type: 'battle', level: 8 },
+    lines: [
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '星路有三條規矩：不追假光、不信回音、不把恐懼交給黑暗。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '聽起來你以前追過假光。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '……聽規矩就好，不准問規矩怎麼來的。' },
+    ],
+  },
+  {
+    id: 'ch1-009-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '被偷走的聲音',
+    finalHint: '▶ 開始第 9 關',
+    next: { type: 'battle', level: 9 },
+    lines: [
+      { speaker: '祖父的聲音', portrait: 'grandpa', accentColor: 0xffcc55, side: 'right', text: '孫兒……別相信勇氣。牠曾經讓所有人失望。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '這聲音是祖父，可是……祖父不會這樣說話。' },
+      { speaker: '幻影', portrait: 'phantom', accentColor: 0x88aaff, side: 'right', text: '呵呵，記得真清楚。越清楚，越好偷。' },
+    ],
+  },
+  {
+    id: 'ch1-010-pre',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '星路裂口',
+    finalHint: '▶ 開始第 10 關',
+    next: { type: 'battle', level: 10 },
+    lines: [
+      { speaker: '幻影', portrait: 'phantom', accentColor: 0x88aaff, side: 'right', text: '小雞，你想救的人，也許根本不想被你找到。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '你偷得到聲音，偷不到祖父看著我時的溫度。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '別跟影子辯論。把它打到說出真正的名字。' },
+    ],
+  },
+  {
+    id: 'ch1-010-post',
+    chapterLabel: '第一章 · 星火與勇氣',
+    title: '幽影之名',
+    finalHint: '▶ 前往第 11 關',
+    next: { type: 'story', nodeId: 'ch1-011-pre' },
+    lines: [
+      { speaker: '幻影', portrait: 'phantom', accentColor: 0x88aaff, side: 'right', text: '我只是影子。真正等著你的，是混沌。' },
+      { speaker: '勇氣', portrait: 'courage', accentColor: 0xff6644, side: 'right', text: '混沌……那名字不該再出現在星路上。' },
+      { speaker: '小雞', portrait: 'chicken', accentColor: 0x66aaff, side: 'left', text: '那就更不能停。祖父和答案，都在前面。' },
+    ],
+  },
+];

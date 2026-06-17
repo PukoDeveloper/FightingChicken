@@ -19,7 +19,7 @@
 ## 遊戲模式
 
 - **關卡模式**：12 關，後段關卡使用縮放後的混合 Boss pattern，難度曲線更長。
-- **故事模式**：章節對話與專屬戰鬥。
+- **故事模式**：章節對話與專屬戰鬥；第一章 50 關大綱見 [`docs/story-chapter-1-outline.md`](docs/story-chapter-1-outline.md)。
 - **無盡模式**：逐波提升難度，每波後可選 Buff。
 - **虛空之境**：60 秒內對黑洞造成最高傷害。
 
@@ -27,6 +27,7 @@
 
 - **三階段 Boss 戰**：依 HP 進入 Phase 1 / 2 / 3，彈幕密度與機制逐步提升。
 - **多種彈幕機制**：螺旋、瞄準、扇形、環形、衝擊波、泡泡、炸彈、雷射、追蹤曲線彈、散射、狙擊、傳送、火焰與地面衝擊。
+- **動態載入故事內容**：故事對白按章節段落拆成獨立 chunk，進入對應劇情時才載入，避免長文本全部進入主封包。
 - **進度系統**：服裝、技能、裝備、僚雞、成就、圖鑑與宇宙灰燼貨幣。
 - **關卡解鎖**：通關前一關後解鎖下一關，選關畫面會顯示最高分。
 - **短暫無敵時間**：受擊後有約 1.2 秒緩衝，利於彈幕閃避節奏。
@@ -112,12 +113,19 @@ src/
 │   ├── levels.ts             # 關卡、波次、Boss pattern
 │   ├── battleProgression.ts  # 波次清除與 Boss 終章事件 helper
 │   ├── achievements.ts       # 成就註冊與觸發條件
+│   ├── story/                # 故事 manifest、型別與動態載入內容 chunk
 │   ├── i18n/                 # UI 語言檔
 │   ├── endless.ts            # 無盡模式 scaling 與 Buff
 │   └── persistence.ts        # 存檔載入/寫入
 └── scenes/
     ├── GameScene.ts          # 核心戰鬥場景
+    ├── DynamicStoryScene.ts  # 共用故事播放場景（動態載入對白）
     ├── LevelSelectScene.ts   # 關卡選擇
     ├── AchievementsScene.ts  # 成就列表
     └── GameOverScene.ts      # 結算畫面
+```
+
+```text
+docs/
+└── story-chapter-1-outline.md # 第一章 50 關故事大綱與角色弧線
 ```

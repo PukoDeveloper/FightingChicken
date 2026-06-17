@@ -116,13 +116,49 @@ export interface WavePhaseConfig {
   teleportInterval: number; // ms between teleports; 0 = disabled
 }
 
+/** Configuration for a group of smaller enemies that must all be defeated to clear a wave. */
+export interface MobGroupConfig {
+  /** Display label shown in the HP bar for this encounter. */
+  label: string;
+  /** Number of mobs spawned at the start of the wave. */
+  count: number;
+  /** HP for each individual mob. */
+  mobHp: number;
+  /** Collision radius for each mob. Defaults to 26 px. */
+  hitboxRadius?: number;
+  /** Visual scale applied to the level's enemy sprite. Defaults to 0.58. */
+  displayScale?: number;
+  /** Horizontal formation shape. Defaults to a straight line. */
+  layout?: 'line' | 'arc';
+  /** Vertical spawn position as a fraction of screen height. Defaults to 0.2. */
+  yFrac?: number;
+  /** Horizontal patrol amplitude in px. Defaults to 24. */
+  moveAmplitude?: number;
+  /** Patrol period in ms. Defaults to 2400. */
+  movePeriodMs?: number;
+  /** Delay before each mob's first shot, staggered by mob index. Defaults to 500 ms. */
+  initialFireDelayMs?: number;
+  /** Interval between shots for each mob. */
+  fireInterval: number;
+  /** Bullets fired per volley. */
+  bulletWays: number;
+  /** Radian spread between bullets in a volley. */
+  bulletSpread: number;
+  /** Bullet speed in px/s. */
+  bulletSpeed: number;
+  /** Bullet colour for mob volleys. */
+  bulletColor: number;
+}
+
 /** Configuration for one enemy encounter (wave) within a level. */
 export interface WaveConfig {
   waveNumber: number;   // 1-based display number
-  enemyHp: number;
+  enemyHp: number;      // Boss HP, or total encounter HP for mob-group waves
   phase2Frac: number;   // HP fraction at which phase 2 starts
   phase3Frac: number;   // HP fraction at which phase 3 starts
   phases: [WavePhaseConfig, WavePhaseConfig, WavePhaseConfig]; // [phase1, phase2, phase3]
+  /** Optional mob encounter; when set, this wave spawns several smaller enemies instead of the boss. */
+  mobGroup?: MobGroupConfig;
   /**
    * When true the enemy smoothly tracks the player's X position (horizontally)
    * during gameplay, creating a "left-right swaying tracking" movement pattern.
@@ -233,7 +269,7 @@ export function phase(overrides: Partial<WavePhaseConfig>): WavePhaseConfig {
   };
 }
 
-// ─── Level 1 · 初級挑戰 (1 wave) ──────────────────────────────────────────────
+// ─── Level 1 · 初級挑戰 (mob warm-up + boss) ──────────────────────────────────
 
 const LEVEL_1: LevelConfig = {
   levelNumber: 1,
@@ -242,6 +278,30 @@ const LEVEL_1: LevelConfig = {
   waves: [
     {
       waveNumber: 1,
+      enemyHp: 120,
+      phase2Frac: 0.66,
+      phase3Frac: 0.33,
+      mobGroup: {
+        label: '勇氣小隊',
+        count: 3,
+        mobHp: 40,
+        hitboxRadius: 24,
+        displayScale: 0.54,
+        layout: 'line',
+        yFrac: 0.20,
+        moveAmplitude: 24,
+        movePeriodMs: 2600,
+        initialFireDelayMs: 650,
+        fireInterval: 1550,
+        bulletWays: 1,
+        bulletSpread: 0.22,
+        bulletSpeed: BULLET_SPEED_SLOW,
+        bulletColor: COL_BULLET_P1,
+      },
+      phases: [phase({}), phase({}), phase({})],
+    },
+    {
+      waveNumber: 2,
       enemyHp: 200,
       phase2Frac: 0.66,
       phase3Frac: 0.33,
@@ -735,8 +795,7 @@ const LEVEL_5: LevelConfig = {
 };
 
 // ─── Level 6 · 機甲試煉 (2 waves) ─────────────────────────────────────────────
-// Wave 1: Tracking Mech – sways left-right to follow the player and rains
-//         bullets straight down, mixing in rings, aimed shots, and bombs.
+// Wave 1: Mech Drone Squad – several smaller drones fan out before the boss.
 // Wave 2: Mech Chicken BOSS – full arsenal with straight-down curtains.
 
 const LEVEL_6: LevelConfig = {
@@ -750,7 +809,23 @@ const LEVEL_6: LevelConfig = {
       enemyHp: 320,
       phase2Frac: 0.66,
       phase3Frac: 0.33,
-      enemyTracksPlayer: true,
+      mobGroup: {
+        label: '機甲小隊',
+        count: 4,
+        mobHp: 80,
+        hitboxRadius: 25,
+        displayScale: 0.50,
+        layout: 'arc',
+        yFrac: 0.21,
+        moveAmplitude: 34,
+        movePeriodMs: 2200,
+        initialFireDelayMs: 500,
+        fireInterval: 1350,
+        bulletWays: 2,
+        bulletSpread: 0.24,
+        bulletSpeed: BULLET_SPEED_FAST,
+        bulletColor: COL_BULLET_MECH,
+      },
       phases: [
         phase({
           spiralInterval: 280, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_MECH,
@@ -1168,9 +1243,21 @@ function scaleWave(
   scale: PhaseScale,
   movement?: Pick<WaveConfig, 'enemyTracksPlayer' | 'enemySineMoves' | 'enemySineAmplitude' | 'enemySinePeriodMs'>,
 ): WaveConfig {
+  const scaledMobGroup = base.mobGroup
+    ? {
+        ...base.mobGroup,
+        mobHp: Math.max(10, roundToStep(base.mobGroup.mobHp * scale.hp, 5)),
+        fireInterval: scaleActiveInterval(base.mobGroup.fireInterval, scale.density),
+        bulletWays: scaleActiveCount(base.mobGroup.bulletWays, scale.count),
+        bulletSpeed: scaleActiveSpeed(base.mobGroup.bulletSpeed, scale.speed),
+      }
+    : undefined;
+
   return {
     waveNumber,
-    enemyHp: Math.max(120, roundToStep(base.enemyHp * scale.hp, 5)),
+    enemyHp: scaledMobGroup
+      ? scaledMobGroup.count * scaledMobGroup.mobHp
+      : Math.max(120, roundToStep(base.enemyHp * scale.hp, 5)),
     phase2Frac: PHASE2_FRAC,
     phase3Frac: PHASE3_FRAC,
     phases: [
@@ -1178,6 +1265,7 @@ function scaleWave(
       scalePhase(base.phases[1], scale, 1),
       scalePhase(base.phases[2], scale, 2),
     ],
+    mobGroup: scaledMobGroup,
     enemyTracksPlayer: movement?.enemyTracksPlayer ?? base.enemyTracksPlayer,
     enemySineMoves: movement?.enemySineMoves ?? base.enemySineMoves,
     enemySineAmplitude: movement?.enemySineAmplitude ?? base.enemySineAmplitude,
@@ -1272,425 +1360,127 @@ export function createLevel(levelNumber: number): LevelConfig {
 
 // ─── Story-exclusive levels ───────────────────────────────────────────────────
 
-/** Story Chapter 1 battle – introductory single wave vs 勇氣. */
-const STORY_CH1_LEVEL: LevelConfig = {
-  levelNumber: 1,
-  name: '遇見勇氣',
-  enemyType: 'courage',
-  waves: [
-    {
-      waveNumber: 1,
-      enemyHp: 130,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 300, spiralWays: 4, spiralSpeed: BULLET_SPEED_SLOW, spiralColor: COL_BULLET_P1,
-          aimInterval: 1800,   aimWays: 2,   aimSpread: 0.20,                 aimSpeed: BULLET_SPEED_SLOW, aimColor: COL_BULLET_P1,
-        }),
-        phase({
-          spiralInterval: 240, spiralWays: 6,  spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
-          aimInterval: 1400,   aimWays: 2,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 2200, spreadWays: 4, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 180, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
-          aimInterval: 1000,   aimWays: 3,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P3,
-          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_SLOW,   spreadColor: COL_BULLET_P3,
-          ringInterval: 4500,  ringCount: 14,  ringSpeed: BULLET_SPEED_SLOW,     ringColor: COL_BULLET_RING,
-        }),
-      ],
-    },
-  ],
-};
+const STORY_LEVEL_NAMES = [
+  '星野出發',
+  '守門者勇氣',
+  '不准說害怕',
+  '星火徽記',
+  '第一個同行者',
+  '祖父的訊號',
+  '記憶碎片一',
+  '勇氣的規矩',
+  '被偷走的聲音',
+  '星路裂口',
+  '幽光森林',
+  '假祖父',
+  '勇氣的沉默',
+  '記憶碎片二',
+  '幻影之謎',
+  '小雞的嫉妒',
+  '勇氣回歸',
+  '記憶不是證據',
+  '幻影的空白',
+  '被吞下的名字',
+  '黑潮邊界',
+  '勇氣的失敗',
+  '不只是救人',
+  '混沌低語',
+  '混沌的降臨',
+  '分歧的同伴',
+  '一個人的星路',
+  '勇氣的真名',
+  '混沌的真話',
+  '重新同行',
+  '水晶塔入口',
+  '封印協議',
+  '無效的眼淚',
+  '祖父的筆跡',
+  '水晶守衛試煉',
+  '故障的保護',
+  '幻影的交易',
+  '勇氣不相信幻影',
+  '塔心鑰匙',
+  '守衛的最後命令',
+  '暴風信使',
+  '停不下來的風',
+  '被送丟的訊息',
+  '小雞學會等待',
+  '風暴之眼',
+  '龍王門前',
+  '大局與一人',
+  '幻影的選擇',
+  '龍王之戰',
+  '虛空門扉',
+];
 
-/** Story Chapter 2 battle – two-wave rematch vs 勇氣; moderate difficulty. */
-const STORY_CH2_LEVEL: LevelConfig = {
-  levelNumber: 2,
-  name: '第一次對決',
-  enemyType: 'courage',
-  waves: [
-    {
-      waveNumber: 1,
-      enemyHp: 160,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 260, spiralWays: 5, spiralSpeed: BULLET_SPEED_SLOW, spiralColor: COL_BULLET_P1,
-          aimInterval: 1500,   aimWays: 2,   aimSpread: 0.22,                 aimSpeed: BULLET_SPEED_SLOW, aimColor: COL_BULLET_P1,
-        }),
-        phase({
-          spiralInterval: 200, spiralWays: 7,  spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
-          aimInterval: 1200,   aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1800, spreadWays: 4, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 150, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
-          aimInterval: 800,    aimWays: 3,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P3,
-          spreadInterval: 1200, spreadWays: 5, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_SLOW,   spreadColor: COL_BULLET_P3,
-          ringInterval: 3800,  ringCount: 12,  ringSpeed: BULLET_SPEED_SLOW,     ringColor: COL_BULLET_RING,
-        }),
-      ],
-    },
-    {
-      waveNumber: 2,
-      enemyHp: 180,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 220, spiralWays: 6, spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P2,
-          aimInterval: 1300,   aimWays: 3,   aimSpread: 0.25,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 170, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 1000,   aimWays: 3,     aimSpread: 0.28,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1500, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-        }),
-        phase({
-          spiralInterval: 120, spiralWays: 11, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
-          aimInterval: 700,    aimWays: 3,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1000, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 3000,  ringCount: 16,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-        }),
-      ],
-    },
-  ],
-};
+/** Story mode's first chapter is planned as a 50-level arc. */
+export const STORY_TOTAL_LEVELS = STORY_LEVEL_NAMES.length;
 
-/** Story Chapter 3 battle – two-wave fight vs 幻影 (Phantom); harder than ch2, introduces shockwaves and bubbles. */
-const STORY_CH3_LEVEL: LevelConfig = {
-  levelNumber: 3,
-  name: '幽靈之謎',
-  enemyType: 'phantom',
-  waves: [
-    {
-      waveNumber: 1,
-      enemyHp: 180,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 230, spiralWays: 6, spiralSpeed: BULLET_SPEED_SLOW,   spiralColor: COL_BULLET_P1,
-          aimInterval: 1400,   aimWays: 3,   aimSpread: 0.22,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P1,
-        }),
-        phase({
-          spiralInterval: 180, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 1100,   aimWays: 3,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-          shockwaveInterval: 5000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED,       shockwaveColor: COL_SHOCKWAVE,
-        }),
-        phase({
-          spiralInterval: 140, spiralWays: 10, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P3,
-          aimInterval: 850,    aimWays: 4,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1200, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 3200,  ringCount: 14,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20, shockwaveColor: COL_SHOCKWAVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 2,
-      enemyHp: 210,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 200, spiralWays: 7, spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 1200,   aimWays: 3,   aimSpread: 0.25,                   aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          bubbleInterval: 4500, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,      bubbleColor: COL_BUBBLE,
-        }),
-        phase({
-          spiralInterval: 155, spiralWays: 9,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 900,    aimWays: 4,     aimSpread: 0.25,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
-          spreadInterval: 1400, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
-          shockwaveInterval: 4000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 15, shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3800, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10, bubbleColor: COL_BUBBLE,
-        }),
-        phase({
-          spiralInterval: 110, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 680,    aimWays: 4,     aimSpread: 0.18,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 980,  spreadWays: 7, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 2600,  ringCount: 18,  ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 30, shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3000, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 20, bubbleColor: COL_BUBBLE,
-        }),
-      ],
-    },
-  ],
-};
+function storyBaseLevel(level: number): LevelConfig {
+  if (level <= 1) return LEVEL_1;
+  if (level <= 3) return LEVEL_2;
+  if (level <= 8) return LEVEL_3;
+  if (level <= 20) return LEVEL_4;
+  if (level <= 30) return LEVEL_5;
+  if (level <= 40) return LEVEL_6;
+  if (level <= 45) return LEVEL_7;
+  if (level <= 49) return LEVEL_8;
+  return LEVEL_12;
+}
 
-/** Story Chapter 4 battle – three-wave fight vs 混沌 (Chaos); difficulty between story ch3 and normal level 5. */
-const STORY_CH4_LEVEL: LevelConfig = {
-  levelNumber: 4,
-  name: '混沌的降臨',
-  enemyType: 'chaos',
-  waves: [
-    {
-      waveNumber: 1,
-      enemyHp: 220,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 210, spiralWays: 7,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_P2,
-          aimInterval: 1300,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_P2,
-          spreadInterval: 1900, spreadWays: 5, spreadAngle: 0.24, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-          bombInterval: 8000,  bombCount: 1, bombFuseMs: 2400, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 7000, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 170, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 950,    aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1450, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P3,
-          ringInterval: 4200,   ringCount: 20, ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5800, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
-          bombInterval: 6500,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 125, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 660,    aimWays: 5,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 950,  spreadWays: 7, spreadAngle: 0.17, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2700,  ringCount: 26,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 40,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 5000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,       bubbleColor: COL_BUBBLE,
-          bombInterval: 5200,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4200, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4500, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 2,
-      enemyHp: 240,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 195, spiralWays: 8,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
-          aimInterval: 1150,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
-          spreadInterval: 1700, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
-          shockwaveInterval: 6200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
-          bombInterval: 7500,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 6200, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 155, spiralWays: 10, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 850,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1250, spreadWays: 6, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 3600,  ringCount: 24,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4800, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 40,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 6000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10,  bubbleColor: COL_BUBBLE,
-          bombInterval: 6000,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 5500, curveWays: 2,  curveSpeed: 168, curveTurnRate: 1.2, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 110, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 570,    aimWays: 5,     aimSpread: 0.17,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 790,  spreadWays: 8, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2400,  ringCount: 30,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3600, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 60,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4200, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 18,  bubbleColor: COL_BUBBLE,
-          bombInterval: 4800,  bombCount: 2, bombFuseMs: 1800, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3800, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3800, curveWays: 2,  curveSpeed: 178, curveTurnRate: 1.4, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 3,
-      enemyHp: 260,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      phases: [
-        phase({
-          spiralInterval: 185, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P2,
-          aimInterval: 1050,   aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
-          spreadInterval: 1600, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P2,
-          ringInterval: 4400,   ringCount: 20, ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5600, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 30,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 7000, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,       bubbleColor: COL_BUBBLE,
-          bombInterval: 7000,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5800, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 6500, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 145, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 780,    aimWays: 5,     aimSpread: 0.20,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1100, spreadWays: 7, spreadAngle: 0.16, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2900,  ringCount: 28,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 55,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 5000, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 15,  bubbleColor: COL_BUBBLE,
-          bombInterval: 5500,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4800, curveWays: 2,  curveSpeed: 175, curveTurnRate: 1.3, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 100, spiralWays: 15, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 520,    aimWays: 5,     aimSpread: 0.15,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 720,  spreadWays: 9, spreadAngle: 0.12, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2100,  ringCount: 35,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3200, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 75,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3500, bubbleCount: 4, bubbleSpeed: BUBBLE_SPEED + 25,  bubbleColor: COL_BUBBLE,
-          bombInterval: 4500,  bombCount: 2, bombFuseMs: 1700, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3400, laserCount: 7, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3400, curveWays: 2,  curveSpeed: 185, curveTurnRate: 1.6, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-  ],
-};
+function storyWaveCount(level: number): number {
+  if (level === 1) return 1;
+  if (level <= 20) return level % 5 === 0 ? 2 : 1;
+  if (level < STORY_TOTAL_LEVELS) return level % 5 === 0 ? 3 : 2;
+  return 3;
+}
 
-/** Story Chapter 5 battle – three-wave fight vs 水晶守衛 (Mech); difficulty ~12% above story ch4, introduces straight-bullet tracking mechanic. */
-const STORY_CH5_LEVEL: LevelConfig = {
-  levelNumber: 5,
-  name: '水晶守衛的試煉',
-  enemyType: 'mech',
-  waves: [
-    {
-      waveNumber: 1,
-      enemyHp: 250,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      enemyTracksPlayer: true,
-      phases: [
-        phase({
-          spiralInterval: 200, spiralWays: 8,  spiralSpeed: BULLET_SPEED_MEDIUM, spiralColor: COL_BULLET_MECH,
-          aimInterval: 1250,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_MEDIUM, aimColor: COL_BULLET_MECH,
-          spreadInterval: 1850, spreadWays: 5, spreadAngle: 0.24, spreadSpeed: BULLET_SPEED_SLOW, spreadColor: COL_BULLET_P2,
-          straightInterval: 2000, straightCount: 3, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 8000,  bombCount: 1, bombFuseMs: 2400, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-        }),
-        phase({
-          spiralInterval: 165, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_MECH,
-          aimInterval: 920,    aimWays: 4,     aimSpread: 0.22,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P2,
-          spreadInterval: 1400, spreadWays: 6, spreadAngle: 0.20, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
-          ringInterval: 4000,   ringCount: 21, ringSpeed: BULLET_SPEED_MEDIUM,   ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5500, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 25,  shockwaveColor: COL_SHOCKWAVE,
-          straightInterval: 1500, straightCount: 5, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 6000,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5000, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 120, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 640,    aimWays: 5,     aimSpread: 0.19,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 920,  spreadWays: 7, spreadAngle: 0.16, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2600,  ringCount: 27,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3900, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 45,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4800, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 5,   bubbleColor: COL_BUBBLE,
-          straightInterval: 1100, straightCount: 6, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 5000,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4000, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4300, curveWays: 2,  curveSpeed: 170, curveTurnRate: 1.25, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 2,
-      enemyHp: 270,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      enemyTracksPlayer: true,
-      phases: [
-        phase({
-          spiralInterval: 190, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_MECH,
-          aimInterval: 1100,   aimWays: 3,     aimSpread: 0.26,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_MECH,
-          spreadInterval: 1650, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_MEDIUM, spreadColor: COL_BULLET_P2,
-          shockwaveInterval: 6000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 20,  shockwaveColor: COL_SHOCKWAVE,
-          straightInterval: 1800, straightCount: 3, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 7000,  bombCount: 1, bombFuseMs: 2200, bombRingCount: 8,  bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5800, laserCount: 4, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-        }),
-        phase({
-          spiralInterval: 150, spiralWays: 11, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 820,    aimWays: 4,     aimSpread: 0.21,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1200, spreadWays: 6, spreadAngle: 0.18, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 3500,  ringCount: 24,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4600, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 45,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 5800, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED + 10,  bubbleColor: COL_BUBBLE,
-          straightInterval: 1300, straightCount: 5, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 5500,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4600, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 5200, curveWays: 2,  curveSpeed: 170, curveTurnRate: 1.25, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 105, spiralWays: 14, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 545,    aimWays: 5,     aimSpread: 0.17,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 760,  spreadWays: 8, spreadAngle: 0.14, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2250,  ringCount: 31,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3500, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 65,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4000, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 20,  bubbleColor: COL_BUBBLE,
-          straightInterval: 900,  straightCount: 7, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 4300,  bombCount: 2, bombFuseMs: 1800, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3500, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3600, curveWays: 2,  curveSpeed: 178, curveTurnRate: 1.45, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-    {
-      waveNumber: 3,
-      enemyHp: 295,
-      phase2Frac: 0.66,
-      phase3Frac: 0.33,
-      enemyTracksPlayer: true,
-      phases: [
-        phase({
-          spiralInterval: 180, spiralWays: 9,  spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_MECH,
-          aimInterval: 1000,   aimWays: 4,     aimSpread: 0.24,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_MECH,
-          spreadInterval: 1550, spreadWays: 5, spreadAngle: 0.22, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P2,
-          ringInterval: 4200,   ringCount: 20, ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 5400, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 35,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 6800, bubbleCount: 2, bubbleSpeed: BUBBLE_SPEED,       bubbleColor: COL_BUBBLE,
-          straightInterval: 1700, straightCount: 4, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 6500,  bombCount: 1, bombFuseMs: 2000, bombRingCount: 10, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 5500, laserCount: 5, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 6200, curveWays: 2,  curveSpeed: 165, curveTurnRate: 1.1, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 140, spiralWays: 12, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 760,    aimWays: 5,     aimSpread: 0.19,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 1050, spreadWays: 7, spreadAngle: 0.15, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2800,  ringCount: 28,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 4000, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 58,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 4800, bubbleCount: 3, bubbleSpeed: BUBBLE_SPEED + 15,  bubbleColor: COL_BUBBLE,
-          straightInterval: 1200, straightCount: 6, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 5200,  bombCount: 1, bombFuseMs: 1900, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 4200, laserCount: 6, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 4600, curveWays: 2,  curveSpeed: 175, curveTurnRate: 1.35, curveColor: COL_BULLET_CURVE,
-        }),
-        phase({
-          spiralInterval: 96,  spiralWays: 15, spiralSpeed: BULLET_SPEED_FAST,   spiralColor: COL_BULLET_P3,
-          aimInterval: 510,    aimWays: 5,     aimSpread: 0.14,                  aimSpeed: BULLET_SPEED_FAST,   aimColor: COL_BULLET_P3,
-          spreadInterval: 700,  spreadWays: 9, spreadAngle: 0.12, spreadSpeed: BULLET_SPEED_FAST,   spreadColor: COL_BULLET_P3,
-          ringInterval: 2000,  ringCount: 34,  ringSpeed: BULLET_SPEED_FAST,     ringColor: COL_BULLET_RING,
-          shockwaveInterval: 3100, shockwaveSpeed: SHOCKWAVE_EXPAND_SPEED + 78,  shockwaveColor: COL_SHOCKWAVE,
-          bubbleInterval: 3350, bubbleCount: 4, bubbleSpeed: BUBBLE_SPEED + 24,  bubbleColor: COL_BUBBLE,
-          straightInterval: 870,  straightCount: 8, straightSpeed: BULLET_SPEED_FAST, straightColor: COL_BULLET_MECH,
-          bombInterval: 4200,  bombCount: 2, bombFuseMs: 1650, bombRingCount: 12, bombRingSpeed: BULLET_SPEED_MEDIUM, bombColor: COL_BULLET_BOMB,
-          laserInterval: 3200, laserCount: 7, laserSpeed: BULLET_SPEED_FAST,     laserColor: COL_BULLET_LASER,
-          curveInterval: 3200, curveWays: 2,  curveSpeed: 185, curveTurnRate: 1.6, curveColor: COL_BULLET_CURVE,
-        }),
-      ],
-    },
-  ],
-};
+function storyScale(level: number, waveIndex: number): PhaseScale {
+  const progress = (level - 1) / Math.max(1, STORY_TOTAL_LEVELS - 1);
+  const milestoneBoost = level % 5 === 0 ? 0.08 : 0;
+  const waveBoost = waveIndex * 0.04;
+  return {
+    hp: 0.55 + progress * 0.95 + milestoneBoost + waveIndex * 0.08,
+    density: 0.72 + progress * 0.65 + milestoneBoost + waveBoost,
+    speed: 0.88 + progress * 0.28 + waveIndex * 0.025,
+    count: 0.82 + progress * 0.35 + waveIndex * 0.025,
+  };
+}
 
-/** Story-mode level map keyed by 1-based chapter number. */
-const STORY_LEVELS: Record<number, LevelConfig> = {
-  1: STORY_CH1_LEVEL,
-  2: STORY_CH2_LEVEL,
-  3: STORY_CH3_LEVEL,
-  4: STORY_CH4_LEVEL,
-  5: STORY_CH5_LEVEL,
-};
+function storyGuardianFinale(level: number, base: LevelConfig): LevelConfig['guardianPetFinale'] {
+  if (level === 30 && base.guardianPetFinale === 'chaos') return 'chaos';
+  if (level === 49 && base.guardianPetFinale === 'dragon') return 'dragon';
+  return undefined;
+}
+
+function createStoryBattleLevel(level: number): LevelConfig {
+  const base = storyBaseLevel(level);
+  const waveCount = storyWaveCount(level);
+  const baseOffset = (level - 1) % base.waves.length;
+
+  return {
+    levelNumber: level,
+    name: STORY_LEVEL_NAMES[level - 1],
+    enemyType: base.enemyType,
+    guardianPetFinale: storyGuardianFinale(level, base),
+    itemDropMult: base.itemDropMult,
+    waves: Array.from({ length: waveCount }, (_, idx) => {
+      const baseWave = base.waves[(baseOffset + idx) % base.waves.length];
+      return scaleWave(baseWave, idx + 1, storyScale(level, idx));
+    }),
+  };
+}
+
+/** Story-mode level map keyed by 1-based story level number. */
+const STORY_LEVELS: Record<number, LevelConfig> = {};
+for (let level = 1; level <= STORY_TOTAL_LEVELS; level++) {
+  STORY_LEVELS[level] = createStoryBattleLevel(level);
+}
 
 /**
- * Returns the story-exclusive LevelConfig for the given 1-based chapter number,
- * or null if no story level has been defined for that chapter.
+ * Returns the story-exclusive LevelConfig for the given 1-based story level,
+ * or null if no story level has been defined for that number.
  */
-export function getStoryLevel(chapter: number): LevelConfig | null {
-  return STORY_LEVELS[chapter] ?? null;
+export function getStoryLevel(storyLevel: number): LevelConfig | null {
+  return STORY_LEVELS[storyLevel] ?? null;
 }

@@ -4,22 +4,8 @@ import type { Core } from '@inkshot/engine';
 import { createStarfield } from '../game/sprites';
 import { startBgm, sfxMenuClick } from '../game/audio';
 import { TEXT } from '../game/i18n';
-
-// ─── Story chapter data ────────────────────────────────────────────────────
-interface ChapterEntry {
-  number: string;
-  title: string;
-  subtitle: string;
-}
-
-const CHAPTERS: ChapterEntry[] = [
-  { number: '序章',   title: '小雞的覺醒',   subtitle: '一切從這裡開始……' },
-  { number: '第一章', title: '遇見勇氣',     subtitle: '命中注定的相遇' },
-  { number: '第二章', title: '第一次對決',   subtitle: '初戰告捷，卻留下疑問' },
-  { number: '第三章', title: '幽靈之謎',     subtitle: '神秘的幻影在暗中窺視' },
-  { number: '第四章', title: '混沌的降臨',   subtitle: '星空深處的真正主人現身' },
-  { number: '第五章', title: '水晶守衛的試煉', subtitle: '前往水晶塔，拯救祖父' },
-];
+import { storyState } from '../game/store';
+import { STORY_MENU_ENTRIES } from '../game/story/manifest';
 
 const CHAPTER_ITEM_H = 88;
 const CHAPTER_ITEM_GAP = 12;
@@ -85,26 +71,12 @@ async function enter(core: Core): Promise<void> {
   outerList.addChild(innerList);
 
   // Build chapter items
-  const totalContentH = CHAPTERS.length * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP) - CHAPTER_ITEM_GAP;
+  const totalContentH = STORY_MENU_ENTRIES.length * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP) - CHAPTER_ITEM_GAP;
 
-  /** Maps a 0-based chapter index to its scene key, or null if not yet implemented. */
-  function chapterSceneKey(idx: number): string | null {
-    const keys: Record<number, string> = {
-      0: 'story_prologue',
-      1: 'story_ch1',
-      2: 'story_ch2',
-      3: 'story_ch3',
-      4: 'story_ch4',
-      5: 'story_ch5',
-    };
-    return keys[idx] ?? null;
-  }
-
-  for (let i = 0; i < CHAPTERS.length; i++) {
-    const ch = CHAPTERS[i];
+  for (let i = 0; i < STORY_MENU_ENTRIES.length; i++) {
+    const ch = STORY_MENU_ENTRIES[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
-    // Chapters 0–5 are playable; all others are coming soon
-    const isPlayable = chapterSceneKey(i) !== null;
+    const isPlayable = true;
 
     const item = new Container();
     item.y = itemY;
@@ -176,7 +148,8 @@ async function enter(core: Core): Promise<void> {
       item.on('pointerdown', async () => {
         if (!_inputReady) return;
         sfxMenuClick();
-        await core.events.emit('scene/load', { key: chapterSceneKey(i)! });
+        storyState.currentNodeId = ch.nodeId;
+        await core.events.emit('scene/load', { key: 'story_dynamic' });
       });
     }
 
@@ -232,14 +205,12 @@ async function enter(core: Core): Promise<void> {
       const localY = e.global.y - innerPos.y;
       const localX = e.global.x - innerPos.x;
       const idx = Math.floor(localY / (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP));
-      if (idx >= 0 && idx < CHAPTERS.length) {
+      if (idx >= 0 && idx < STORY_MENU_ENTRIES.length) {
         const remainder = localY - idx * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
         if (remainder < CHAPTER_ITEM_H && localX >= 0 && localX < CHAPTER_ITEM_W) {
-          const key = chapterSceneKey(idx);
-          if (key !== null) {
-            sfxMenuClick();
-            void core.events.emit('scene/load', { key });
-          }
+          storyState.currentNodeId = STORY_MENU_ENTRIES[idx].nodeId;
+          sfxMenuClick();
+          void core.events.emit('scene/load', { key: 'story_dynamic' });
         }
       }
     }
