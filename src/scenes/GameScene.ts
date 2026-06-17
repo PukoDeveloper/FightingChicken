@@ -35,6 +35,16 @@ import {
   ENEMY_BULLET_R,
   SCORE_PER_HIT,
   SCORE_BONUS_WAVE_MULT,
+  SCORE_PENALTY_PER_DAMAGE,
+  COSMIC_ASH_LEVEL_CLEAR,
+  COSMIC_ASH_STORY_MILESTONE_INTERVAL,
+  COSMIC_ASH_STORY_MILESTONE,
+  COSMIC_ASH_STORY_FINAL_BONUS,
+  COSMIC_ASH_ENDLESS_MILESTONE_INTERVAL,
+  COSMIC_ASH_ENDLESS_MILESTONE,
+  COSMIC_ASH_VOID_COMPLETION,
+  COSMIC_ASH_VOID_DAMAGE_STEP,
+  COSMIC_ASH_VOID_DAMAGE_BONUS_CAP,
   ITEM_COLLECT_R,
   ITEM_LIFETIME_MS,
   ITEM_SPAWN_MIN_MS,
@@ -2621,6 +2631,16 @@ async function enter(core: Core): Promise<void> {
     }
   }
 
+  function applyScoreDamagePenalty(damage: number): void {
+    if (isVoid || damage <= 0) return;
+    score = Math.max(0, score - damage * SCORE_PENALTY_PER_DAMAGE);
+  }
+
+  function awardCosmicAsh(amount: number): void {
+    if (amount <= 0) return;
+    currencyState.cosmicAsh += amount;
+  }
+
   function applyEnemyDamage(damage: number, particles: EnemyHitParticleOptions): boolean {
     hitFlashTimer = 80;
     sfxEnemyHit();
@@ -3985,7 +4005,9 @@ async function enter(core: Core): Promise<void> {
             continue;
           }
 
-          playerHP = Math.max(0, playerHP - (b.damage ?? 1));
+          const incomingDamage = b.damage ?? 1;
+          playerHP = Math.max(0, playerHP - incomingDamage);
+          applyScoreDamagePenalty(incomingDamage);
           invincibleMs = effectiveInvincibleMs;
           playerHitThisRun = true;
 
@@ -4091,6 +4113,7 @@ async function enter(core: Core): Promise<void> {
             }
 
             playerHP = Math.max(0, playerHP - 1);
+            applyScoreDamagePenalty(1);
             invincibleMs = effectiveInvincibleMs;
             playerHitThisRun = true;
 
@@ -4298,6 +4321,7 @@ async function enter(core: Core): Promise<void> {
             }
 
             playerHP = Math.max(0, playerHP - 1);
+            applyScoreDamagePenalty(1);
             invincibleMs = effectiveInvincibleMs;
             playerHitThisRun = true;
             sfxPlayerHit();
@@ -4370,6 +4394,7 @@ async function enter(core: Core): Promise<void> {
             }
 
             playerHP = Math.max(0, playerHP - 1);
+            applyScoreDamagePenalty(1);
             invincibleMs = effectiveInvincibleMs;
             playerHitThisRun = true;
             sfxPlayerHit();
@@ -4445,6 +4470,7 @@ async function enter(core: Core): Promise<void> {
                 });
               } else {
                 playerHP = Math.max(0, playerHP - 1);
+                applyScoreDamagePenalty(1);
                 invincibleMs = effectiveInvincibleMs;
                 playerHitThisRun = true;
                 sfxPlayerHit();
@@ -4769,11 +4795,11 @@ async function enter(core: Core): Promise<void> {
       endlessState.bestWave = endlessState.wave;
     }
 
-    // Award 宇宙灰燼 every 10 waves completed
+    // Award Cosmic Ash at regular endless milestones.
     const completedWave = endlessState.wave - 1;
-    if (completedWave > 0 && completedWave % 10 === 0) {
-      currencyState.cosmicAsh += 1;
-      waveBannerText.text = `✨ 獲得宇宙灰燼 ×1！`;
+    if (completedWave > 0 && completedWave % COSMIC_ASH_ENDLESS_MILESTONE_INTERVAL === 0) {
+      awardCosmicAsh(COSMIC_ASH_ENDLESS_MILESTONE);
+      waveBannerText.text = `✨ 獲得宇宙灰燼 ×${COSMIC_ASH_ENDLESS_MILESTONE}！`;
       waveBannerText.alpha = 1;
       await new Promise<void>((resolve) => setTimeout(resolve, 1200));
       waveBannerText.alpha = 0;
@@ -4795,6 +4821,13 @@ async function enter(core: Core): Promise<void> {
       gameResult.score = totalDamage;
       voidState.lastDamage = totalDamage;
       if (totalDamage > voidState.highScore) voidState.highScore = totalDamage;
+      if (won) {
+        const damageBonus = Math.min(
+          Math.floor(totalDamage / COSMIC_ASH_VOID_DAMAGE_STEP),
+          COSMIC_ASH_VOID_DAMAGE_BONUS_CAP,
+        );
+        awardCosmicAsh(COSMIC_ASH_VOID_COMPLETION + damageBonus);
+      }
       voidState.active = false;
       gameResult.playedLevel = -1; // sentinel for void mode
     } else if (isEndless) {
@@ -4834,8 +4867,15 @@ async function enter(core: Core): Promise<void> {
           ? Math.min(lvl + 1, STORY_TOTAL_LEVELS)
           : nextLevelAfterClear(lvl);
 
-        // Award 宇宙灰燼 on level clear
-        currencyState.cosmicAsh += 1;
+        if (gameResult.storyMode) {
+          const storyMilestone = lvl > 0 && lvl % COSMIC_ASH_STORY_MILESTONE_INTERVAL === 0;
+          awardCosmicAsh(storyMilestone ? COSMIC_ASH_STORY_MILESTONE : 0);
+          if (lvl >= STORY_TOTAL_LEVELS) {
+            awardCosmicAsh(COSMIC_ASH_STORY_FINAL_BONUS);
+          }
+        } else {
+          awardCosmicAsh(COSMIC_ASH_LEVEL_CLEAR);
+        }
 
         // Level-mode achievements should not be unlocked by story-mode clears.
         if (!gameResult.storyMode) {

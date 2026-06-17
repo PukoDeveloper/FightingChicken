@@ -63,6 +63,28 @@ export const HEALTH_ITEM_INVINCIBLE_MS = 2000;
 export const SCORE_PER_HIT = 10;
 /** Multiplied by the wave's max HP to compute the wave-clear bonus score. */
 export const SCORE_BONUS_WAVE_MULT = 20;
+/** Score deducted per HP lost by the player. */
+export const SCORE_PENALTY_PER_DAMAGE = 100;
+
+// ─── Cosmic Ash economy ─────────────────────────────────────────────────────
+/** Cosmic Ash granted for clearing one normal level-mode level. */
+export const COSMIC_ASH_LEVEL_CLEAR = 1;
+/** Story-mode levels award Cosmic Ash every N cleared story levels. */
+export const COSMIC_ASH_STORY_MILESTONE_INTERVAL = 5;
+/** Cosmic Ash granted at each story milestone. */
+export const COSMIC_ASH_STORY_MILESTONE = 1;
+/** Extra Cosmic Ash granted when the current story chapter finale is cleared. */
+export const COSMIC_ASH_STORY_FINAL_BONUS = 2;
+/** Endless mode awards Cosmic Ash every N completed waves. */
+export const COSMIC_ASH_ENDLESS_MILESTONE_INTERVAL = 5;
+/** Cosmic Ash granted at each endless milestone. */
+export const COSMIC_ASH_ENDLESS_MILESTONE = 1;
+/** Base Cosmic Ash granted for surviving a full Void Realm session. */
+export const COSMIC_ASH_VOID_COMPLETION = 1;
+/** Void Realm grants one bonus ash per this much damage, up to the cap below. */
+export const COSMIC_ASH_VOID_DAMAGE_STEP = 5000;
+/** Maximum bonus Cosmic Ash from Void Realm damage thresholds. */
+export const COSMIC_ASH_VOID_DAMAGE_BONUS_CAP = 2;
 
 // ─── Enemy types ─────────────────────────────────────────────────────────────
 /** Identifies which enemy sprite & theme is used for a level. */

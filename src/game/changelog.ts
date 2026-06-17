@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 export interface ChangelogEntry {
   version: string;
@@ -9,6 +9,23 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.2.0',
+    date: '2026-06-17',
+    title: '分數與宇宙灰燼平衡更新',
+    highlights: [
+      '受傷現在會依實際損失 HP 扣分',
+      '重新平衡關卡、故事、無盡與虛空之境的宇宙灰燼獲取',
+      '故事模式灰燼改為里程碑獎勵，避免與一般關卡模式收益混淆',
+    ],
+    details: [
+      '每損失 1 HP 會扣除 100 分，分數最低不低於 0；公主小雞召喚護衛的生命消耗不視為受傷扣分。',
+      '關卡模式維持每次通關獲得 1 宇宙灰燼。',
+      '故事模式改為每 5 關通關獲得 1 宇宙灰燼，第一章終章額外獲得 2。',
+      '無盡模式改為每 5 波通關獲得 1 宇宙灰燼。',
+      '虛空之境完成 60 秒會依總傷害獲得 1 到 3 宇宙灰燼。',
+    ],
+  },
   {
     version: '1.1.0',
     date: '2026-06-17',
