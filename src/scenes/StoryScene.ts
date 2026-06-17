@@ -14,6 +14,12 @@ const CHAPTER_ITEM_W = 320;
 let _cleanup: (() => void) | null = null;
 let _inputReady = false;
 
+function isStoryEntryUnlocked(index: number): boolean {
+  // Index 0 is prologue, index 1 is story level 1. Level 2+ requires
+  // the previous story level to be cleared.
+  return index <= 1 || storyState.clearedLevels.has(index - 1);
+}
+
 async function enter(core: Core): Promise<void> {
   _inputReady = false;
   const W = core.app.screen.width;
@@ -76,7 +82,7 @@ async function enter(core: Core): Promise<void> {
   for (let i = 0; i < STORY_MENU_ENTRIES.length; i++) {
     const ch = STORY_MENU_ENTRIES[i];
     const itemY = i * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
-    const isPlayable = true;
+    const isPlayable = isStoryEntryUnlocked(i);
 
     const item = new Container();
     item.y = itemY;
@@ -127,14 +133,14 @@ async function enter(core: Core): Promise<void> {
     subLabel.y = 58;
     item.addChild(subLabel);
 
-    // Right badge: "▶ 開始" for playable, "即將推出" for others
+    // Right badge: "▶ 開始" for playable, unlock requirement for locked nodes
     const badgeStyle = new TextStyle({
       fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
       fontSize: 11,
       fill: isPlayable ? 0x44ff88 : 0x888888,
     });
     const badgeLabel = new Text({
-      text: isPlayable ? '▶ 開始' : '即將推出',
+      text: isPlayable ? '▶ 開始' : `🔒 通關第 ${i - 1} 關`,
       style: badgeStyle,
     });
     badgeLabel.anchor.set(1, 0.5);
@@ -208,6 +214,7 @@ async function enter(core: Core): Promise<void> {
       if (idx >= 0 && idx < STORY_MENU_ENTRIES.length) {
         const remainder = localY - idx * (CHAPTER_ITEM_H + CHAPTER_ITEM_GAP);
         if (remainder < CHAPTER_ITEM_H && localX >= 0 && localX < CHAPTER_ITEM_W) {
+          if (!isStoryEntryUnlocked(idx)) return;
           storyState.currentNodeId = STORY_MENU_ENTRIES[idx].nodeId;
           sfxMenuClick();
           void core.events.emit('scene/load', { key: 'story_dynamic' });

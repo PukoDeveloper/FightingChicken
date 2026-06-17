@@ -23,6 +23,12 @@ export const gameResult = {
 export const storyState = {
   /** Current story node to show in the shared story dialogue scene. */
   currentNodeId: 'prologue',
+  /**
+   * Story levels cleared at least once, keyed by 1-based story level number.
+   * Kept separate from normal level clears so story progression cannot be
+   * bypassed by clearing level mode.
+   */
+  clearedLevels: new Set<number>(),
 };
 
 /** Developer-only runtime config. Values here are editable via the dev menu. */

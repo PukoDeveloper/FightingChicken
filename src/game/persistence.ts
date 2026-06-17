@@ -1,5 +1,5 @@
 import type { Core } from '@inkshot/engine';
-import { gameResult, endlessState, costumeState, currencyState, equipmentState, voidState, wingmanState } from './store';
+import { gameResult, endlessState, costumeState, currencyState, equipmentState, storyState, voidState, wingmanState } from './store';
 import type { CostumeId } from './costumes';
 import type { EquipmentId, EquipSlotId } from './equipment';
 import { EQUIPMENT_DEFS } from './equipment';
@@ -98,6 +98,7 @@ export async function saveProgress(): Promise<PersistenceResult> {
       patch: {
         levelHighScores: { ...gameResult.levelHighScores },
         clearedLevels: [...costumeState.clearedLevels],
+        storyClearedLevels: [...storyState.clearedLevels],
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
@@ -146,6 +147,14 @@ export async function loadProgress(): Promise<PersistenceResult> {
       for (const lvl of data.clearedLevels) {
         if (typeof lvl === 'number' && Number.isFinite(lvl)) {
           costumeState.clearedLevels.add(lvl);
+        }
+      }
+    }
+
+    if (Array.isArray(data.storyClearedLevels)) {
+      for (const lvl of data.storyClearedLevels) {
+        if (typeof lvl === 'number' && Number.isFinite(lvl)) {
+          storyState.clearedLevels.add(lvl);
         }
       }
     }
@@ -243,6 +252,7 @@ export function exportProgress(): PersistenceResult {
     const snapshot = {
       levelHighScores: { ...gameResult.levelHighScores },
       clearedLevels: [...costumeState.clearedLevels],
+      storyClearedLevels: [...storyState.clearedLevels],
       selectedCostume: costumeState.selected,
       endlessBestWave: endlessState.bestWave,
       endlessHighScore: endlessState.highScore,
@@ -284,6 +294,7 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
     endlessState.highScore = 0;
     voidState.highScore = 0;
     costumeState.clearedLevels = new Set();
+    storyState.clearedLevels = new Set();
     costumeState.selected = DEFAULT_COSTUME;
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
@@ -306,6 +317,14 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
       for (const lvl of data.clearedLevels) {
         if (typeof lvl === 'number' && Number.isFinite(lvl)) {
           costumeState.clearedLevels.add(lvl);
+        }
+      }
+    }
+
+    if (Array.isArray(data.storyClearedLevels)) {
+      for (const lvl of data.storyClearedLevels) {
+        if (typeof lvl === 'number' && Number.isFinite(lvl)) {
+          storyState.clearedLevels.add(lvl);
         }
       }
     }
@@ -403,6 +422,7 @@ export async function importProgress(data: Record<string, unknown>): Promise<Per
       patch: {
         levelHighScores: { ...gameResult.levelHighScores },
         clearedLevels: [...costumeState.clearedLevels],
+        storyClearedLevels: [...storyState.clearedLevels],
         selectedCostume: costumeState.selected,
         endlessBestWave: endlessState.bestWave,
         endlessHighScore: endlessState.highScore,
@@ -437,6 +457,7 @@ export async function clearProgress(): Promise<PersistenceResult> {
     endlessState.highScore = 0;
     voidState.highScore = 0;
     costumeState.clearedLevels = new Set();
+    storyState.clearedLevels = new Set();
     costumeState.selected = DEFAULT_COSTUME;
     currencyState.cosmicAsh = 0;
     equipmentState.obtained = new Set();
@@ -452,6 +473,7 @@ export async function clearProgress(): Promise<PersistenceResult> {
       patch: {
         levelHighScores: {},
         clearedLevels: [],
+        storyClearedLevels: [],
         selectedCostume: DEFAULT_COSTUME,
         endlessBestWave: 1,
         endlessHighScore: 0,
