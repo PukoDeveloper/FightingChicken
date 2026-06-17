@@ -413,6 +413,43 @@ async function enter(core: Core): Promise<void> {
   eqBtn.on('pointerover', () => eqBtn.scale.set(1.06));
   eqBtn.on('pointerout',  () => eqBtn.scale.set(1.0));
 
+  // ── Changelog button (bottom-left, next to equipment button) ──────────────
+  const logBtnW = 72, logBtnH = 34;
+  const logBtn = new Container();
+  logBtn.eventMode = 'static';
+  logBtn.cursor = 'pointer';
+  const logBtnBg = new Graphics();
+  logBtnBg
+    .roundRect(0, 0, logBtnW, logBtnH, 8)
+    .fill({ color: 0x10102e, alpha: 0.92 })
+    .stroke({ color: 0x66aaff, width: 1.5 });
+  logBtn.addChild(logBtnBg);
+  const logBtnText = new Text({
+    text: '📝 日誌',
+    style: new TextStyle({
+      fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      fontSize: 14,
+      fontWeight: 'bold',
+      fill: 0xaaddff,
+    }),
+  });
+  logBtnText.anchor.set(0.5);
+  logBtnText.x = logBtnW / 2;
+  logBtnText.y = logBtnH / 2;
+  logBtn.addChild(logBtnText);
+  logBtn.x = 10 + cpBtnW + 8 + encBtnW + 8 + eqBtnW + 8;
+  logBtn.y = H - logBtnH - 10;
+  uiLayer.addChild(logBtn);
+
+  logBtn.on('pointerdown', async () => {
+    if (_transitioning) return;
+    _transitioning = true;
+    sfxMenuClick();
+    await core.events.emit('scene/load', { key: 'changelog' });
+  });
+  logBtn.on('pointerover', () => logBtn.scale.set(1.06));
+  logBtn.on('pointerout',  () => logBtn.scale.set(1.0));
+
   // ── Currency display (top-right corner) ────────────────────────────────
   const ashDisplay = new Text({
     text: `✨ ${currencyState.cosmicAsh}`,
@@ -746,7 +783,7 @@ async function enter(core: Core): Promise<void> {
     core.events.emitSync('tween/kill', { target: btn.scale as unknown as Record<string, unknown> });
     closeOverlay();
     worldLayer.removeChild(stars, chickenContainer, couragePreview, vsText);
-    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn, encBtn);
+    uiLayer.removeChild(title, subtitle, costumeLabel, costumeNameText, prevBtn, nextBtn, btn, achBtn, devBtn, cpBtn, encBtn, logBtn);
     if (eqBtn) uiLayer.removeChild(eqBtn);
     if (ashDisplay) uiLayer.removeChild(ashDisplay);
     stars.destroy({ children: true });
@@ -764,6 +801,7 @@ async function enter(core: Core): Promise<void> {
     devBtn.destroy({ children: true });
     cpBtn.destroy({ children: true });
     encBtn.destroy({ children: true });
+    logBtn.destroy({ children: true });
     if (eqBtn) eqBtn.destroy({ children: true });
     if (ashDisplay) ashDisplay.destroy();
     unsubTick();

@@ -594,6 +594,18 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
       storm: { label: '暴風晶群', mobSprite: 'crystal', bodyColor: COL_BULLET_STORM, accentColor: 0xffffff, bulletColor: COL_BULLET_STORM },
       dragon: { label: '龍焰幼體', mobSprite: 'ember', bodyColor: COL_BULLET_FLAME, accentColor: 0xffdd44, bulletColor: COL_BULLET_FLAME },
     };
+    const movementPattern: NonNullable<MobGroupConfig['movementPattern']> =
+      enemyType === 'storm' ? 'orbit'
+        : enemyType === 'dragon' ? 'dive'
+          : enemyType === 'mech' ? 'zigzag'
+            : enemyType === 'phantom' ? 'sine'
+              : enemyType === 'chaos' || enemyType === 'blackhole' ? 'orbit'
+                : 'zigzag';
+    const attackPattern: NonNullable<MobGroupConfig['attackPattern']> =
+      enemyType === 'mech' ? 'straight'
+        : enemyType === 'storm' || enemyType === 'chaos' || enemyType === 'blackhole' ? 'ring'
+          : enemyType === 'dragon' || enemyType === 'phantom' ? 'split'
+            : 'aimed';
 
     mobGroup = {
       ...theme[enemyType],
@@ -602,8 +614,11 @@ export function createEndlessWaveConfig(waveNum: number): WaveConfig {
       hitboxRadius: 24,
       displayScale: 0.92,
       layout: waveNum % 8 === 2 ? 'line' : 'arc',
+      movementPattern,
+      attackPattern,
       yFrac: 0.19,
-      moveAmplitude: capAt(26 + Math.floor(waveNum / 3), 58),
+      moveAmplitude: capAt(42 + Math.floor(waveNum / 2), 92),
+      verticalAmplitude: capAt(12 + Math.floor(waveNum / 4), 42),
       movePeriodMs: Math.max(1350, 2600 - waveNum * 28),
       initialFireDelayMs: 450,
       fireInterval,

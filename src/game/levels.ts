@@ -136,10 +136,16 @@ export interface MobGroupConfig {
   displayScale?: number;
   /** Horizontal formation shape. Defaults to a straight line. */
   layout?: 'line' | 'arc';
+  /** Movement style used by the group. Defaults to sine. */
+  movementPattern?: 'sine' | 'zigzag' | 'dive' | 'orbit';
+  /** Attack style used by each mob volley. Defaults to aimed. */
+  attackPattern?: 'aimed' | 'straight' | 'ring' | 'split';
   /** Vertical spawn position as a fraction of screen height. Defaults to 0.2. */
   yFrac?: number;
   /** Horizontal patrol amplitude in px. Defaults to 24. */
   moveAmplitude?: number;
+  /** Vertical patrol amplitude in px. Defaults to 8. */
+  verticalAmplitude?: number;
   /** Patrol period in ms. Defaults to 2400. */
   movePeriodMs?: number;
   /** Delay before each mob's first shot, staggered by mob index. Defaults to 500 ms. */
@@ -297,8 +303,11 @@ const LEVEL_1: LevelConfig = {
         hitboxRadius: 24,
         displayScale: 0.95,
         layout: 'line',
+        movementPattern: 'zigzag',
+        attackPattern: 'aimed',
         yFrac: 0.20,
-        moveAmplitude: 24,
+        moveAmplitude: 44,
+        verticalAmplitude: 10,
         movePeriodMs: 2600,
         initialFireDelayMs: 650,
         fireInterval: 1550,
@@ -828,8 +837,11 @@ const LEVEL_6: LevelConfig = {
         hitboxRadius: 25,
         displayScale: 0.92,
         layout: 'arc',
+        movementPattern: 'sine',
+        attackPattern: 'straight',
         yFrac: 0.21,
-        moveAmplitude: 34,
+        moveAmplitude: 54,
+        verticalAmplitude: 16,
         movePeriodMs: 2200,
         initialFireDelayMs: 500,
         fireInterval: 1350,

@@ -1,6 +1,6 @@
 {
   "name": "fighting-chicken",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "手機彈幕遊戲：小雞大戰勇氣",
   "type": "module",
   "scripts": {
